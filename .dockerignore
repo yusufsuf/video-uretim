@@ -1,0 +1,14 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+*.pyo
+.env
+backend/.env
+uploads/
+outputs/
+*.md
+.vscode
+.idea
+node_modules
+.gemini

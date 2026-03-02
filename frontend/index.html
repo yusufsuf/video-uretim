@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Elbise fotoğraflarından profesyonel AI moda videoları üretin.">
+    <title>Fashion Video Automation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+    <!-- Ambient Background -->
+    <div class="ambient-bg">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="app-container">
+
+        <!-- Header -->
+        <header class="header">
+            <div class="brand">
+                <div class="logo-icon">✦</div>
+                <h1>Fashion Video AI</h1>
+            </div>
+            <p class="subtitle">Elbise fotoğraflarınızı profesyonel moda videolarına dönüştürün</p>
+        </header>
+
+        <!-- Main Grid -->
+        <div class="main-grid">
+
+            <!-- Left Column: Uploads & Settings -->
+            <div>
+                <!-- Upload Card -->
+                <div class="card" style="margin-bottom: 24px;">
+                    <div class="card-title">
+                        <span class="icon">📸</span>
+                        Elbise Fotoğrafları
+                    </div>
+
+                    <div class="upload-grid">
+                        <!-- Front Image -->
+                        <div class="upload-zone" id="front-zone"
+                            onclick="document.getElementById('front-input').click()">
+                            <span class="badge">Zorunlu</span>
+                            <div class="upload-icon">👗</div>
+                            <div class="upload-label">Ön Görünüm</div>
+                            <div class="upload-hint">JPG, PNG veya WebP</div>
+                            <input type="file" id="front-input" accept="image/*">
+                        </div>
+
+                        <!-- Back Image -->
+                        <div class="upload-zone" id="back-zone" onclick="document.getElementById('back-input').click()">
+                            <span class="badge" style="background: var(--text-muted);">Opsiyonel</span>
+                            <div class="upload-icon">👗</div>
+                            <div class="upload-label">Arka Görünüm</div>
+                            <div class="upload-hint">Tutarlılık için önerilir</div>
+                            <input type="file" id="back-input" accept="image/*">
+                        </div>
+                    </div>
+
+                    <div class="upload-grid">
+                        <!-- Reference Image (Location) -->
+                        <div class="upload-zone" id="refimg-zone"
+                            onclick="document.getElementById('refimg-input').click()">
+                            <span class="badge" style="background: var(--text-muted);">Opsiyonel</span>
+                            <div class="upload-icon">🖼️</div>
+                            <div class="upload-label">Mekan / Referans</div>
+                            <div class="upload-hint">Mekan veya stil referansı</div>
+                            <input type="file" id="refimg-input" accept="image/*">
+                        </div>
+
+                        <!-- Reference Video -->
+                        <div class="upload-zone video-upload-zone" id="video-zone"
+                            onclick="document.getElementById('video-input').click()">
+                            <span class="badge" style="background: var(--text-muted);">Opsiyonel</span>
+                            <div class="upload-icon">🎬</div>
+                            <div class="upload-label">Referans Video</div>
+                            <div class="upload-hint">Hareket referansı MP4</div>
+                            <input type="file" id="video-input" accept="video/*">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Card -->
+                <div class="card">
+                    <div class="card-title">
+                        <span class="icon">⚙️</span>
+                        Video Ayarları
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Mekan</label>
+                            <select class="form-select" id="location-select">
+                                <option value="studio">Stüdyo</option>
+                                <option value="beach">Sahil</option>
+                                <option value="city_street">Şehir Sokağı</option>
+                                <option value="garden">Bahçe</option>
+                                <option value="rooftop">Çatı Katı</option>
+                                <option value="runway">Podyum</option>
+                                <option value="custom">Özel Mekan</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Kamera Stili</label>
+                            <select class="form-select" id="camera-select">
+                                <option value="">Otomatik</option>
+                                <option value="slow pan">Yavaş Pan</option>
+                                <option value="dolly in">Dolly In</option>
+                                <option value="orbit">Orbit (Dönüş)</option>
+                                <option value="static">Sabit</option>
+                                <option value="tracking">Takip</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Manken Hareketi</label>
+                            <select class="form-select" id="action-select">
+                                <option value="">Otomatik</option>
+                                <option value="walk">Yürüyüş</option>
+                                <option value="turn">Dönüş</option>
+                                <option value="pose">Poz</option>
+                                <option value="hair flip">Saç Savurma</option>
+                                <option value="confident strut">Kendinden Emin Yürüyüş</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Mood</label>
+                            <select class="form-select" id="mood-select">
+                                <option value="">Otomatik</option>
+                                <option value="luxury">Lüks</option>
+                                <option value="casual">Günlük</option>
+                                <option value="energetic">Enerjik</option>
+                                <option value="romantic">Romantik</option>
+                                <option value="edgy">Cesur</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Video Süresi (saniye)</label>
+                            <input type="number" class="form-input" id="duration-input" min="3" max="60" value="10"
+                                step="1">
+                        </div>
+
+                        <div class="form-group full-width" id="custom-location-group" style="display: none;">
+                            <label class="form-label">Özel Mekan Tanımı</label>
+                            <input type="text" class="form-input" id="custom-location"
+                                placeholder="Örn: Toskana'da bir üzüm bağı, gün batımı...">
+                        </div>
+                    </div>
+
+                    <button class="generate-btn" id="generate-btn" disabled>
+                        <span class="btn-content">
+                            <span>✨</span>
+                            <span>Video Oluştur</span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Column: Progress & Result -->
+            <div>
+                <!-- Progress Card -->
+                <div class="card progress-section" id="progress-section">
+                    <div class="card-title">
+                        <span class="icon">🔄</span>
+                        İşlem Durumu
+                    </div>
+
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                    <div class="progress-info">
+                        <span class="progress-status" id="progress-status">Başlatılıyor...</span>
+                        <span class="progress-percent" id="progress-percent">0%</span>
+                    </div>
+
+                    <div class="steps-timeline" id="steps-timeline">
+                        <div class="step-item" data-step="analyzing">
+                            <div class="step-icon">1</div>
+                            <span class="step-label">Elbise analiz ediliyor</span>
+                        </div>
+                        <div class="step-item" data-step="preprocessing">
+                            <div class="step-icon">2</div>
+                            <span class="step-label">Görseller işleniyor</span>
+                        </div>
+                        <div class="step-item" data-step="generating_vto">
+                            <div class="step-icon">3</div>
+                            <span class="step-label">Elbise mankene giydiriliyor</span>
+                        </div>
+                        <div class="step-item" data-step="generating_video">
+                            <div class="step-icon">4</div>
+                            <span class="step-label">Video sahneleri üretiliyor</span>
+                        </div>
+                        <div class="step-item" data-step="merging">
+                            <div class="step-icon">5</div>
+                            <span class="step-label">Sahneler birleştiriliyor</span>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Panel -->
+                    <div class="analysis-panel" id="analysis-panel">
+                        <div class="card-title" style="font-size: 0.9rem; margin-top: 20px;">
+                            <span class="icon" style="width:24px; height:24px; font-size:12px;">🔍</span>
+                            Elbise Analizi
+                        </div>
+                        <div class="analysis-grid" id="analysis-grid"></div>
+                    </div>
+
+                    <!-- Prompt Panel -->
+                    <div class="prompt-panel" id="prompt-panel">
+                        <div class="card-title" style="font-size: 0.9rem; margin-top: 16px;">
+                            <span class="icon" style="width:24px; height:24px; font-size:12px;">📝</span>
+                            Sahne Promptu
+                        </div>
+                        <div class="prompt-text" id="prompt-text"></div>
+                    </div>
+                </div>
+
+                <!-- Result Card -->
+                <div class="card result-section" id="result-section">
+                    <div class="card-title">
+                        <span class="icon">🎥</span>
+                        Sonuç
+                    </div>
+
+                    <div class="result-video-wrapper">
+                        <video id="result-video" controls loop autoplay muted></video>
+                    </div>
+
+                    <div class="result-actions">
+                        <button class="action-btn btn-download" id="download-btn">
+                            ⬇️ İndir
+                        </button>
+                        <button class="action-btn btn-new" id="new-btn">
+                            ➕ Yeni Video
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Error -->
+                <div class="error-message" id="error-message">
+                    <span>⚠️</span>
+                    <span id="error-text"></span>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

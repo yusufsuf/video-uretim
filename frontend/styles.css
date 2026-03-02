@@ -1,0 +1,684 @@
+/* ── Design Tokens ─────────────────────────────────────────────── */
+:root {
+    --bg-primary: #faf9f7;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-card-hover: #faf9f7;
+    --bg-glass: rgba(255, 255, 255, 0.9);
+    --border-subtle: #ece8e3;
+    --border-accent: #c4b5a3;
+
+    --text-primary: #1a1a1a;
+    --text-secondary: #6b6560;
+    --text-muted: #a8a099;
+
+    --accent: #1a1a1a;
+    --accent-warm: #c4a882;
+    --accent-soft: #e8dfd4;
+    --accent-success: #4a7c59;
+    --accent-error: #b85450;
+
+    --gradient-btn: linear-gradient(135deg, #1a1a1a 0%, #3a3a3a 100%);
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.08);
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Outfit', 'Inter', sans-serif;
+
+    --transition-fast: 0.15s ease;
+    --transition-smooth: 0.3s ease;
+}
+
+/* ── Reset & Base ──────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: var(--font-body);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Layout ────────────────────────────────────────────────────── */
+.ambient-bg {
+    display: none;
+}
+
+.app-container {
+    position: relative;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 24px;
+}
+
+/* ── Header ────────────────────────────────────────────────────── */
+.header {
+    text-align: center;
+    margin-bottom: 56px;
+}
+
+.header .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.header .logo-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--accent);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: white;
+}
+
+.header h1 {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.03em;
+}
+
+.header .subtitle {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+}
+
+/* ── Cards ─────────────────────────────────────────────────────── */
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: 28px;
+    transition: box-shadow var(--transition-smooth);
+}
+
+.card:hover {
+    box-shadow: var(--shadow-md);
+}
+
+.card-title {
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.card-title .icon {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+/* ── Upload Zones ──────────────────────────────────────────────── */
+.upload-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.upload-zone {
+    position: relative;
+    border: 1.5px dashed var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+    background: var(--bg-primary);
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.upload-zone:hover {
+    border-color: var(--accent-warm);
+    background: #fdfcfa;
+}
+
+.upload-zone.active {
+    border-color: var(--accent);
+    background: #fdfcfa;
+    border-style: solid;
+}
+
+.upload-zone.has-file {
+    padding: 12px;
+}
+
+.upload-zone .upload-icon {
+    font-size: 28px;
+    opacity: 0.5;
+}
+
+.upload-zone .upload-label {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.upload-zone .upload-hint {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.upload-zone .badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--accent);
+    color: white;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.upload-zone .preview-img {
+    max-width: 100%;
+    max-height: 160px;
+    border-radius: var(--radius-md);
+    object-fit: contain;
+}
+
+.upload-zone .remove-btn {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent-error);
+    color: white;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity var(--transition-fast);
+    z-index: 2;
+    opacity: 0.8;
+}
+
+.upload-zone .remove-btn:hover {
+    opacity: 1;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+/* ── Reference Video Upload ────────────────────────────────────── */
+.video-upload-zone {
+    border-color: var(--border-subtle);
+    background: var(--bg-primary);
+}
+
+.video-upload-zone:hover {
+    border-color: var(--accent-warm);
+}
+
+.video-upload-zone.has-file {
+    border-color: var(--accent-warm);
+    border-style: solid;
+}
+
+.video-upload-zone .badge {
+    background: var(--text-muted);
+}
+
+/* ── Form Controls ─────────────────────────────────────────────── */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 24px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.form-select,
+.form-input {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color var(--transition-fast);
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a8a099' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 10px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    padding-right: 36px;
+}
+
+.form-select:focus,
+.form-input:focus {
+    border-color: var(--accent);
+}
+
+.form-select option {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+/* ── Generate Button ───────────────────────────────────────────── */
+.generate-btn {
+    width: 100%;
+    padding: 14px 28px;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius-lg);
+    color: white;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.generate-btn:hover {
+    background: #333;
+    box-shadow: var(--shadow-md);
+}
+
+.generate-btn:active {
+    transform: scale(0.99);
+}
+
+.generate-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.generate-btn .btn-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* ── Progress Section ──────────────────────────────────────────── */
+.progress-section {
+    display: none;
+    margin-top: 24px;
+}
+
+.progress-section.active {
+    display: block;
+    animation: fadeInUp 0.4s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.progress-bar-container {
+    background: var(--bg-primary);
+    border-radius: 50px;
+    height: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 50px;
+    width: 0%;
+    transition: width 0.6s ease-out;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.progress-status {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.progress-percent {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+/* ── Steps Timeline ────────────────────────────────────────────── */
+.steps-timeline {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.step-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    border-left: 2px solid var(--border-subtle);
+    transition: all var(--transition-smooth);
+}
+
+.step-item.active {
+    border-left-color: var(--accent);
+    background: #fdfcfa;
+}
+
+.step-item.completed {
+    border-left-color: var(--accent-success);
+}
+
+.step-item .step-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    transition: all var(--transition-smooth);
+}
+
+.step-item.active .step-icon {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+
+.step-item.completed .step-icon {
+    background: var(--accent-success);
+    border-color: var(--accent-success);
+    color: white;
+}
+
+.step-item .step-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.step-item.active .step-label {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.step-item.completed .step-label {
+    color: var(--text-secondary);
+}
+
+/* ── Result Section ────────────────────────────────────────────── */
+.result-section {
+    display: none;
+    margin-top: 24px;
+}
+
+.result-section.active {
+    display: block;
+    animation: fadeInUp 0.4s ease-out;
+}
+
+.result-video-wrapper {
+    position: relative;
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    background: var(--bg-primary);
+    aspect-ratio: 9 / 16;
+    max-height: 560px;
+    margin: 0 auto 20px;
+    max-width: 320px;
+    box-shadow: var(--shadow-lg);
+}
+
+.result-video-wrapper video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.result-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.result-actions .action-btn {
+    padding: 10px 20px;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.btn-download {
+    background: var(--accent);
+    border: none;
+    color: white;
+}
+
+.btn-download:hover {
+    background: #333;
+}
+
+.btn-new {
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-secondary);
+}
+
+.btn-new:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+/* ── Analysis Panel ────────────────────────────────────────────── */
+.analysis-panel {
+    display: none;
+    margin-top: 16px;
+}
+
+.analysis-panel.active {
+    display: block;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 8px;
+}
+
+.analysis-item {
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    border: 1px solid var(--border-subtle);
+}
+
+.analysis-item .label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.analysis-item .value {
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* ── Scene Prompt Panel ────────────────────────────────────────── */
+.prompt-panel {
+    display: none;
+    margin-top: 12px;
+}
+
+.prompt-panel.active {
+    display: block;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+.prompt-text {
+    background: var(--bg-primary);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    font-size: 0.75rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    border-left: 2px solid var(--accent-warm);
+    font-style: italic;
+}
+
+/* ── Error ─────────────────────────────────────────────────────── */
+.error-message {
+    display: none;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    color: var(--accent-error);
+    font-size: 0.8rem;
+    margin-top: 12px;
+}
+
+.error-message.active {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: fadeInUp 0.3s ease-out;
+}
+
+/* ── Grid Layouts ──────────────────────────────────────────────── */
+.main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .main-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .upload-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .app-container {
+        padding: 24px 16px;
+    }
+
+    .header h1 {
+        font-size: 1.5rem;
+    }
+
+    .card {
+        padding: 20px;
+    }
+}
