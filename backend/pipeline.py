@@ -37,11 +37,53 @@ logger = logging.getLogger(__name__)
 # In-memory job store (replace with DB for production)
 jobs: dict[str, JobResponse] = {}
 
+HISTORY_FILE = os.path.join(settings.DATA_DIR, "job_history.json")
+
+
+def _load_history() -> list[dict]:
+    """Load job history from disk."""
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                import json
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return []
+    return []
+
+
+def _save_to_history(job: JobResponse):
+    """Append a completed job to the persistent history file."""
+    import json
+    from datetime import datetime
+
+    history = _load_history()
+    entry = job.model_dump()
+    entry["created_at"] = datetime.now().isoformat()
+    # Remove large nested objects to keep history lean
+    if entry.get("analysis"):
+        entry["analysis_summary"] = f"{entry['analysis'].get('garment_type', '')} - {entry['analysis'].get('color', '')}"
+    entry.pop("analysis", None)
+    entry.pop("scene_prompt", None)
+
+    history.insert(0, entry)  # newest first
+    # Keep last 100 entries
+    history = history[:100]
+
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+
 
 def _update_job(job_id: str, **kwargs):
     if job_id in jobs:
         for k, v in kwargs.items():
             setattr(jobs[job_id], k, v)
+        # Auto-save to history on completion or failure
+        if jobs[job_id].status in (JobStatus.COMPLETED, JobStatus.FAILED):
+            try:
+                _save_to_history(jobs[job_id])
+            except Exception as e:
+                logger.error("Failed to save job history: %s", e)
 
 
 def _merge_videos_ffmpeg(clip_paths: list[str], output_path: str) -> str:

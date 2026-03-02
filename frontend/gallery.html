@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Galeri — Fashion Video AI</title>
+    <link rel="stylesheet" href="/styles.css">
+    <style>
+        .gallery-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .gallery-header h1 {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .back-link {
+            text-decoration: none;
+            color: var(--accent);
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: opacity 0.2s;
+        }
+
+        .back-link:hover {
+            opacity: 0.7;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .gallery-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+        }
+
+        .gallery-video {
+            width: 100%;
+            aspect-ratio: 16/9;
+            background: #f0ebe6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .gallery-video video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-info {
+            padding: 16px;
+        }
+
+        .gallery-info .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .gallery-info .meta {
+            margin-top: 8px;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        .gallery-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .gallery-actions a,
+        .gallery-actions button {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-align: center;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: background 0.2s;
+        }
+
+        .btn-download {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-download:hover {
+            opacity: 0.85;
+        }
+
+        .btn-view {
+            background: var(--bg-body);
+            color: var(--text-primary);
+            border: 1px solid var(--border-subtle) !important;
+        }
+
+        .btn-view:hover {
+            background: var(--bg-card);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 0.9rem;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container" style="max-width: 1100px;">
+        <div class="gallery-header">
+            <h1>🎬 Video Galeri</h1>
+            <a href="/" class="back-link">← Yeni Video Oluştur</a>
+        </div>
+
+        <div id="gallery-content">
+            <div class="empty-state">
+                <div class="icon">⏳</div>
+                <p>Yükleniyor...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API = window.location.origin;
+
+        async function loadGallery() {
+            try {
+                const resp = await fetch(`${API}/api/gallery`);
+                const data = await resp.json();
+                const items = data.items || [];
+                const container = document.getElementById("gallery-content");
+
+                if (items.length === 0) {
+                    container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📭</div>
+                        <p>Henüz üretilmiş video yok.<br>
+                        <a href="/" style="color:var(--accent);">İlk videonuzu oluşturun →</a></p>
+                    </div>`;
+                    return;
+                }
+
+                let html = '<div class="gallery-grid">';
+                items.forEach(item => {
+                    const date = item.created_at ? new Date(item.created_at).toLocaleString("tr-TR") : "";
+                    const isCompleted = item.status === "completed";
+                    const statusClass = isCompleted ? "status-completed" : "status-failed";
+                    const statusText = isCompleted ? "Tamamlandı" : "Hata";
+
+                    html += `
+                <div class="gallery-item">
+                    <div class="gallery-video">
+                        ${isCompleted && item.result_url
+                            ? `<video src="${item.result_url}" muted loop preload="metadata"
+                                onmouseover="this.play()" onmouseout="this.pause();this.currentTime=0;"></video>`
+                            : `<div style="color:var(--text-muted);font-size:0.85rem;">Video yok</div>`
+                        }
+                    </div>
+                    <div class="gallery-info">
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                        <div class="meta">
+                            ${item.analysis_summary ? `<div>👗 ${item.analysis_summary}</div>` : ""}
+                            ${date ? `<div>📅 ${date}</div>` : ""}
+                            ${item.message ? `<div>💬 ${item.message}</div>` : ""}
+                        </div>
+                        ${isCompleted && item.result_url ? `
+                        <div class="gallery-actions">
+                            <a href="${item.result_url}" target="_blank" class="btn-view">▶ İzle</a>
+                            <a href="${item.result_url}" download class="btn-download">⬇ İndir</a>
+                        </div>` : ""}
+                    </div>
+                </div>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            } catch (err) {
+                document.getElementById("gallery-content").innerHTML = `
+                <div class="empty-state">
+                    <div class="icon">⚠️</div>
+                    <p>Galeri yüklenirken hata: ${err.message}</p>
+                </div>`;
+            }
+        }
+
+        loadGallery();
+    </script>
+</body>
+
+</html>

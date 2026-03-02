@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from config import settings
 from models import GenerationRequest, JobResponse, JobStatus, LocationPreset
-from pipeline import jobs, run_pipeline
+from pipeline import jobs, run_pipeline, _load_history
 
 # ─── Logging ───────────────────────────────────────────────────────
 logging.basicConfig(
@@ -168,6 +168,20 @@ async def get_job_status(job_id: str):
             message="Job bulunamadı.",
         )
     return jobs[job_id]
+
+
+@app.get("/api/gallery")
+async def get_gallery():
+    """Return job history for the gallery page."""
+    history = _load_history()
+    return {"items": history}
+
+
+@app.get("/gallery")
+async def gallery_page():
+    """Serve the gallery page."""
+    gallery_path = os.path.join(_get_frontend_dir(), "gallery.html")
+    return FileResponse(gallery_path, media_type="text/html")
 
 
 @app.get("/")
