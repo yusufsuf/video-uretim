@@ -92,6 +92,7 @@ async def generate_video_endpoint(
     reference_image: Optional[UploadFile] = File(None, description="Referans stil/poz resmi (opsiyonel)"),
     reference_video: Optional[UploadFile] = File(None, description="Referans hareket videosu (opsiyonel)"),
     location: str = Form("studio"),
+    model_preset: str = Form("default"),
     custom_location: Optional[str] = Form(None),
     camera_style: Optional[str] = Form(None),
     model_action: Optional[str] = Form(None),
@@ -152,6 +153,7 @@ async def generate_video_endpoint(
             duration=int(duration),
             scene_count=int(scene_count),
             video_description=video_description,
+            model_preset=model_preset,
         )
     )
 

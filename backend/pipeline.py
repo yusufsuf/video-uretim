@@ -29,6 +29,7 @@ from services.claid_service import preprocess_garment
 from services.video_service import (
     download_file,
     generate_video,
+    get_model_image_url,
     virtual_try_on,
 )
 
@@ -148,6 +149,7 @@ async def run_pipeline(
     duration: int = 10,
     scene_count: int = 2,
     video_description: Optional[str] = None,
+    model_preset: str = "default",
 ):
     """Execute the full pipeline asynchronously."""
     try:
@@ -191,9 +193,12 @@ async def run_pipeline(
         _update_job(job_id, status=JobStatus.GENERATING_VTO, progress=40, message="Elbise mankene giydiriliyor...")
         logger.info("[%s] Step 4 – Virtual Try-On", job_id)
 
+        # Determine model image: user's reference takes priority, then preset
+        model_url = reference_image_url if (reference_image_url and not reference_image_path) else get_model_image_url(model_preset)
+
         vto_result = await virtual_try_on(
             garment_image_url=processed_front,
-            model_image_url=reference_image_url if not reference_image_path else None,
+            model_image_url=model_url,
         )
         _update_job(job_id, progress=50, message="Virtual try-on tamamlandı.")
 

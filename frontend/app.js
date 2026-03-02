@@ -14,6 +14,7 @@ const frontInput = document.getElementById("front-input");
 const backInput = document.getElementById("back-input");
 const refimgInput = document.getElementById("refimg-input");
 const videoInput = document.getElementById("video-input");
+const modelSel = document.getElementById("model-select");
 const locationSel = document.getElementById("location-select");
 const cameraSel = document.getElementById("camera-select");
 const actionSel = document.getElementById("action-select");
@@ -159,6 +160,7 @@ async function startGeneration() {
     if (refimgFile) formData.append("reference_image", refimgFile);
     if (videoFile) formData.append("reference_video", videoFile);
     formData.append("location", locationSel.value);
+    formData.append("model_preset", modelSel.value);
     formData.append("duration", Math.max(3, Math.min(60, parseInt(durationInput.value) || 10)));
     formData.append("scene_count", Math.max(1, Math.min(10, parseInt(sceneCountInput.value) || 2)));
     if (videoDescInput.value.trim()) formData.append("video_description", videoDescInput.value.trim());

@@ -16,6 +16,23 @@ logger = logging.getLogger(__name__)
 # Ensure FAL_KEY is set as environment variable for the fal-client SDK
 os.environ["FAL_KEY"] = settings.FAL_KEY
 
+# ─── Model Presets ─────────────────────────────────────────────────
+# Public model images for Virtual Try-On
+MODEL_PRESETS = {
+    "default": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
+    "model_1": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=512&h=768&fit=crop",
+    "model_2": "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=512&h=768&fit=crop",
+    "model_3": "https://images.unsplash.com/photo-1589156280159-27698a70f29e?w=512&h=768&fit=crop",
+    "model_4": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=512&h=768&fit=crop",
+    "model_5": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=512&h=768&fit=crop",
+    "model_6": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=512&h=768&fit=crop",
+}
+
+
+def get_model_image_url(preset: str = "default") -> str:
+    """Resolve a model preset key to an image URL."""
+    return MODEL_PRESETS.get(preset, MODEL_PRESETS["default"])
+
 
 # ─── Virtual Try-On (IDM-VTON on fal.ai) ──────────────────────────
 async def virtual_try_on(
