@@ -208,6 +208,25 @@
                         </div>
                     </div>
 
+                    <!-- Template Controls -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 16px; align-items: center;">
+                        <select class="form-select" id="template-select" style="flex: 1; font-size: 0.75rem;">
+                            <option value="">📋 Şablon Seç...</option>
+                        </select>
+                        <button type="button" id="load-template-btn"
+                            style="padding: 8px 12px; background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer; font-size: 0.7rem; white-space: nowrap;">
+                            📥 Yükle
+                        </button>
+                        <button type="button" id="save-template-btn"
+                            style="padding: 8px 12px; background: var(--accent); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0.7rem; white-space: nowrap;">
+                            💾 Kaydet
+                        </button>
+                        <button type="button" id="delete-template-btn"
+                            style="padding: 8px 12px; background: var(--accent-error); color: white; border: none; border-radius: var(--radius-md); cursor: pointer; font-size: 0.7rem; white-space: nowrap;">
+                            🗑
+                        </button>
+                    </div>
+
                     <button class="generate-btn" id="generate-btn" disabled>
                         <span class="btn-content">
                             <span>✨</span>

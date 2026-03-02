@@ -343,3 +343,90 @@ watermarkInput.addEventListener("change", () => {
         watermarkLabel.textContent = `✅ ${watermarkFile.name}`;
     }
 });
+
+// ─── Prompt Templates (localStorage) ─────────────────────────────
+const templateSelect = document.getElementById("template-select");
+const saveTemplateBtn = document.getElementById("save-template-btn");
+const loadTemplateBtn = document.getElementById("load-template-btn");
+const deleteTemplateBtn = document.getElementById("delete-template-btn");
+
+const TEMPLATE_KEY = "fashionvideo_templates";
+
+function getTemplates() {
+    try { return JSON.parse(localStorage.getItem(TEMPLATE_KEY) || "{}"); }
+    catch { return {}; }
+}
+
+function saveTemplates(templates) {
+    localStorage.setItem(TEMPLATE_KEY, JSON.stringify(templates));
+}
+
+function refreshTemplateList() {
+    const templates = getTemplates();
+    templateSelect.innerHTML = '<option value="">📋 Şablon Seç...</option>';
+    Object.keys(templates).forEach(name => {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        templateSelect.appendChild(opt);
+    });
+}
+
+function getCurrentSettings() {
+    return {
+        location: locationSel.value,
+        model_preset: modelSel.value,
+        camera_style: cameraSel.value,
+        model_action: actionSel.value,
+        mood: moodSel.value,
+        duration: durationInput.value,
+        scene_count: sceneCountInput.value,
+        aspect_ratio: aspectRatioSel.value,
+        video_description: videoDescInput.value,
+        custom_location: customLocIn.value,
+    };
+}
+
+function applySettings(s) {
+    if (s.location) locationSel.value = s.location;
+    if (s.model_preset) modelSel.value = s.model_preset;
+    if (s.camera_style) cameraSel.value = s.camera_style;
+    if (s.model_action) actionSel.value = s.model_action;
+    if (s.mood) moodSel.value = s.mood;
+    if (s.duration) durationInput.value = s.duration;
+    if (s.scene_count) sceneCountInput.value = s.scene_count;
+    if (s.aspect_ratio) aspectRatioSel.value = s.aspect_ratio;
+    if (s.video_description) videoDescInput.value = s.video_description;
+    if (s.custom_location) customLocIn.value = s.custom_location;
+    // Toggle custom location visibility
+    customLocGrp.style.display = locationSel.value === "custom" ? "flex" : "none";
+}
+
+saveTemplateBtn.addEventListener("click", () => {
+    const name = prompt("Şablon adı girin:");
+    if (!name || !name.trim()) return;
+    const templates = getTemplates();
+    templates[name.trim()] = getCurrentSettings();
+    saveTemplates(templates);
+    refreshTemplateList();
+    templateSelect.value = name.trim();
+});
+
+loadTemplateBtn.addEventListener("click", () => {
+    const name = templateSelect.value;
+    if (!name) return;
+    const templates = getTemplates();
+    if (templates[name]) applySettings(templates[name]);
+});
+
+deleteTemplateBtn.addEventListener("click", () => {
+    const name = templateSelect.value;
+    if (!name) return;
+    if (!confirm(`"${name}" şablonunu silmek istediğinize emin misiniz?`)) return;
+    const templates = getTemplates();
+    delete templates[name];
+    saveTemplates(templates);
+    refreshTemplateList();
+});
+
+refreshTemplateList();
