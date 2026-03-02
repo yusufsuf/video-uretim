@@ -296,6 +296,16 @@ function showResult(url) {
     };
 }
 
+// ─── WhatsApp Share ──────────────────────────────────────────────
+const whatsappBtn = document.getElementById("whatsapp-btn");
+whatsappBtn.addEventListener("click", () => {
+    const videoUrl = resultVideo.src;
+    if (!videoUrl) return;
+    const fullUrl = new URL(videoUrl, window.location.origin).href;
+    const text = encodeURIComponent(`🎬 Fashion Video AI ile oluşturduğum video:\n${fullUrl}`);
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+});
+
 // ─── New Video ───────────────────────────────────────────────────
 newBtn.addEventListener("click", () => {
     resultSec.classList.remove("active");

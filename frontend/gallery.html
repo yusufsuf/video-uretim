@@ -220,6 +220,8 @@
                         <div class="gallery-actions">
                             <a href="${item.result_url}" target="_blank" class="btn-view">▶ İzle</a>
                             <a href="${item.result_url}" download class="btn-download">⬇ İndir</a>
+                            <button onclick="shareWhatsApp('${item.result_url}')"
+                                style="background:#25D366;color:white;flex:1;" class="btn-view">📱 WA</button>
                         </div>` : ""}
                     </div>
                 </div>`;
@@ -236,6 +238,12 @@
         }
 
         loadGallery();
+
+        function shareWhatsApp(videoPath) {
+            const fullUrl = new URL(videoPath, window.location.origin).href;
+            const text = encodeURIComponent(`🎬 Fashion Video AI ile oluşturulan video:\n${fullUrl}`);
+            window.open(`https://wa.me/?text=${text}`, "_blank");
+        }
     </script>
 </body>
 
