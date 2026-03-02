@@ -249,6 +249,22 @@ body {
     opacity: 1;
 }
 
+/* Mini upload zone for watermark/logo */
+.mini-upload {
+    min-height: auto;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    flex-direction: row;
+    gap: 8px;
+    border-style: dashed;
+}
+
+.mini-upload-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
 input[type="file"] {
     display: none;
 }

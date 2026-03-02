@@ -177,6 +177,24 @@
                                 step="1">
                         </div>
 
+                        <div class="form-group">
+                            <label class="form-label">Video Formatı</label>
+                            <select class="form-select" id="aspect-ratio-select">
+                                <option value="9:16">Dikey (9:16) — Reels/TikTok</option>
+                                <option value="16:9">Yatay (16:9) — YouTube</option>
+                                <option value="1:1">Kare (1:1) — Instagram</option>
+                                <option value="4:5">Portre (4:5) — Facebook</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Watermark / Logo</label>
+                            <div class="upload-zone mini-upload" id="watermark-zone">
+                                <input type="file" id="watermark-input" accept="image/png,image/webp" hidden>
+                                <span class="mini-upload-label" id="watermark-label">📌 Logo Yükle (PNG)</span>
+                            </div>
+                        </div>
+
                         <div class="form-group full-width">
                             <label class="form-label">Video Açıklaması (Opsiyonel)</label>
                             <textarea class="form-input" id="video-description" rows="3"

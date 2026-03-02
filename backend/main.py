@@ -99,7 +99,9 @@ async def generate_video_endpoint(
     mood: Optional[str] = Form(None),
     duration: str = Form("10"),
     scene_count: str = Form("2"),
+    aspect_ratio: str = Form("9:16"),
     video_description: Optional[str] = Form(None),
+    watermark_image: Optional[UploadFile] = File(None, description="Watermark/logo PNG"),
 ):
     """Start a new fashion video generation job."""
 
@@ -154,6 +156,8 @@ async def generate_video_endpoint(
             scene_count=int(scene_count),
             video_description=video_description,
             model_preset=model_preset,
+            aspect_ratio=aspect_ratio,
+            watermark_path=await _save_upload(watermark_image) if watermark_image else None,
         )
     )
 

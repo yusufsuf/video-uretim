@@ -150,6 +150,8 @@ async def run_pipeline(
     scene_count: int = 2,
     video_description: Optional[str] = None,
     model_preset: str = "default",
+    aspect_ratio: str = "9:16",
+    watermark_path: Optional[str] = None,
 ):
     """Execute the full pipeline asynchronously."""
     try:
@@ -224,6 +226,7 @@ async def run_pipeline(
                 image_url=vto_result,
                 prompt=scene.full_scene_prompt,
                 duration=kling_duration,
+                aspect_ratio=aspect_ratio,
             )
 
             clip_path = await download_file(video_url, settings.OUTPUT_DIR, extension=f"_scene{scene_num}.mp4")
@@ -248,6 +251,29 @@ async def run_pipeline(
         else:
             final_path = clip_paths[0]
 
+        logger.info("[%s] Pipeline completed – %s", job_id, final_path)
+
+        # ── Step 7 (optional): Watermark overlay ─────────────────
+        if watermark_path and os.path.isfile(watermark_path):
+            logger.info("[%s] Step 7 – Applying watermark", job_id)
+            _update_job(job_id, progress=95, message="Watermark ekleniyor...")
+            watermarked_path = final_path.replace(".mp4", "_wm.mp4")
+            try:
+                import subprocess
+                subprocess.run([
+                    "ffmpeg", "-y", "-i", final_path, "-i", watermark_path,
+                    "-filter_complex",
+                    "[1:v]scale=iw/6:-1,format=rgba,colorchannelmixer=aa=0.7[wm];"
+                    "[0:v][wm]overlay=W-w-20:H-h-20[out]",
+                    "-map", "[out]", "-map", "0:a?",
+                    "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                    watermarked_path,
+                ], check=True, capture_output=True, timeout=120)
+                os.replace(watermarked_path, final_path)
+                logger.info("[%s] Watermark applied", job_id)
+            except Exception as wm_err:
+                logger.warning("[%s] Watermark failed (continuing without): %s", job_id, wm_err)
+
         relative = final_path.replace("\\", "/")
 
         _update_job(
@@ -257,7 +283,7 @@ async def run_pipeline(
             message="Video başarıyla üretildi!",
             result_url=f"/outputs/{relative.split('/outputs/')[-1]}",
         )
-        logger.info("[%s] Pipeline completed – %s", job_id, final_path)
+        logger.info("[%s] Pipeline fully completed – %s", job_id, final_path)
 
     except Exception as exc:
         logger.exception("[%s] Pipeline failed", job_id)

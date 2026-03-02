@@ -21,6 +21,10 @@ const actionSel = document.getElementById("action-select");
 const moodSel = document.getElementById("mood-select");
 const durationInput = document.getElementById("duration-input");
 const sceneCountInput = document.getElementById("scene-count-input");
+const aspectRatioSel = document.getElementById("aspect-ratio-select");
+const watermarkInput = document.getElementById("watermark-input");
+const watermarkZone = document.getElementById("watermark-zone");
+const watermarkLabel = document.getElementById("watermark-label");
 const videoDescInput = document.getElementById("video-description");
 const customLocGrp = document.getElementById("custom-location-group");
 const customLocIn = document.getElementById("custom-location");
@@ -46,6 +50,7 @@ let frontFile = null;
 let backFile = null;
 let refimgFile = null;
 let videoFile = null;
+let watermarkFile = null;
 let currentJobId = null;
 let pollInterval = null;
 
@@ -161,8 +166,10 @@ async function startGeneration() {
     if (videoFile) formData.append("reference_video", videoFile);
     formData.append("location", locationSel.value);
     formData.append("model_preset", modelSel.value);
+    formData.append("aspect_ratio", aspectRatioSel.value);
     formData.append("duration", Math.max(3, Math.min(60, parseInt(durationInput.value) || 10)));
     formData.append("scene_count", Math.max(1, Math.min(10, parseInt(sceneCountInput.value) || 2)));
+    if (watermarkFile) formData.append("watermark_image", watermarkFile);
     if (videoDescInput.value.trim()) formData.append("video_description", videoDescInput.value.trim());
     if (locationSel.value === "custom") formData.append("custom_location", customLocIn.value);
     if (cameraSel.value) formData.append("camera_style", cameraSel.value);
@@ -317,3 +324,12 @@ setupUploadZone(frontZone, frontInput, "front");
 setupUploadZone(backZone, backInput, "back");
 setupUploadZone(refimgZone, refimgInput, "refimg");
 setupUploadZone(videoZone, videoInput, "video");
+
+// Watermark mini upload
+watermarkZone.addEventListener("click", () => watermarkInput.click());
+watermarkInput.addEventListener("change", () => {
+    if (watermarkInput.files[0]) {
+        watermarkFile = watermarkInput.files[0];
+        watermarkLabel.textContent = `✅ ${watermarkFile.name}`;
+    }
+});
