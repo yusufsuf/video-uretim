@@ -169,11 +169,22 @@ async def get_job_status(job_id: str):
 @app.get("/")
 async def root():
     """Serve the frontend index.html."""
-    frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend")
-    index_path = os.path.join(frontend_dir, "index.html")
+    index_path = os.path.join(_get_frontend_dir(), "index.html")
     return FileResponse(index_path, media_type="text/html")
 
 
+def _get_frontend_dir() -> str:
+    """Resolve the frontend directory – works in both Docker and local dev."""
+    # Docker: frontend is at /app/frontend
+    docker_path = os.path.join(os.path.dirname(__file__), "frontend")
+    if os.path.isdir(docker_path):
+        return docker_path
+    # Local dev: frontend is at ../frontend
+    local_path = os.path.join(os.path.dirname(__file__), "..", "frontend")
+    if os.path.isdir(local_path):
+        return local_path
+    raise RuntimeError(f"Frontend directory not found at {docker_path} or {local_path}")
+
+
 # Serve frontend static files (CSS, JS) – must be LAST mount
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
-app.mount("/", StaticFiles(directory=FRONTEND_DIR), name="frontend")
+app.mount("/", StaticFiles(directory=_get_frontend_dir()), name="frontend")
