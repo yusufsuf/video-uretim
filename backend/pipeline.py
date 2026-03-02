@@ -104,11 +104,14 @@ async def run_pipeline(
     front_url: str,
     back_url: Optional[str] = None,
     duration: int = 10,
+    scene_count: int = 2,
+    video_description: Optional[str] = None,
 ):
     """Execute the full pipeline asynchronously."""
     try:
-        # Clamp duration
+        # Clamp values
         duration = max(3, min(60, duration))
+        scene_count = max(1, min(10, scene_count))
 
         # ── Step 1: Analyse the garment ─────────────────────────
         _update_job(job_id, status=JobStatus.ANALYZING, progress=5, message="Elbise analiz ediliyor...")
@@ -135,6 +138,8 @@ async def run_pipeline(
             analysis=analysis,
             request=request,
             total_duration=duration,
+            scene_count=scene_count,
+            video_description=video_description,
             location_image_path=reference_image_path,
         )
         _update_job(job_id, scene_prompt=scene_prompt, progress=35, message=f"{scene_prompt.scene_count} sahne planlandı.")

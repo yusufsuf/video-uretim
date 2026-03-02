@@ -19,6 +19,8 @@ const cameraSel = document.getElementById("camera-select");
 const actionSel = document.getElementById("action-select");
 const moodSel = document.getElementById("mood-select");
 const durationInput = document.getElementById("duration-input");
+const sceneCountInput = document.getElementById("scene-count-input");
+const videoDescInput = document.getElementById("video-description");
 const customLocGrp = document.getElementById("custom-location-group");
 const customLocIn = document.getElementById("custom-location");
 const generateBtn = document.getElementById("generate-btn");
@@ -158,6 +160,8 @@ async function startGeneration() {
     if (videoFile) formData.append("reference_video", videoFile);
     formData.append("location", locationSel.value);
     formData.append("duration", Math.max(3, Math.min(60, parseInt(durationInput.value) || 10)));
+    formData.append("scene_count", Math.max(1, Math.min(10, parseInt(sceneCountInput.value) || 2)));
+    if (videoDescInput.value.trim()) formData.append("video_description", videoDescInput.value.trim());
     if (locationSel.value === "custom") formData.append("custom_location", customLocIn.value);
     if (cameraSel.value) formData.append("camera_style", cameraSel.value);
     if (actionSel.value) formData.append("model_action", actionSel.value);

@@ -134,6 +134,8 @@ async def generate_multi_scene_prompt(
     analysis: DressAnalysisResult,
     request: GenerationRequest,
     total_duration: int = 10,
+    scene_count: int = 2,
+    video_description: Optional[str] = None,
     location_image_path: Optional[str] = None,
 ) -> MultiScenePrompt:
     """Create multi-scene prompts for the video generator."""
@@ -145,10 +147,14 @@ async def generate_multi_scene_prompt(
         f"Kıyafet analizi:\n{analysis.model_dump_json(indent=2)}\n\n"
         f"Mekan: {location_str}\n"
         f"Toplam video süresi: {total_duration} saniye\n"
+        f"İstenen sahne sayısı: {scene_count}\n"
         f"Kamera stili: {request.camera_style or 'farklı açılardan çeşitlendir'}\n"
         f"Manken hareketi: {request.model_action or 'otomatik seç, çeşitli hareketler'}\n"
         f"Mood: {request.mood or analysis.mood}\n"
     )
+
+    if video_description:
+        user_text += f"\nKullanıcının ek açıklaması: {video_description}\n"
 
     if location_image_path:
         user_text += "\nKullanıcı bir mekan referans fotoğrafı gönderdi. Bu mekanı videonun arka planı olarak kullan, sahne betimlemelerinde bu mekanın özelliklerini yansıt."

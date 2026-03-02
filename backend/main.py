@@ -96,7 +96,9 @@ async def generate_video_endpoint(
     camera_style: Optional[str] = Form(None),
     model_action: Optional[str] = Form(None),
     mood: Optional[str] = Form(None),
-    duration: str = Form("5"),
+    duration: str = Form("10"),
+    scene_count: str = Form("2"),
+    video_description: Optional[str] = Form(None),
 ):
     """Start a new fashion video generation job."""
 
@@ -148,6 +150,8 @@ async def generate_video_endpoint(
             front_url=front_url,
             back_url=back_url,
             duration=int(duration),
+            scene_count=int(scene_count),
+            video_description=video_description,
         )
     )
 
