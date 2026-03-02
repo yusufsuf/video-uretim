@@ -106,7 +106,7 @@ Bunlara göre bir moda videosu için ÇOKLU SAHNE planı oluşturacaksın.
 ÖNEMLİ KURALLAR:
 - Her sahne farklı bir kamera açısı ve manken hareketi içermeli
 - Sahneler profesyonel bir moda videosu akışı oluşturmalı (giriş, detay, tam boy, kapanış gibi)
-- Her sahne minimum 5, maksimum 10 saniye olmalı
+- Her sahne minimum 3, maksimum 15 saniye olmalı (Kling 3.0 Pro limitleri)
 - Toplam süre, kullanıcının istediği süreye yaklaşmalı
 - Eğer mekan referans fotoğrafı varsa, o mekanı sahne betimlemelerinde kullan
 - full_scene_prompt İngilizce olmalı, sinematik ve detaylı olmalı

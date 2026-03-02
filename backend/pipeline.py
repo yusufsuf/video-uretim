@@ -219,8 +219,9 @@ async def run_pipeline(
             )
             logger.info("[%s] Generating scene %d/%d (%ds)", job_id, scene_num, scene_prompt.scene_count, scene.duration_seconds)
 
-            # Kling supports "5" or "10" as duration strings
-            kling_duration = "10" if scene.duration_seconds > 7 else "5"
+            # Kling 3.0 Pro supports 3-15 second clips
+            scene_dur = max(3, min(15, scene.duration_seconds))
+            kling_duration = str(scene_dur)
 
             video_url = await generate_video(
                 image_url=vto_result,
