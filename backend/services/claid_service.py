@@ -125,6 +125,7 @@ CLAID_FASHION_URL = "https://api.claid.ai/v1/image/ai-fashion-models"
 
 async def generate_fashion_photo(
     clothing_url: str,
+    model_image_url: str = "",
     pose: str = "standing, walking forward",
     background: str = "luxury fashion studio with soft lighting",
     aspect_ratio: str = "9:16",
@@ -135,10 +136,12 @@ async def generate_fashion_photo(
     pose and background, producing much better results.
 
     Args:
-        clothing_url:  Public URL of the garment image.
-        pose:          Pose description for the model.
-        background:    Background/setting description.
-        aspect_ratio:  Output aspect ratio (9:16, 16:9, 1:1).
+        clothing_url:    Public URL of the garment image.
+        model_image_url: Full-body model photo URL. Claid will dress this model
+                         with the garment. If empty, Claid generates its own model.
+        pose:            Pose description for the model.
+        background:      Background/setting text prompt for scene generation.
+        aspect_ratio:    Output aspect ratio (9:16, 16:9, 1:1).
 
     Returns:
         URL of the generated fashion photo.
@@ -151,13 +154,20 @@ async def generate_fashion_photo(
         "Accept": "application/json",
     }
 
+    # Build input: clothing + optional full-body model
+    input_data: dict = {
+        "clothing": [clothing_url],
+    }
+    if model_image_url:
+        input_data["model"] = model_image_url
+
     payload = {
-        "input": {
-            "clothing": [clothing_url],
-        },
+        "input": input_data,
         "options": {
             "pose": pose,
-            "background": background,
+            "background": {
+                "prompt": background,
+            },
             "aspect_ratio": aspect_ratio,
         },
         "output": {
@@ -166,7 +176,12 @@ async def generate_fashion_photo(
         },
     }
 
-    logger.info("Claid Fashion Photo – pose: %s, background: %s", pose[:60], background[:60])
+    logger.info(
+        "Claid Fashion Photo – model: %s, pose: %s, bg: %s",
+        "custom" if model_image_url else "auto",
+        pose[:50],
+        background[:50],
+    )
 
     async with httpx.AsyncClient(timeout=120) as client:
         # Submit the job

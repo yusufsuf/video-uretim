@@ -214,6 +214,7 @@ async def run_pipeline(
             try:
                 photo_url = await generate_fashion_photo(
                     clothing_url=garment_url,
+                    model_image_url=reference_image_url or "",
                     pose=pose,
                     background=bg,
                     aspect_ratio=aspect_ratio,
