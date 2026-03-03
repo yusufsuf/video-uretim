@@ -2,11 +2,12 @@
 
 Steps:
 1. Analyse the garment (GPT-4o Vision)
-2. Preprocess images (Claid API – background removal + enhance)
-3. Generate multi-scene prompts (GPT-4o)
-4. Virtual Try-On (Fal.ai IDM-VTON)
-5. Generate video clips per scene (Fal.ai Kling v3 Pro)
-6. Merge clips into final video (FFmpeg)
+2. Generate multi-scene prompts (GPT-4o – natural look, garment_lock)
+3. Per-scene loop:
+   a. Select front/back garment photo based on view_type
+   b. Generate fashion model photo (Claid AI Fashion Models)
+   c. Generate video clip (Fal.ai Kling v3 Pro)
+4. Merge clips into final video (FFmpeg)
 """
 
 import logging
@@ -25,12 +26,10 @@ from models import (
     PhotoType,
 )
 from services.analysis_service import analyse_dress, generate_multi_scene_prompt
-from services.claid_service import preprocess_garment
+from services.claid_service import preprocess_garment, generate_fashion_photo
 from services.video_service import (
     download_file,
     generate_video,
-    get_model_image_url,
-    virtual_try_on,
 )
 
 logger = logging.getLogger(__name__)
@@ -167,18 +166,9 @@ async def run_pipeline(
         _update_job(job_id, analysis=analysis, progress=15, message="Elbise analizi tamamlandı.")
         logger.info("[%s] Analysis result: %s", job_id, analysis.garment_type)
 
-        # ── Step 2: Preprocess images via Claid ─────────────────
-        _update_job(job_id, status=JobStatus.PREPROCESSING, progress=20, message="Görseller işleniyor...")
-        logger.info("[%s] Step 2 – Preprocessing images", job_id)
-
-        is_ghost = analysis.photo_type in (PhotoType.GHOST, PhotoType.FLATLAY)
-        processed_front = await preprocess_garment(front_url, local_path=front_path, is_ghost=is_ghost)
-
-        _update_job(job_id, progress=25, message="Görseller hazırlandı.")
-
-        # ── Step 3: Generate multi-scene prompts ────────────────
-        _update_job(job_id, progress=30, message="Sahneler planlanıyor...")
-        logger.info("[%s] Step 3 – Generating multi-scene prompts (duration=%ds)", job_id, duration)
+        # ── Step 2: Generate multi-scene prompts ────────────────
+        _update_job(job_id, progress=20, message="Sahneler planlanıyor...")
+        logger.info("[%s] Step 2 – Generating multi-scene prompts (duration=%ds)", job_id, duration)
 
         scene_prompt = await generate_multi_scene_prompt(
             analysis=analysis,
@@ -188,44 +178,68 @@ async def run_pipeline(
             video_description=video_description,
             location_image_path=reference_image_path,
         )
-        _update_job(job_id, scene_prompt=scene_prompt, progress=35, message=f"{scene_prompt.scene_count} sahne planlandı.")
+        _update_job(job_id, scene_prompt=scene_prompt, progress=25, message=f"{scene_prompt.scene_count} sahne planlandı.")
         logger.info("[%s] Planned %d scenes", job_id, scene_prompt.scene_count)
 
-        # ── Step 4: Virtual Try-On ──────────────────────────────
-        _update_job(job_id, status=JobStatus.GENERATING_VTO, progress=40, message="Elbise mankene giydiriliyor...")
-        logger.info("[%s] Step 4 – Virtual Try-On", job_id)
-
-        # Determine model image: user's reference takes priority, then preset
-        model_url = reference_image_url if (reference_image_url and not reference_image_path) else get_model_image_url(model_preset)
-
-        vto_result = await virtual_try_on(
-            garment_image_url=processed_front,
-            model_image_url=model_url,
-            description=f"A fashion model wearing a {analysis.color} {analysis.fabric} {analysis.garment_type}, {analysis.cut_style} cut, {analysis.length} length, {analysis.details}",
-        )
-        _update_job(job_id, progress=50, message="Virtual try-on tamamlandı.")
-
-        # ── Step 5: Generate video clips per scene ──────────────
-        _update_job(job_id, status=JobStatus.GENERATING_VIDEO, progress=55, message="Video sahneleri üretiliyor...")
-        logger.info("[%s] Step 5 – Generating %d video clips", job_id, scene_prompt.scene_count)
+        # ── Step 3: Per-scene photo + video loop ─────────────────
+        _update_job(job_id, status=JobStatus.GENERATING_PHOTO, progress=30, message="Sahne fotoğrafları üretiliyor...")
+        logger.info("[%s] Step 3 – Per-scene photo + video generation", job_id)
 
         clip_paths = []
+        total_scenes = scene_prompt.scene_count
+
         for i, scene in enumerate(scene_prompt.scenes):
             scene_num = i + 1
-            progress = 55 + int((scene_num / scene_prompt.scene_count) * 25)
+
+            # ── 3a: Select garment photo based on view_type ──────
+            view = getattr(scene, "view_type", "front").lower()
+            if view in ("back", "transition") and back_url:
+                garment_url = back_url
+            else:
+                garment_url = front_url
+
+            # ── 3b: Generate fashion model photo via Claid ───────
+            photo_progress = 30 + int((scene_num / total_scenes) * 25)
             _update_job(
                 job_id,
-                progress=progress,
-                message=f"Sahne {scene_num}/{scene_prompt.scene_count} üretiliyor...",
+                status=JobStatus.GENERATING_PHOTO,
+                progress=photo_progress,
+                message=f"Sahne {scene_num}/{total_scenes} fotoğrafı üretiliyor...",
             )
-            logger.info("[%s] Generating scene %d/%d (%ds)", job_id, scene_num, scene_prompt.scene_count, scene.duration_seconds)
+            logger.info("[%s] Scene %d/%d – Generating fashion photo (view_type=%s)", job_id, scene_num, total_scenes, view)
+
+            pose = getattr(scene, "pose_description", "") or scene.model_action_prompt
+            bg = getattr(scene, "background_description", "") or scene_prompt.background_prompt
+
+            try:
+                photo_url = await generate_fashion_photo(
+                    clothing_url=garment_url,
+                    pose=pose,
+                    background=bg,
+                    aspect_ratio=aspect_ratio,
+                )
+            except Exception as photo_err:
+                logger.warning("[%s] Claid fashion photo failed for scene %d: %s – using garment image directly", job_id, scene_num, photo_err)
+                photo_url = garment_url  # fallback
+
+            logger.info("[%s] Scene %d photo ready: %s", job_id, scene_num, photo_url[:80] if photo_url else "N/A")
+
+            # ── 3c: Generate video from photo via Kling ──────────
+            video_progress = 55 + int((scene_num / total_scenes) * 25)
+            _update_job(
+                job_id,
+                status=JobStatus.GENERATING_VIDEO,
+                progress=video_progress,
+                message=f"Sahne {scene_num}/{total_scenes} videosu üretiliyor...",
+            )
+            logger.info("[%s] Scene %d/%d – Generating video (%ds)", job_id, scene_num, total_scenes, scene.duration_seconds)
 
             # Kling 3.0 Pro supports 3-15 second clips
             scene_dur = max(3, min(15, scene.duration_seconds))
             kling_duration = str(scene_dur)
 
             video_url = await generate_video(
-                image_url=vto_result,
+                image_url=photo_url,
                 prompt=scene.full_scene_prompt,
                 duration=kling_duration,
                 aspect_ratio=aspect_ratio,
@@ -233,12 +247,12 @@ async def run_pipeline(
 
             clip_path = await download_file(video_url, settings.OUTPUT_DIR, extension=f"_scene{scene_num}.mp4")
             clip_paths.append(clip_path)
-            logger.info("[%s] Scene %d downloaded: %s", job_id, scene_num, clip_path)
+            logger.info("[%s] Scene %d completed: %s", job_id, scene_num, clip_path)
 
-        # ── Step 6: Merge clips ─────────────────────────────────
+        # ── Step 4: Merge clips ─────────────────────────────────
         if len(clip_paths) > 1:
             _update_job(job_id, status=JobStatus.MERGING, progress=85, message="Sahneler birleştiriliyor...")
-            logger.info("[%s] Step 6 – Merging %d clips", job_id, len(clip_paths))
+            logger.info("[%s] Step 4 – Merging %d clips", job_id, len(clip_paths))
 
             final_filename = f"{uuid.uuid4().hex}_final.mp4"
             final_path = os.path.join(settings.OUTPUT_DIR, final_filename)
@@ -255,9 +269,9 @@ async def run_pipeline(
 
         logger.info("[%s] Pipeline completed – %s", job_id, final_path)
 
-        # ── Step 7 (optional): Watermark overlay ─────────────────
+        # ── Step 5 (optional): Watermark overlay ─────────────────
         if watermark_path and os.path.isfile(watermark_path):
-            logger.info("[%s] Step 7 – Applying watermark", job_id)
+            logger.info("[%s] Step 5 – Applying watermark", job_id)
             _update_job(job_id, progress=95, message="Watermark ekleniyor...")
             watermarked_path = final_path.replace(".mp4", "_wm.mp4")
             try:

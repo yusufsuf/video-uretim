@@ -120,6 +120,96 @@ async def enhance_image(image_url: str, target_width: int = 1024) -> str:
     return output_url
 
 
+# ─── Claid AI Fashion Models (per-scene photo generation) ────────
+CLAID_FASHION_URL = "https://api.claid.ai/v1/image/ai-fashion-models"
+
+async def generate_fashion_photo(
+    clothing_url: str,
+    pose: str = "standing, walking forward",
+    background: str = "luxury fashion studio with soft lighting",
+    aspect_ratio: str = "9:16",
+) -> str:
+    """Generate a fashion model photo wearing the garment using Claid AI Fashion Models.
+
+    This replaces IDM-VTON. Each scene gets its own unique photo with a specific
+    pose and background, producing much better results.
+
+    Args:
+        clothing_url:  Public URL of the garment image.
+        pose:          Pose description for the model.
+        background:    Background/setting description.
+        aspect_ratio:  Output aspect ratio (9:16, 16:9, 1:1).
+
+    Returns:
+        URL of the generated fashion photo.
+    """
+    import asyncio
+
+    headers = {
+        "Authorization": f"Bearer {settings.CLAID_API_KEY}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+    payload = {
+        "input": {
+            "clothing": [clothing_url],
+        },
+        "options": {
+            "pose": pose,
+            "background": background,
+            "aspect_ratio": aspect_ratio,
+        },
+        "output": {
+            "number_of_images": 1,
+            "format": "png",
+        },
+    }
+
+    logger.info("Claid Fashion Photo – pose: %s, background: %s", pose[:60], background[:60])
+
+    async with httpx.AsyncClient(timeout=120) as client:
+        # Submit the job
+        resp = await client.post(CLAID_FASHION_URL, json=payload, headers=headers)
+        resp.raise_for_status()
+        result = resp.json()
+
+        # Check if result is immediate or needs polling
+        result_url = result.get("data", {}).get("result_url", "")
+        output_objects = result.get("data", {}).get("result", {}).get("output_objects", [])
+
+        if output_objects:
+            # Immediate result
+            photo_url = output_objects[0].get("tmp_url", "")
+            logger.info("Claid Fashion Photo completed (immediate): %s", photo_url[:80])
+            return photo_url
+
+        if result_url:
+            # Need to poll for result
+            logger.info("Claid Fashion Photo polling: %s", result_url[:80])
+            for attempt in range(12):  # max 12 * 10s = 2 min wait
+                await asyncio.sleep(10)
+                poll_resp = await client.get(result_url, headers=headers)
+                poll_resp.raise_for_status()
+                poll_data = poll_resp.json()
+
+                status = poll_data.get("data", {}).get("status", "")
+                if status == "DONE":
+                    objects = poll_data.get("data", {}).get("result", {}).get("output_objects", [])
+                    if objects:
+                        photo_url = objects[0].get("tmp_url", "")
+                        logger.info("Claid Fashion Photo completed (polled): %s", photo_url[:80])
+                        return photo_url
+                elif status in ("FAILED", "ERROR"):
+                    raise RuntimeError(f"Claid Fashion Photo failed: {poll_data}")
+
+                logger.info("Claid Fashion Photo polling attempt %d, status: %s", attempt + 1, status)
+
+            raise TimeoutError("Claid Fashion Photo generation timed out after 2 minutes")
+
+        raise ValueError(f"Unexpected Claid response: {result}")
+
+
 # ─── Main preprocessing entry point ──────────────────────────────
 async def preprocess_garment(image_url: str, local_path: str = "", is_ghost: bool = False) -> str:
     """Full preprocessing pipeline for a garment image.

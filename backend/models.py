@@ -26,11 +26,19 @@ class DressAnalysisResult(BaseModel):
     photo_type: PhotoType = Field(description="Fotoğraf tipi (mannequin / ghost / flatlay)")
     garment_type: str = Field(description="Kıyafet türü (elbise, ceket, pantolon vb.)")
     color: str = Field(description="Ana renk / renkler")
+    color_secondary: str = Field(default="none", description="İkincil renk")
     pattern: str = Field(description="Desen bilgisi (düz, çizgili, çiçekli vb.)")
     fabric: str = Field(description="Kumaş tipi tahmini (ipek, pamuk, polyester vb.)")
+    neckline: str = Field(default="", description="Yaka şekli ve derinliği")
+    sleeve_type: str = Field(default="", description="Kol tipi, uzunluk, manşet")
     cut_style: str = Field(description="Kesim stili (A-line, bodycon, oversize vb.)")
     length: str = Field(description="Uzunluk (mini, midi, maxi vb.)")
     details: str = Field(description="Ekstra detaylar (dantel, düğme, kemer vb.)")
+    front_silhouette: str = Field(default="", description="Önden tam siluet açıklaması")
+    back_details: str = Field(default="", description="Arkadan detaylı açıklama (kapama, dikişler)")
+    back_silhouette: str = Field(default="", description="Arkadan siluet açıklaması")
+    hem_description: str = Field(default="", description="Etek ucu tanımı (ön ve arkadan)")
+    description_en: str = Field(default="", description="3-4 cümlelik İngilizce tam kıyafet açıklaması")
     season: str = Field(description="Uygun mevsim önerisi")
     mood: str = Field(description="Genel mood / atmosfer")
 
@@ -40,11 +48,15 @@ class SingleScenePrompt(BaseModel):
     model_config = {"protected_namespaces": ()}
 
     scene_number: int = Field(description="Sahne numarası")
+    scene_title: str = Field(default="", description="Kısa sahne başlığı")
     camera_prompt: str = Field(description="Kamera açısı ve hareketi")
     model_action_prompt: str = Field(description="Mankenin hareketi / pozu")
     lighting_prompt: str = Field(description="Aydınlatma ayarı")
-    full_scene_prompt: str = Field(description="Bu sahne için tam prompt")
+    pose_description: str = Field(default="", description="Detaylı poz açıklaması (Claid için)")
+    background_description: str = Field(default="", description="Arka plan açıklaması (Claid için)")
+    full_scene_prompt: str = Field(description="Bu sahne için tam video prompt")
     duration_seconds: int = Field(description="Bu sahnenin süresi (saniye)")
+    view_type: str = Field(default="front", description="front / back / transition")
 
 
 class MultiScenePrompt(BaseModel):
@@ -55,6 +67,8 @@ class MultiScenePrompt(BaseModel):
     total_duration: int = Field(description="Toplam video süresi")
     scene_count: int = Field(description="Sahne sayısı")
     scenes: List[SingleScenePrompt] = Field(description="Sahne listesi")
+    garment_lock_description: str = Field(default="", description="Tüm sahnelerde tutarlı kıyafet tanımı")
+    location_theme: str = Field(default="", description="Genel mekan teması")
 
 
 class GenerationRequest(BaseModel):
@@ -73,6 +87,7 @@ class JobStatus(str, Enum):
     ANALYZING = "analyzing"
     PREPROCESSING = "preprocessing"
     GENERATING_VTO = "generating_vto"
+    GENERATING_PHOTO = "generating_photo"
     GENERATING_VIDEO = "generating_video"
     MERGING = "merging"
     COMPLETED = "completed"

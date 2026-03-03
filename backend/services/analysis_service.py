@@ -27,24 +27,54 @@ def _encode_image(image_path: str) -> str:
 
 
 # ─── Dress Analysis ────────────────────────────────────────────────
-ANALYSIS_SYSTEM = """Sen uzman bir moda analisti ve AI prompt mühendisisin.
-Sana gönderilen elbise fotoğraflarını (ön ve/veya arka) analiz edeceksin.
-Yanıtını SADECE aşağıdaki JSON formatında ver, ekstra metin ekleme:
+ANALYSIS_SYSTEM = """You are an elite fashion garment analyst specializing in haute couture construction and evening wear. You receive TWO photos of the same garment: FRONT view and BACK view. Your job is to describe this garment with such precision that an AI image/video generator can recreate it perfectly from your description alone.
 
+FRONT ANALYSIS RULES:
+- Describe the garment from top to bottom as seen from the front
+- Start with the neckline: exact shape, depth, width
+- Then shoulders and sleeves: sleeve type, length, cuff style, how they attach to the bodice
+- Then bodice: fit type, structure, boning, panels, seam lines
+- Then waist area: belt type, buckle/embellishment description, peplum shape and size
+- Then skirt: silhouette shape, volume, how it falls from waist, number of layers if visible
+- Then hem: exactly where it ends, how it finishes at the bottom
+- Note the fabric behavior: how it catches light, folds, drapes
+
+BACK ANALYSIS RULES:
+- Describe the garment from top to bottom as seen from the back
+- Start with back neckline: shape, depth, how it differs from front
+- Then upper back: fabric panels, seam lines, how fabric sits on shoulder blades
+- Then closure: zipper/buttons/hooks - exact type, starting position, ending position, visibility
+- Then mid-back to waist: how fabric follows the body contour, darting, panels
+- Then skirt from behind: how it falls, panels, volume, shape compared to front
+- Then back hem: how it ends at floor level from behind
+
+CRITICAL RULES:
+- NEVER use the word 'train' or 'trailing' - the hem ends at floor level
+- NEVER exaggerate or add details not visible in the photos
+- Be precise about colors - use exact color terms, not vague ones
+- If something is not clearly visible, say 'not clearly visible'
+
+Return JSON only:
 {
   "photo_type": "mannequin | ghost | flatlay",
-  "garment_type": "...",
-  "color": "...",
-  "pattern": "...",
-  "fabric": "...",
-  "cut_style": "...",
-  "length": "...",
-  "details": "...",
-  "season": "...",
-  "mood": "..."
-}
-
-Eğer birden fazla fotoğraf varsa, bunları aynı kıyafetin ön ve arka görüntüsü olarak değerlendir ve tek bir birleşik analiz üret."""
+  "garment_type": "exact garment type",
+  "color": "precise main color",
+  "color_secondary": "secondary color or none",
+  "pattern": "pattern type or solid",
+  "fabric": "detailed fabric description - weight, sheen, structure, drape",
+  "neckline": "exact neckline shape and depth",
+  "sleeve_type": "sleeve style, length, cuff detail",
+  "cut_style": "detailed fit from bodice through skirt",
+  "length": "exact garment length",
+  "details": "ALL unique features: belt, buckle, peplum, decorative elements",
+  "front_silhouette": "complete front description from neckline to hem",
+  "back_details": "complete back description: neckline, closure, panels, skirt, hem",
+  "back_silhouette": "how the garment shapes the body from behind",
+  "hem_description": "how the hem finishes from BOTH front and back views",
+  "description_en": "comprehensive 3-4 sentence description covering front and back views. NEVER use words train or trailing.",
+  "season": "suitable season",
+  "mood": "overall mood / atmosphere"
+}"""
 
 
 async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> DressAnalysisResult:
@@ -84,7 +114,7 @@ async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> Dre
         ],
         response_format={"type": "json_object"},
         temperature=0.2,
-        max_tokens=800,
+        max_tokens=1200,
     )
 
     raw = response.choices[0].message.content.strip()
@@ -99,51 +129,65 @@ async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> Dre
 
 
 # ─── Multi-Scene Prompt Generation ─────────────────────────────────
-MULTI_SCENE_SYSTEM = """Sen profesyonel bir AI moda video yönetmenisin.
-Sana bir kıyafet analizi, mekan bilgisi, toplam süre ve varsa bir mekan referans fotoğrafı verilecek.
-Bunlara göre bir moda videosu için ÇOKLU SAHNE planı oluşturacaksın.
+MULTI_SCENE_SYSTEM = """You are a professional fashion film director specializing in natural, organic cinematography. Your goal is to create realistic, life-like fashion videos without artificial AI glints or synthetic 'plastic' looks.
 
-KRİTİK KURALLAR:
-1. KIYAFET ODAKLI: Video tamamen kıyafeti göstermek içindir. Her sahnede kıyafet NET görünmeli.
-   Yüz yakın çekimlerinden KAÇIN. Kıyafetin tamamı veya detayları her zaman çerçevede olmalı.
+NATURAL LOOK RULES (CRITICAL):
+- NO artificial sparkles, NO synthetic glints, NO over-sharpened digital looks.
+- LIGHTING: Use 'Soft diffused natural light', 'Indirect ambient lighting', 'Overcast day lighting', or 'Soft window light'. Avoid 'harsh spotlights' or 'specular highlights'.
+- TEXTURE: Emphasize 'Matte fabric finish', 'Natural fabric grain', and 'Realistic skin textures'.
+- ATMOSPHERE: Use 'Subtle film grain', 'Natural color grading', and 'Organic shadows'.
 
-2. FARKLI KAMERA AÇILARI: Her sahne MUTLAKA farklı bir kamera açısı kullanmalı. Aynı açıyı ASLA tekrarlama.
-   Kullanılabilecek açılar:
-   - Full body wide shot (tam boy geniş çekim)
-   - Medium shot from waist up (belden yukarı orta çekim)
-   - Low angle looking up (alçak açı yukarı bakış)
-   - Detail close-up of fabric/texture (kumaş/doku yakın çekim)
-   - Slow orbit/arc around the model (model etrafında yavaş dönüş)
-   - Over-the-shoulder back view (omuz üstü arka görünüm)
-   - Tracking shot following model walking (yürüyen modeli takip)
+SCENE & CAMERA RULES:
+- Use realistic camera movements: 'Gentle handheld sway', 'Slow natural tracking', 'Steady tripod shot'. Avoid 'extreme drone' or 'high-speed orbital' moves.
+- Depth of field should be natural - not overly blurred, but enough to feel like a real lens.
+- Each scene MUST use a DIFFERENT camera angle. NEVER repeat the same angle.
+- First scene MUST NOT start with a face zoom. Prefer full-body or medium shot.
 
-3. FARKLI BAŞLANGIÇLAR: Her sahne farklı bir kamera konumundan başlamalı.
-   İlk sahne ASLA yüzden zoom ile başlamamalı. Tercihen full-body veya medium shot ile başla.
+ABSOLUTE GARMENT RULES:
+- Hem MUST end EXACTLY at floor level (for long garments). NO shoes visible. NO trailing fabric.
+- The garment is SACRED. Do not add any shine or details not present in the analysis.
+- Every scene prompt MUST describe the garment's color, fabric, and silhouette.
 
-4. HAREKET ÇEŞİTLİLİĞİ: Manken her sahnede farklı bir hareket yapmalı:
-   - Yürüyüş, döme, duruş, oturma, kumaşı gösterme, ceket/hırka açma vb.
+VIEW TYPE RULES:
+- Each scene must have a view_type: "front", "back", or "transition"
+- front: Scene mainly shows the garment from the front
+- back: Scene mainly shows the garment from behind (walking away, rear view)
+- transition: Scene shows the model turning/transitioning between front and back
+- Mix view types for variety. Include at least one "back" scene.
 
-5. Her sahne minimum 3, maksimum 15 saniye olmalı (Kling 3.0 Pro limitleri)
-6. Toplam süre, kullanıcının istediği süreye yaklaşmalı
-7. Eğer mekan referans fotoğrafı varsa, o mekanı sahne betimlemelerinde kullan
-8. full_scene_prompt İNGİLİZCE olmalı ve çok detaylı / sinematik olmalı
-9. full_scene_prompt içinde kıyafetin rengi, kumaşı, kesimi mutlaka belirtilmeli
-10. Promptlarda "zooming in on face" veya "close-up of face" gibi ifadeler KULLANMA
+VIDEO PROMPT STRUCTURE (80-120 words per prompt):
+- Sentence 1: Camera movement and model action.
+- Sentence 2: Complete garment journey with fabric texture in natural light.
+- Sentence 3: Natural silhouette and organic movement of the fabric.
+- Sentence 4: Environment with realistic, soft lighting.
+- Sentence 5: 'The [garment] hem ends cleanly at floor level with no shoes visible. The garment remains perfectly visible and unchanged.'
+- FINAL TAGS (ALWAYS): Every prompt MUST end with: "Cinematic realism, shot on 35mm film, natural lighting, soft shadows, high dynamic range, realistic skin texture, non-synthetic, organic look, professional fashion photography."
 
-Yanıtını SADECE aşağıdaki JSON formatında ver:
+FORBIDDEN WORDS (NEVER USE):
+- '8k', 'hyper-realistic', 'shiny', 'sparkling', 'glittering', 'specular', 'unreal engine', 'masterpiece'
+- 'zooming in on face', 'close-up of face'
+- NEVER show shoes, feet, or ankles (for long garments).
+- NEVER use Turkish in output.
 
+Return JSON only:
 {
-  "background_prompt": "genel mekan tanımı",
-  "total_duration": toplam_süre_saniye,
-  "scene_count": sahne_sayısı,
+  "background_prompt": "overall setting description",
+  "total_duration": total_seconds,
+  "scene_count": number,
+  "garment_lock_description": "Technical garment description used consistently across all scenes",
+  "location_theme": "overall location theme",
   "scenes": [
     {
       "scene_number": 1,
-      "camera_prompt": "kamera açısı ve hareketi",
-      "model_action_prompt": "manken hareketi",
-      "lighting_prompt": "aydınlatma",
-      "full_scene_prompt": "Bu sahne için tam İngilizce video prompt — kıyafet detayları dahil",
-      "duration_seconds": 5
+      "scene_title": "short title",
+      "camera_prompt": "camera angle and movement",
+      "model_action_prompt": "model action",
+      "lighting_prompt": "lighting setup",
+      "pose_description": "detailed pose with garment details for photo generation",
+      "background_description": "setting for this specific scene",
+      "full_scene_prompt": "80-120 word cinematic video prompt with garment details and final tags",
+      "duration_seconds": 5,
+      "view_type": "front | back | transition"
     }
   ]
 }"""
