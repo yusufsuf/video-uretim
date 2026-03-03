@@ -125,21 +125,18 @@ CLAID_FASHION_URL = "https://api.claid.ai/v1/image/ai-fashion-models"
 
 async def generate_fashion_photo(
     clothing_url: str,
-    model_image_url: str = "",
     pose: str = "standing, walking forward",
     background: str = "luxury fashion studio with soft lighting",
     aspect_ratio: str = "9:16",
 ) -> str:
     """Generate a fashion model photo wearing the garment using Claid AI Fashion Models.
 
-    This replaces IDM-VTON. Each scene gets its own unique photo with a specific
-    pose and background, producing much better results.
+    Claid generates its own AI fashion model and dresses it with the garment.
+    Each scene gets a unique photo with specific pose and background.
 
     Args:
-        clothing_url:    Public URL of the garment image.
-        model_image_url: Full-body model photo URL. Claid will dress this model
-                         with the garment. If empty, Claid generates its own model.
-        pose:            Pose description for the model.
+        clothing_url:    URL or data URI of the garment image.
+        pose:            Pose description for the AI model.
         background:      Background/setting text prompt for scene generation.
         aspect_ratio:    Output aspect ratio (9:16, 16:9, 1:1).
 
@@ -154,15 +151,10 @@ async def generate_fashion_photo(
         "Accept": "application/json",
     }
 
-    # Build input: clothing + optional full-body model
-    input_data: dict = {
-        "clothing": [clothing_url],
-    }
-    if model_image_url:
-        input_data["model"] = model_image_url
-
     payload = {
-        "input": input_data,
+        "input": {
+            "clothing": [clothing_url],
+        },
         "options": {
             "pose": pose,
             "background": {
@@ -177,8 +169,7 @@ async def generate_fashion_photo(
     }
 
     logger.info(
-        "Claid Fashion Photo – model: %s, pose: %s, bg: %s",
-        "custom" if model_image_url else "auto",
+        "Claid Fashion Photo – pose: %s, bg: %s",
         pose[:50],
         background[:50],
     )
