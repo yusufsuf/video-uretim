@@ -18,20 +18,53 @@ os.environ["FAL_KEY"] = settings.FAL_KEY
 
 # ─── Model Presets ─────────────────────────────────────────────────
 # Public model images for Virtual Try-On
+# Using Fal.ai's own test images and reliable direct-access CDN URLs
+DEFAULT_MODEL_URL = (
+    "https://storage.googleapis.com/falserverless/"
+    "model_tests/try_on/person.jpg"
+)
+
 MODEL_PRESETS = {
-    "default": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
-    "model_1": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=512&h=768&fit=crop",
-    "model_2": "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=512&h=768&fit=crop",
-    "model_3": "https://images.unsplash.com/photo-1589156280159-27698a70f29e?w=512&h=768&fit=crop",
-    "model_4": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=512&h=768&fit=crop",
-    "model_5": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=512&h=768&fit=crop",
-    "model_6": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=512&h=768&fit=crop",
+    "default": DEFAULT_MODEL_URL,
+    "model_1": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
+    "model_2": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
+    "model_3": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
+    "model_4": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
+    "model_5": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
+    "model_6": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
 }
 
 
 def get_model_image_url(preset: str = "default") -> str:
     """Resolve a model preset key to an image URL."""
-    return MODEL_PRESETS.get(preset, MODEL_PRESETS["default"])
+    return MODEL_PRESETS.get(preset, DEFAULT_MODEL_URL)
+
+
+async def _ensure_accessible_url(url: str) -> str:
+    """Download an image URL and convert to base64 data URI if needed.
+    This ensures Fal.ai can always access the image, even if the
+    original host blocks hotlinking or requires specific headers."""
+    # Fal.ai's own URLs are always accessible
+    if "storage.googleapis.com/falserverless" in url:
+        return url
+    # data URIs are already inline
+    if url.startswith("data:"):
+        return url
+
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+            content_type = resp.headers.get("content-type", "image/jpeg")
+            if ";" in content_type:
+                content_type = content_type.split(";")[0].strip()
+            import base64
+            b64 = base64.b64encode(resp.content).decode()
+            logger.info("Converted URL to data URI (%d bytes)", len(resp.content))
+            return f"data:{content_type};base64,{b64}"
+    except Exception as exc:
+        logger.warning("Failed to pre-download image (%s), using URL as-is", exc)
+        return url
 
 
 # ─── Virtual Try-On (IDM-VTON on fal.ai) ──────────────────────────
@@ -51,17 +84,17 @@ async def virtual_try_on(
     """
     # Default model image – a generic fashion model pose
     if model_image_url is None:
-        model_image_url = (
-            "https://storage.googleapis.com/falserverless/"
-            "model_tests/try_on/person.jpg"
-        )
+        model_image_url = DEFAULT_MODEL_URL
+
+    # Ensure the model image is accessible by Fal.ai
+    accessible_url = await _ensure_accessible_url(model_image_url)
 
     logger.info("Starting VTO – garment: %s", garment_image_url[:80])
 
     result = await fal_client.run_async(
         "fal-ai/idm-vton",
         arguments={
-            "human_image_url": model_image_url,
+            "human_image_url": accessible_url,
             "garment_image_url": garment_image_url,
             "description": "A fashion model wearing the garment, professional fashion photography",
         },
