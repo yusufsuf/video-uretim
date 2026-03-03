@@ -71,6 +71,7 @@ async def _ensure_accessible_url(url: str) -> str:
 async def virtual_try_on(
     garment_image_url: str,
     model_image_url: Optional[str] = None,
+    description: str = "A fashion model wearing the garment, professional fashion photography",
 ) -> str:
     """Apply the garment onto a model using IDM-VTON via fal.ai.
 
@@ -78,6 +79,7 @@ async def virtual_try_on(
         garment_image_url: URL of the preprocessed garment image.
         model_image_url:   URL of the model / person image.
                            If None a default fashion model will be used.
+        description:       Description of the garment for better VTO fidelity.
 
     Returns:
         URL of the resulting try-on image.
@@ -96,7 +98,7 @@ async def virtual_try_on(
         arguments={
             "human_image_url": accessible_url,
             "garment_image_url": garment_image_url,
-            "description": "A fashion model wearing the garment, professional fashion photography",
+            "description": description,
         },
     )
 
@@ -130,6 +132,7 @@ async def generate_video(
         arguments={
             "image_url": image_url,
             "prompt": prompt,
+            "negative_prompt": "face close-up, zooming into face, blurry, distorted fabric, low quality, deformed hands",
             "duration": duration,
             "aspect_ratio": aspect_ratio,
         },

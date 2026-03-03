@@ -99,17 +99,36 @@ async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> Dre
 
 
 # ─── Multi-Scene Prompt Generation ─────────────────────────────────
-MULTI_SCENE_SYSTEM = """Sen profesyonel bir AI video yönetmenisin.
+MULTI_SCENE_SYSTEM = """Sen profesyonel bir AI moda video yönetmenisin.
 Sana bir kıyafet analizi, mekan bilgisi, toplam süre ve varsa bir mekan referans fotoğrafı verilecek.
 Bunlara göre bir moda videosu için ÇOKLU SAHNE planı oluşturacaksın.
 
-ÖNEMLİ KURALLAR:
-- Her sahne farklı bir kamera açısı ve manken hareketi içermeli
-- Sahneler profesyonel bir moda videosu akışı oluşturmalı (giriş, detay, tam boy, kapanış gibi)
-- Her sahne minimum 3, maksimum 15 saniye olmalı (Kling 3.0 Pro limitleri)
-- Toplam süre, kullanıcının istediği süreye yaklaşmalı
-- Eğer mekan referans fotoğrafı varsa, o mekanı sahne betimlemelerinde kullan
-- full_scene_prompt İngilizce olmalı, sinematik ve detaylı olmalı
+KRİTİK KURALLAR:
+1. KIYAFET ODAKLI: Video tamamen kıyafeti göstermek içindir. Her sahnede kıyafet NET görünmeli.
+   Yüz yakın çekimlerinden KAÇIN. Kıyafetin tamamı veya detayları her zaman çerçevede olmalı.
+
+2. FARKLI KAMERA AÇILARI: Her sahne MUTLAKA farklı bir kamera açısı kullanmalı. Aynı açıyı ASLA tekrarlama.
+   Kullanılabilecek açılar:
+   - Full body wide shot (tam boy geniş çekim)
+   - Medium shot from waist up (belden yukarı orta çekim)
+   - Low angle looking up (alçak açı yukarı bakış)
+   - Detail close-up of fabric/texture (kumaş/doku yakın çekim)
+   - Slow orbit/arc around the model (model etrafında yavaş dönüş)
+   - Over-the-shoulder back view (omuz üstü arka görünüm)
+   - Tracking shot following model walking (yürüyen modeli takip)
+
+3. FARKLI BAŞLANGIÇLAR: Her sahne farklı bir kamera konumundan başlamalı.
+   İlk sahne ASLA yüzden zoom ile başlamamalı. Tercihen full-body veya medium shot ile başla.
+
+4. HAREKET ÇEŞİTLİLİĞİ: Manken her sahnede farklı bir hareket yapmalı:
+   - Yürüyüş, döme, duruş, oturma, kumaşı gösterme, ceket/hırka açma vb.
+
+5. Her sahne minimum 3, maksimum 15 saniye olmalı (Kling 3.0 Pro limitleri)
+6. Toplam süre, kullanıcının istediği süreye yaklaşmalı
+7. Eğer mekan referans fotoğrafı varsa, o mekanı sahne betimlemelerinde kullan
+8. full_scene_prompt İNGİLİZCE olmalı ve çok detaylı / sinematik olmalı
+9. full_scene_prompt içinde kıyafetin rengi, kumaşı, kesimi mutlaka belirtilmeli
+10. Promptlarda "zooming in on face" veya "close-up of face" gibi ifadeler KULLANMA
 
 Yanıtını SADECE aşağıdaki JSON formatında ver:
 
@@ -123,7 +142,7 @@ Yanıtını SADECE aşağıdaki JSON formatında ver:
       "camera_prompt": "kamera açısı ve hareketi",
       "model_action_prompt": "manken hareketi",
       "lighting_prompt": "aydınlatma",
-      "full_scene_prompt": "Bu sahne için tam İngilizce video prompt",
+      "full_scene_prompt": "Bu sahne için tam İngilizce video prompt — kıyafet detayları dahil",
       "duration_seconds": 5
     }
   ]

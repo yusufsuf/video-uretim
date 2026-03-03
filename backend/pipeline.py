@@ -201,6 +201,7 @@ async def run_pipeline(
         vto_result = await virtual_try_on(
             garment_image_url=processed_front,
             model_image_url=model_url,
+            description=f"A fashion model wearing a {analysis.color} {analysis.fabric} {analysis.garment_type}, {analysis.cut_style} cut, {analysis.length} length, {analysis.details}",
         )
         _update_job(job_id, progress=50, message="Virtual try-on tamamlandı.")
 
