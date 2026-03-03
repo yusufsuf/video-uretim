@@ -121,22 +121,20 @@ async def enhance_image(image_url: str, target_width: int = 1024) -> str:
 
 
 # ─── Claid AI Fashion Models (per-scene photo generation) ────────
+CLAID_FASHION_URL = "https://api.claid.ai/v1/image/ai-fashion-models"
 
 async def generate_fashion_photo(
     clothing_url: str,
     prompt: str = "Full body front view, fashion model standing elegantly in a luxury studio",
     aspect_ratio: str = "9:16",
 ) -> str:
-    """Generate a fashion model photo wearing the garment using Claid AI.
+    """Generate a fashion model photo wearing the garment using Claid AI Fashion Models.
 
-    Uses the /v1-beta1/image/edit endpoint with ai_fashion_models operation.
-    Claid generates an AI model wearing the garment with the specified
-    pose, camera angle, and background — all described in the prompt.
+    Uses the dedicated /v1/image/ai-fashion-models endpoint.
 
     Args:
         clothing_url: URL or data URI of the garment image.
-        prompt:       Complete photo description: camera angle + pose + background.
-                      Example: "Full body front view, model standing in marble lobby"
+        prompt:       Complete scene description: camera angle + pose + background.
         aspect_ratio: Output aspect ratio (9:16, 16:9, 1:1).
 
     Returns:
@@ -151,14 +149,15 @@ async def generate_fashion_photo(
     }
 
     payload = {
-        "input": clothing_url,
-        "operations": {
-            "ai_fashion_models": {
-                "prompt": prompt,
-                "aspect_ratio": aspect_ratio,
-            }
+        "input": {
+            "clothing": [clothing_url],
+        },
+        "scene_prompt": prompt,
+        "options": {
+            "aspect_ratio": aspect_ratio,
         },
         "output": {
+            "number_of_images": 1,
             "format": "png",
         },
     }
@@ -167,11 +166,10 @@ async def generate_fashion_photo(
 
     async with httpx.AsyncClient(timeout=180) as http:
         # Submit the job
-        resp = await http.post(
-            f"{CLAID_BASE_URL}/image/edit",
-            json=payload,
-            headers=headers,
-        )
+        resp = await http.post(CLAID_FASHION_URL, json=payload, headers=headers)
+
+        # Log full response for debugging
+        logger.info("Claid response status: %d, body: %s", resp.status_code, resp.text[:500])
         resp.raise_for_status()
         result = resp.json()
 
