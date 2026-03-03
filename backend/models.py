@@ -54,7 +54,8 @@ class SingleScenePrompt(BaseModel):
     lighting_prompt: str = Field(description="Aydınlatma ayarı")
     pose_description: str = Field(default="", description="Detaylı poz açıklaması (Claid için)")
     background_description: str = Field(default="", description="Arka plan açıklaması (Claid için)")
-    full_scene_prompt: str = Field(description="Bu sahne için tam video prompt")
+    photo_prompt: str = Field(default="", description="Claid fotoğraf prompt'u (açı + poz + arka plan)")
+    full_scene_prompt: str = Field(description="Kling video prompt'u (video hareketi)")
     duration_seconds: int = Field(description="Bu sahnenin süresi (saniye)")
     view_type: str = Field(default="front", description="front / back / transition")
 

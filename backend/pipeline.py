@@ -209,19 +209,20 @@ async def run_pipeline(
             )
             logger.info("[%s] Scene %d/%d – Generating fashion photo (view_type=%s)", job_id, scene_num, total_scenes, view)
 
-            pose = getattr(scene, "pose_description", "") or scene.model_action_prompt
-            bg = getattr(scene, "background_description", "") or scene_prompt.background_prompt
+            # Use photo_prompt from GPT (contains angle + pose + background)
+            claid_prompt = getattr(scene, "photo_prompt", "") or ""
+            if not claid_prompt:
+                # Fallback: build from pose + background fields
+                pose = getattr(scene, "pose_description", "") or scene.model_action_prompt
+                bg = getattr(scene, "background_description", "") or scene_prompt.background_prompt
+                garment_desc = getattr(scene_prompt, "garment_lock_description", "") or ""
+                claid_prompt = f"Full body {view} view, {pose}, wearing {garment_desc}, {bg}"
 
-            try:
-                photo_url = await generate_fashion_photo(
-                    clothing_url=garment_url,
-                    pose=pose,
-                    background=bg,
-                    aspect_ratio=aspect_ratio,
-                )
-            except Exception as photo_err:
-                logger.warning("[%s] Claid fashion photo failed for scene %d: %s – using garment image directly", job_id, scene_num, photo_err)
-                photo_url = garment_url  # fallback
+            photo_url = await generate_fashion_photo(
+                clothing_url=garment_url,
+                prompt=claid_prompt,
+                aspect_ratio=aspect_ratio,
+            )
 
             logger.info("[%s] Scene %d photo ready: %s", job_id, scene_num, photo_url[:80] if photo_url else "N/A")
 

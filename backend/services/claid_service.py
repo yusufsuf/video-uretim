@@ -121,24 +121,23 @@ async def enhance_image(image_url: str, target_width: int = 1024) -> str:
 
 
 # ─── Claid AI Fashion Models (per-scene photo generation) ────────
-CLAID_FASHION_URL = "https://api.claid.ai/v1/image/ai-fashion-models"
 
 async def generate_fashion_photo(
     clothing_url: str,
-    pose: str = "standing, walking forward",
-    background: str = "luxury fashion studio with soft lighting",
+    prompt: str = "Full body front view, fashion model standing elegantly in a luxury studio",
     aspect_ratio: str = "9:16",
 ) -> str:
-    """Generate a fashion model photo wearing the garment using Claid AI Fashion Models.
+    """Generate a fashion model photo wearing the garment using Claid AI.
 
-    Claid generates its own AI fashion model and dresses it with the garment.
-    Each scene gets a unique photo with specific pose and background.
+    Uses the /v1-beta1/image/edit endpoint with ai_fashion_models operation.
+    Claid generates an AI model wearing the garment with the specified
+    pose, camera angle, and background — all described in the prompt.
 
     Args:
-        clothing_url:    URL or data URI of the garment image.
-        pose:            Pose description for the AI model.
-        background:      Background/setting text prompt for scene generation.
-        aspect_ratio:    Output aspect ratio (9:16, 16:9, 1:1).
+        clothing_url: URL or data URI of the garment image.
+        prompt:       Complete photo description: camera angle + pose + background.
+                      Example: "Full body front view, model standing in marble lobby"
+        aspect_ratio: Output aspect ratio (9:16, 16:9, 1:1).
 
     Returns:
         URL of the generated fashion photo.
@@ -152,66 +151,76 @@ async def generate_fashion_photo(
     }
 
     payload = {
-        "input": {
-            "clothing": [clothing_url],
-        },
-        "options": {
-            "pose": pose,
-            "background": {
-                "prompt": background,
-            },
-            "aspect_ratio": aspect_ratio,
+        "input": clothing_url,
+        "operations": {
+            "ai_fashion_models": {
+                "prompt": prompt,
+                "aspect_ratio": aspect_ratio,
+            }
         },
         "output": {
-            "number_of_images": 1,
             "format": "png",
         },
     }
 
-    logger.info(
-        "Claid Fashion Photo – pose: %s, bg: %s",
-        pose[:50],
-        background[:50],
-    )
+    logger.info("Claid Fashion Photo – prompt: %s", prompt[:80])
 
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with httpx.AsyncClient(timeout=180) as http:
         # Submit the job
-        resp = await client.post(CLAID_FASHION_URL, json=payload, headers=headers)
+        resp = await http.post(
+            f"{CLAID_BASE_URL}/image/edit",
+            json=payload,
+            headers=headers,
+        )
         resp.raise_for_status()
         result = resp.json()
 
-        # Check if result is immediate or needs polling
+        logger.info("Claid response: %s", str(result)[:300])
+
+        # Check for immediate result
+        tmp_url = result.get("data", {}).get("output", {}).get("tmp_url", "")
+        if tmp_url:
+            logger.info("Claid Fashion Photo completed (immediate): %s", tmp_url[:80])
+            return tmp_url
+
+        # Check for async result that needs polling
         result_url = result.get("data", {}).get("result_url", "")
         output_objects = result.get("data", {}).get("result", {}).get("output_objects", [])
 
         if output_objects:
-            # Immediate result
             photo_url = output_objects[0].get("tmp_url", "")
-            logger.info("Claid Fashion Photo completed (immediate): %s", photo_url[:80])
-            return photo_url
+            if photo_url:
+                logger.info("Claid Fashion Photo completed (objects): %s", photo_url[:80])
+                return photo_url
 
         if result_url:
-            # Need to poll for result
             logger.info("Claid Fashion Photo polling: %s", result_url[:80])
-            for attempt in range(12):  # max 12 * 10s = 2 min wait
+            for attempt in range(18):  # max 18 * 10s = 3 min wait
                 await asyncio.sleep(10)
-                poll_resp = await client.get(result_url, headers=headers)
+                poll_resp = await http.get(result_url, headers=headers)
                 poll_resp.raise_for_status()
                 poll_data = poll_resp.json()
 
+                # Check for completed result
+                poll_tmp = poll_data.get("data", {}).get("output", {}).get("tmp_url", "")
+                if poll_tmp:
+                    logger.info("Claid Fashion Photo completed (polled): %s", poll_tmp[:80])
+                    return poll_tmp
+
                 status = poll_data.get("data", {}).get("status", "")
-                if status == "DONE":
+                if status in ("DONE", "done", "completed"):
                     objects = poll_data.get("data", {}).get("result", {}).get("output_objects", [])
                     if objects:
                         photo_url = objects[0].get("tmp_url", "")
-                        logger.info("Claid Fashion Photo completed (polled): %s", photo_url[:80])
-                        return photo_url
-                elif status in ("FAILED", "ERROR"):
+                        if photo_url:
+                            logger.info("Claid Fashion Photo completed (polled-objects): %s", photo_url[:80])
+                            return photo_url
+                elif status in ("FAILED", "ERROR", "failed", "error"):
                     raise RuntimeError(f"Claid Fashion Photo failed: {poll_data}")
 
-                logger.info("Claid Fashion Photo polling attempt %d, status: %s", attempt + 1, status)
+                logger.info("Claid Fashion Photo poll %d, status: %s", attempt + 1, status)
 
-            raise TimeoutError("Claid Fashion Photo generation timed out after 2 minutes")
+            raise TimeoutError("Claid Fashion Photo generation timed out after 3 minutes")
 
         raise ValueError(f"Unexpected Claid response: {result}")
 

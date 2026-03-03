@@ -163,6 +163,21 @@ VIDEO PROMPT STRUCTURE (80-120 words per prompt):
 - Sentence 5: 'The [garment] hem ends cleanly at floor level with no shoes visible. The garment remains perfectly visible and unchanged.'
 - FINAL TAGS (ALWAYS): Every prompt MUST end with: "Cinematic realism, shot on 35mm film, natural lighting, soft shadows, high dynamic range, realistic skin texture, non-synthetic, organic look, professional fashion photography."
 
+PHOTO PROMPT RULES (CRITICAL):
+- Each scene must have a photo_prompt for generating the keyframe photo.
+- photo_prompt describes: camera angle/framing + model pose + background/setting.
+- Format: "[Camera angle], [model pose], [garment details], [background/setting]"
+- Examples:
+  - "Full body front view, fashion model standing elegantly with arms at sides, wearing a forest green satin evening gown, in a luxurious marble hotel lobby with warm ambient lighting"
+  - "Medium shot from waist up, model looking over shoulder showing back of dress, sapphire blue silk gown with open back, on a rooftop terrace at golden hour"
+  - "Low angle full body shot, model walking forward confidently, emerald chiffon maxi dress flowing naturally, in a Mediterranean garden with stone arches"
+
+DUAL-PROMPT CONSISTENCY (CRITICAL):
+- The photo_prompt camera angle MUST match the starting angle of the video prompt.
+- If photo_prompt says "full body front view" → video prompt must START with "Camera captures the model from a full body front view, then slowly..."
+- If photo_prompt says "medium shot side angle" → video must begin from that same angle.
+- This ensures seamless transition from photo to video.
+
 FORBIDDEN WORDS (NEVER USE):
 - '8k', 'hyper-realistic', 'shiny', 'sparkling', 'glittering', 'specular', 'unreal engine', 'masterpiece'
 - 'zooming in on face', 'close-up of face'
@@ -183,9 +198,10 @@ Return JSON only:
       "camera_prompt": "camera angle and movement",
       "model_action_prompt": "model action",
       "lighting_prompt": "lighting setup",
-      "pose_description": "detailed pose with garment details for photo generation",
+      "pose_description": "detailed pose for this scene",
       "background_description": "setting for this specific scene",
-      "full_scene_prompt": "80-120 word cinematic video prompt with garment details and final tags",
+      "photo_prompt": "Complete Claid photo prompt: angle + pose + garment + background",
+      "full_scene_prompt": "80-120 word video prompt starting from SAME angle as photo_prompt",
       "duration_seconds": 5,
       "view_type": "front | back | transition"
     }
