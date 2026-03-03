@@ -125,16 +125,16 @@ CLAID_FASHION_URL = "https://api.claid.ai/v1/image/ai-fashion-models"
 
 async def generate_fashion_photo(
     clothing_url: str,
-    prompt: str = "Full body front view, fashion model standing elegantly in a luxury studio",
+    pose: str = "standing elegantly, full body front view",
+    background: str = "luxury fashion studio with soft lighting",
     aspect_ratio: str = "9:16",
 ) -> str:
     """Generate a fashion model photo wearing the garment using Claid AI Fashion Models.
 
-    Uses the dedicated /v1/image/ai-fashion-models endpoint.
-
     Args:
         clothing_url: URL or data URI of the garment image.
-        prompt:       Complete scene description: camera angle + pose + background.
+        pose:         Pose + camera angle description for the AI model.
+        background:   Background/setting description for the scene.
         aspect_ratio: Output aspect ratio (9:16, 16:9, 1:1).
 
     Returns:
@@ -152,8 +152,9 @@ async def generate_fashion_photo(
         "input": {
             "clothing": [clothing_url],
         },
-        "scene_prompt": prompt,
         "options": {
+            "pose": pose,
+            "background": background,
             "aspect_ratio": aspect_ratio,
         },
         "output": {
@@ -162,13 +163,10 @@ async def generate_fashion_photo(
         },
     }
 
-    logger.info("Claid Fashion Photo – prompt: %s", prompt[:80])
+    logger.info("Claid Fashion Photo – pose: %s, bg: %s", pose[:60], background[:60])
 
     async with httpx.AsyncClient(timeout=180) as http:
-        # Submit the job
         resp = await http.post(CLAID_FASHION_URL, json=payload, headers=headers)
-
-        # Log full response for debugging
         logger.info("Claid response status: %d, body: %s", resp.status_code, resp.text[:500])
         resp.raise_for_status()
         result = resp.json()

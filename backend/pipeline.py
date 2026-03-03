@@ -209,18 +209,14 @@ async def run_pipeline(
             )
             logger.info("[%s] Scene %d/%d – Generating fashion photo (view_type=%s)", job_id, scene_num, total_scenes, view)
 
-            # Use photo_prompt from GPT (contains angle + pose + background)
-            claid_prompt = getattr(scene, "photo_prompt", "") or ""
-            if not claid_prompt:
-                # Fallback: build from pose + background fields
-                pose = getattr(scene, "pose_description", "") or scene.model_action_prompt
-                bg = getattr(scene, "background_description", "") or scene_prompt.background_prompt
-                garment_desc = getattr(scene_prompt, "garment_lock_description", "") or ""
-                claid_prompt = f"Full body {view} view, {pose}, wearing {garment_desc}, {bg}"
+            # Use pose + background from GPT scene (separate fields for Claid)
+            pose = getattr(scene, "pose_description", "") or scene.model_action_prompt
+            bg = getattr(scene, "background_description", "") or scene_prompt.background_prompt
 
             photo_url = await generate_fashion_photo(
                 clothing_url=garment_url,
-                prompt=claid_prompt,
+                pose=pose,
+                background=bg,
                 aspect_ratio=aspect_ratio,
             )
 
