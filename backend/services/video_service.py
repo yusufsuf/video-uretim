@@ -17,21 +17,21 @@ logger = logging.getLogger(__name__)
 os.environ["FAL_KEY"] = settings.FAL_KEY
 
 # ─── Model Presets ─────────────────────────────────────────────────
-# Public model images for Virtual Try-On
-# Using Fal.ai's own test images and reliable direct-access CDN URLs
+# Full-body model images for Claid AI Fashion Models dressing
+# These MUST be full-body (head to toe) photos for proper garment fitting
 DEFAULT_MODEL_URL = (
-    "https://storage.googleapis.com/falserverless/"
-    "model_tests/try_on/person.jpg"
+    "https://images.unsplash.com/photo-1534528741775-53994a69daeb"
+    "?w=800&h=1200&fit=crop&crop=center"
 )
 
 MODEL_PRESETS = {
     "default": DEFAULT_MODEL_URL,
-    "model_1": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
-    "model_2": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
-    "model_3": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
-    "model_4": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
-    "model_5": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
-    "model_6": "https://storage.googleapis.com/falserverless/model_tests/try_on/person.jpg",
+    "model_1": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&h=1200&fit=crop&crop=center",
+    "model_2": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&h=1200&fit=crop&crop=center",
+    "model_3": "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=800&h=1200&fit=crop&crop=center",
+    "model_4": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=800&h=1200&fit=crop&crop=center",
+    "model_5": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&h=1200&fit=crop&crop=center",
+    "model_6": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=800&h=1200&fit=crop&crop=center",
 }
 
 

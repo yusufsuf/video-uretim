@@ -30,6 +30,7 @@ from services.claid_service import preprocess_garment, generate_fashion_photo
 from services.video_service import (
     download_file,
     generate_video,
+    get_model_image_url,
 )
 
 logger = logging.getLogger(__name__)
@@ -212,9 +213,11 @@ async def run_pipeline(
             bg = getattr(scene, "background_description", "") or scene_prompt.background_prompt
 
             try:
+                # Use our pre-defined full-body model preset
+                model_url = get_model_image_url(model_preset)
                 photo_url = await generate_fashion_photo(
                     clothing_url=garment_url,
-                    model_image_url=reference_image_url or "",
+                    model_image_url=model_url,
                     pose=pose,
                     background=bg,
                     aspect_ratio=aspect_ratio,
