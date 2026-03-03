@@ -46,6 +46,11 @@ app.add_middleware(
 # Serve generated outputs
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
 
+# Serve model assets (full-body model photos for Claid)
+_assets_dir = os.path.join(os.path.dirname(__file__), "assets")
+if os.path.isdir(_assets_dir):
+    app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
+
 
 # ─── Helpers ───────────────────────────────────────────────────────
 async def _save_upload(upload: UploadFile) -> str:

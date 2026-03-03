@@ -18,26 +18,51 @@ os.environ["FAL_KEY"] = settings.FAL_KEY
 
 # ─── Model Presets ─────────────────────────────────────────────────
 # Full-body model images for Claid AI Fashion Models dressing
-# These MUST be full-body (head to toe) photos for proper garment fitting
-DEFAULT_MODEL_URL = (
-    "https://images.unsplash.com/photo-1534528741775-53994a69daeb"
-    "?w=800&h=1200&fit=crop&crop=center"
-)
+# White background, minimal clothing, head-to-toe, straight pose
+# Files stored locally in backend/assets/models/
+_MODELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets", "models")
 
 MODEL_PRESETS = {
-    "default": DEFAULT_MODEL_URL,
-    "model_1": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800&h=1200&fit=crop&crop=center",
-    "model_2": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&h=1200&fit=crop&crop=center",
-    "model_3": "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=800&h=1200&fit=crop&crop=center",
-    "model_4": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=800&h=1200&fit=crop&crop=center",
-    "model_5": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&h=1200&fit=crop&crop=center",
-    "model_6": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=800&h=1200&fit=crop&crop=center",
+    "default": "model_default.jpg",
+    "model_1": "model_default.jpg",
+    "model_2": "model_default.jpg",
+    "model_3": "model_default.jpg",
+    "model_4": "model_default.jpg",
+    "model_5": "model_default.jpg",
+    "model_6": "model_default.jpg",
 }
 
 
 def get_model_image_url(preset: str = "default") -> str:
-    """Resolve a model preset key to an image URL."""
-    return MODEL_PRESETS.get(preset, DEFAULT_MODEL_URL)
+    """Resolve a model preset key to a base64 data URI.
+
+    Reads the local model image file and converts it to a data URI
+    that can be sent directly to Claid API.
+    """
+    import base64
+    from pathlib import Path
+
+    filename = MODEL_PRESETS.get(preset, MODEL_PRESETS["default"])
+    filepath = os.path.join(_MODELS_DIR, filename)
+
+    if not os.path.exists(filepath):
+        logger.warning("Model preset file not found: %s – using fallback", filepath)
+        # Try to find any image in the models dir
+        for f in os.listdir(_MODELS_DIR):
+            if f.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                filepath = os.path.join(_MODELS_DIR, f)
+                break
+        else:
+            raise FileNotFoundError(f"No model images found in {_MODELS_DIR}")
+
+    suffix = Path(filepath).suffix.lower().lstrip(".")
+    mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(suffix, "image/jpeg")
+
+    with open(filepath, "rb") as f:
+        data = base64.b64encode(f.read()).decode()
+
+    logger.info("Model preset '%s' loaded from %s", preset, filepath)
+    return f"data:{mime};base64,{data}"
 
 
 async def _ensure_accessible_url(url: str) -> str:
@@ -84,9 +109,9 @@ async def virtual_try_on(
     Returns:
         URL of the resulting try-on image.
     """
-    # Default model image – a generic fashion model pose
+    # Default model image – use our preset full-body model
     if model_image_url is None:
-        model_image_url = DEFAULT_MODEL_URL
+        model_image_url = get_model_image_url("default")
 
     # Ensure the model image is accessible by Fal.ai
     accessible_url = await _ensure_accessible_url(model_image_url)
