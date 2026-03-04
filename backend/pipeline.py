@@ -182,8 +182,31 @@ async def run_pipeline(
         _update_job(job_id, scene_prompt=scene_prompt, progress=25, message=f"{scene_prompt.scene_count} sahne planlandı.")
         logger.info("[%s] Planned %d scenes", job_id, scene_prompt.scene_count)
 
+        # ── Step 2b: Preprocess garment images for Claid ─────────
+        _update_job(job_id, status=JobStatus.PREPROCESSING, progress=26, message="Gorseller isleniyor...")
+        logger.info("[%s] Step 2b – Preprocessing garment images for Claid public URL", job_id)
+
+        # Claid AI Fashion Models requires public URLs, not data URIs
+        # Use enhance_image to upload and get a tmp_url
+        from services.claid_service import enhance_image, remove_background
+        try:
+            front_public_url = await enhance_image(front_url)
+            logger.info("[%s] Front garment public URL: %s", job_id, front_public_url[:80] if front_public_url else "N/A")
+        except Exception as e:
+            logger.warning("[%s] Claid enhance failed for front: %s – using data URI", job_id, e)
+            front_public_url = front_url
+
+        back_public_url = None
+        if back_url:
+            try:
+                back_public_url = await enhance_image(back_url)
+                logger.info("[%s] Back garment public URL: %s", job_id, back_public_url[:80] if back_public_url else "N/A")
+            except Exception as e:
+                logger.warning("[%s] Claid enhance failed for back: %s – using data URI", job_id, e)
+                back_public_url = back_url
+
         # ── Step 3: Per-scene photo + video loop ─────────────────
-        _update_job(job_id, status=JobStatus.GENERATING_PHOTO, progress=30, message="Sahne fotoğrafları üretiliyor...")
+        _update_job(job_id, status=JobStatus.GENERATING_PHOTO, progress=30, message="Sahne fotograflari uretiliyor...")
         logger.info("[%s] Step 3 – Per-scene photo + video generation", job_id)
 
         clip_paths = []
@@ -194,10 +217,10 @@ async def run_pipeline(
 
             # ── 3a: Select garment photo based on view_type ──────
             view = getattr(scene, "view_type", "front").lower()
-            if view in ("back", "transition") and back_url:
-                garment_url = back_url
+            if view in ("back", "transition") and back_public_url:
+                garment_url = back_public_url
             else:
-                garment_url = front_url
+                garment_url = front_public_url
 
             # ── 3b: Generate fashion model photo via Claid ───────
             photo_progress = 30 + int((scene_num / total_scenes) * 25)
