@@ -186,24 +186,20 @@ async def run_pipeline(
         _update_job(job_id, status=JobStatus.PREPROCESSING, progress=26, message="Gorseller isleniyor...")
         logger.info("[%s] Step 2b – Preprocessing garment images for Claid public URL", job_id)
 
-        # Claid AI Fashion Models requires public URLs, not data URIs
-        # Use enhance_image to upload and get a tmp_url
-        from services.claid_service import enhance_image, remove_background
-        try:
-            front_public_url = await enhance_image(front_url)
-            logger.info("[%s] Front garment public URL: %s", job_id, front_public_url[:80] if front_public_url else "N/A")
-        except Exception as e:
-            logger.warning("[%s] Claid enhance failed for front: %s – using data URI", job_id, e)
-            front_public_url = front_url
+        # Claid AI Fashion Models requires public URLs (max 4096 chars), not data URIs
+        # Use enhance_image to upload garment and get a short public tmp_url
+        from services.claid_service import enhance_image
+        front_public_url = await enhance_image(front_url)
+        if not front_public_url or front_public_url.startswith("data:"):
+            raise RuntimeError("Could not get public URL for front garment image from Claid")
+        logger.info("[%s] Front garment public URL (%d chars): %s", job_id, len(front_public_url), front_public_url[:100])
 
         back_public_url = None
         if back_url:
-            try:
-                back_public_url = await enhance_image(back_url)
-                logger.info("[%s] Back garment public URL: %s", job_id, back_public_url[:80] if back_public_url else "N/A")
-            except Exception as e:
-                logger.warning("[%s] Claid enhance failed for back: %s – using data URI", job_id, e)
-                back_public_url = back_url
+            back_public_url = await enhance_image(back_url)
+            if not back_public_url or back_public_url.startswith("data:"):
+                raise RuntimeError("Could not get public URL for back garment image from Claid")
+            logger.info("[%s] Back garment public URL (%d chars): %s", job_id, len(back_public_url), back_public_url[:100])
 
         # ── Step 3: Per-scene photo + video loop ─────────────────
         _update_job(job_id, status=JobStatus.GENERATING_PHOTO, progress=30, message="Sahne fotograflari uretiliyor...")
