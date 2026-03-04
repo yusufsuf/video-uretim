@@ -168,10 +168,13 @@ async def generate_fashion_photo(
     async with httpx.AsyncClient(timeout=180) as http:
         resp = await http.post(CLAID_FASHION_URL, json=payload, headers=headers)
         logger.info("Claid response status: %d, body: %s", resp.status_code, resp.text[:500])
-        resp.raise_for_status()
-        result = resp.json()
 
-        logger.info("Claid response: %s", str(result)[:300])
+        if resp.status_code >= 400:
+            raise RuntimeError(
+                f"Claid API error {resp.status_code}: {resp.text[:500]}"
+            )
+
+        result = resp.json()
 
         # Check for immediate result
         tmp_url = result.get("data", {}).get("output", {}).get("tmp_url", "")
