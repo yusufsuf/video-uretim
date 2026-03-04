@@ -107,11 +107,14 @@ function removeFile(type) {
     const zones = { front: frontZone, back: backZone, refimg: refimgZone, video: videoZone };
     const inputs = { front: frontInput, back: backInput, refimg: refimgInput, video: videoInput };
     const zone = zones[type];
+    const plusIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14"/></svg>';
+    const imgIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 16l5-5 4 4 4-4 5 5"/></svg>';
+    const vidIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5,3 19,12 5,21"/></svg>';
 
-    if (type === "front") { frontFile = null; resetZone(zone, "👗", "Ön Görünüm", "JPG, PNG veya WebP", "Zorunlu"); }
-    else if (type === "back") { backFile = null; resetZone(zone, "👗", "Arka Görünüm", "Tutarlılık için önerilir", "Opsiyonel", true); }
-    else if (type === "refimg") { refimgFile = null; resetZone(zone, "🖼️", "Mekan / Referans", "Mekan veya stil referansı", "Opsiyonel", true); }
-    else { videoFile = null; resetZone(zone, "🎬", "Referans Video", "Hareket referansı MP4", "Opsiyonel", false, true); }
+    if (type === "front") { frontFile = null; resetZone(zone, plusIcon, "On Gorunum", "JPG, PNG veya WebP", "Zorunlu"); }
+    else if (type === "back") { backFile = null; resetZone(zone, plusIcon, "Arka Gorunum", "Tutarlilik icin onerilir", "Opsiyonel", true); }
+    else if (type === "refimg") { refimgFile = null; resetZone(zone, imgIcon, "Mekan / Referans", "Mekan veya stil referansi", "Opsiyonel", true); }
+    else { videoFile = null; resetZone(zone, vidIcon, "Referans Video", "Hareket referansi MP4", "Opsiyonel", false, true); }
 
     zone.classList.remove("has-file");
     inputs[type].value = "";
@@ -119,19 +122,17 @@ function removeFile(type) {
 }
 
 function resetZone(zone, icon, label, hint, badge, isMuted = false, isVideo = false) {
-    const badgeStyle = isMuted ? ' style="background: var(--text-muted);"' : '';
-    // Determine type from zone id
+    const badgeClass = isMuted ? ' muted' : '';
     const type = zone.id.replace("-zone", "");
     const inputId = type + "-input";
     const acceptType = isVideo ? "video/*" : "image/*";
     zone.innerHTML = `
-        <span class="badge"${badgeStyle}>${badge}</span>
+        <span class="badge${badgeClass}">${badge}</span>
         <div class="upload-icon">${icon}</div>
         <div class="upload-label">${label}</div>
         <div class="upload-hint">${hint}</div>
         <input type="file" id="${inputId}" accept="${acceptType}">
     `;
-    // Re-bind the input
     const newInput = zone.querySelector("input[type=file]");
     newInput.addEventListener("change", () => {
         if (newInput.files[0]) handleFileSelect(newInput.files[0], zone, type);
