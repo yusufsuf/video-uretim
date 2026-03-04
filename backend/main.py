@@ -46,6 +46,9 @@ app.add_middleware(
 # Serve generated outputs
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
 
+# Serve uploaded files (so Claid can fetch them via public URL)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+
 # Serve model assets (full-body model photos for Claid)
 _assets_dir = os.path.join(os.path.dirname(__file__), "assets")
 if os.path.isdir(_assets_dir):
@@ -65,28 +68,14 @@ async def _save_upload(upload: UploadFile) -> str:
 
 
 def _file_to_url(path: str) -> str:
-    """Convert a local file path to a URL that external APIs can fetch.
+    """Convert a local file path to a public URL that external APIs can fetch.
 
-    NOTE: In production, upload to a cloud bucket and return a public URL.
-    For local development, this returns a data URI (works with small files)
-    or you can use a tunnel like ngrok.
+    Uses BASE_URL + /uploads/filename so Claid and other services can
+    download the file via HTTP instead of receiving a huge data URI.
     """
-    import base64
-    from pathlib import Path
-
-    suffix = Path(path).suffix.lower().lstrip(".")
-    mime_map = {
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "png": "image/png",
-        "webp": "image/webp",
-        "mp4": "video/mp4",
-    }
-    mime = mime_map.get(suffix, "application/octet-stream")
-
-    with open(path, "rb") as f:
-        data = base64.b64encode(f.read()).decode()
-    return f"data:{mime};base64,{data}"
+    filename = os.path.basename(path)
+    base = settings.BASE_URL.rstrip("/")
+    return f"{base}/uploads/{filename}"
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────

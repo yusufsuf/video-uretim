@@ -11,6 +11,9 @@ class Settings:
     FAL_KEY: str = os.getenv("FAL_KEY", "")
     CLAID_API_KEY: str = os.getenv("CLAID_API_KEY", "")
 
+    # Public base URL (set to your Coolify domain in production)
+    BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
+
     # Directories
     UPLOAD_DIR: str = os.path.join(os.path.dirname(__file__), "uploads")
     OUTPUT_DIR: str = os.path.join(os.path.dirname(__file__), "outputs")
