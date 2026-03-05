@@ -56,14 +56,74 @@ if os.path.isdir(_assets_dir):
 
 
 # ─── Helpers ───────────────────────────────────────────────────────
+MAX_IMAGE_BYTES = 9 * 1024 * 1024  # 9 MB target (Kling limit is 10 MB)
+
+
+def _optimize_image(path: str) -> str:
+    """Ensure an image file is under MAX_IMAGE_BYTES.
+
+    Strategy:
+    1. If already under limit → return as-is
+    2. Try reducing JPEG quality progressively (95 → 80 → 65 → 50)
+    3. If still too large, scale dimensions down by 25% and retry
+    Saves the optimized file as JPEG, returns the (possibly new) path.
+    """
+    from PIL import Image
+
+    file_size = os.path.getsize(path)
+    if file_size <= MAX_IMAGE_BYTES:
+        return path  # Already within limits
+
+    logger.info("Optimizing image %s (%d bytes → target <%d)", path, file_size, MAX_IMAGE_BYTES)
+
+    img = Image.open(path)
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
+
+    # Build optimized output path (always .jpg)
+    base = os.path.splitext(path)[0]
+    out_path = base + "_opt.jpg"
+
+    # Try progressively lower quality
+    for quality in [92, 85, 75, 65, 50]:
+        img.save(out_path, "JPEG", quality=quality, optimize=True)
+        if os.path.getsize(out_path) <= MAX_IMAGE_BYTES:
+            logger.info("Optimized to %d bytes (quality=%d)", os.path.getsize(out_path), quality)
+            os.replace(out_path, path.rsplit(".", 1)[0] + ".jpg")
+            return path.rsplit(".", 1)[0] + ".jpg"
+
+    # Quality alone not enough — scale down dimensions progressively
+    for scale in [0.75, 0.5, 0.35, 0.25]:
+        w, h = img.size
+        new_w, new_h = int(w * scale), int(h * scale)
+        resized = img.resize((new_w, new_h), Image.LANCZOS)
+        resized.save(out_path, "JPEG", quality=80, optimize=True)
+        if os.path.getsize(out_path) <= MAX_IMAGE_BYTES:
+            logger.info("Optimized to %d bytes (scale=%.0f%%, %dx%d)", os.path.getsize(out_path), scale * 100, new_w, new_h)
+            final_path = path.rsplit(".", 1)[0] + ".jpg"
+            os.replace(out_path, final_path)
+            return final_path
+
+    # Last resort — return whatever we have
+    final_path = path.rsplit(".", 1)[0] + ".jpg"
+    os.replace(out_path, final_path)
+    logger.warning("Could not optimize %s below %d bytes, final size: %d", path, MAX_IMAGE_BYTES, os.path.getsize(final_path))
+    return final_path
+
+
 async def _save_upload(upload: UploadFile) -> str:
-    """Save an uploaded file and return its local path."""
+    """Save an uploaded file, optimize images to stay under Kling's 10MB limit."""
     ext = os.path.splitext(upload.filename or "img.jpg")[1]
     filename = f"{uuid.uuid4().hex}{ext}"
     path = os.path.join(settings.UPLOAD_DIR, filename)
     content = await upload.read()
     with open(path, "wb") as f:
         f.write(content)
+
+    # Optimize images (skip video files)
+    if ext.lower() in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"):
+        path = _optimize_image(path)
+
     return path
 
 
