@@ -83,6 +83,7 @@ async def run_pipeline(
     back_path: Optional[str],
     side_path: Optional[str],
     reference_image_path: Optional[str],
+    reference_image_url: Optional[str],
     request: GenerationRequest,
     front_url: str,
     side_url: Optional[str] = None,
@@ -123,19 +124,26 @@ async def run_pipeline(
         _update_job(job_id, scene_prompt=scene_prompt, progress=30, message=f"{scene_prompt.scene_count} sahne planlandı.")
         logger.info("[%s] Planned %d scenes", job_id, scene_prompt.scene_count)
 
-        # ── Step 3: Generate background via Nano Banana 2 ────────
-        _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=35, message="Arka plan üretiliyor...")
-        logger.info("[%s] Step 3 – Generating background image", job_id)
+        # ── Step 3: Background image ─────────────────────────────
+        if reference_image_url:
+            # User uploaded a reference background — use it directly, skip Nano Banana
+            background_url = reference_image_url
+            logger.info("[%s] Step 3 – Using uploaded reference image as background: %s", job_id, background_url[:100])
+            _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=50, message="Yüklenen arka plan kullanılıyor...")
+        else:
+            # No reference — generate background via Nano Banana 2
+            _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=35, message="Arka plan üretiliyor...")
+            logger.info("[%s] Step 3 – Generating background image via Nano Banana 2", job_id)
 
-        bg_prompt = scene_prompt.background_image_prompt
-        logger.info("[%s] Background prompt: %s", job_id, bg_prompt[:120])
+            bg_prompt = scene_prompt.background_image_prompt
+            logger.info("[%s] Background prompt: %s", job_id, bg_prompt[:120])
 
-        background_url = await generate_background(
-            prompt=bg_prompt,
-            aspect_ratio=aspect_ratio,
-        )
-        logger.info("[%s] Background generated: %s", job_id, background_url[:100])
-        _update_job(job_id, progress=50, message="Arka plan hazır. Video üretiliyor...")
+            background_url = await generate_background(
+                prompt=bg_prompt,
+                aspect_ratio=aspect_ratio,
+            )
+            logger.info("[%s] Background generated: %s", job_id, background_url[:100])
+            _update_job(job_id, progress=50, message="Arka plan hazır. Video üretiliyor...")
 
         # ── Step 4: Build elements + generate multishot video ────
         _update_job(job_id, status=JobStatus.GENERATING_VIDEO, progress=55, message="Video üretiliyor...")

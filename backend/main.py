@@ -111,6 +111,7 @@ async def generate_video_endpoint(
     front_url = _file_to_url(front_path)
     side_url = _file_to_url(side_path) if side_path else None
     back_url = _file_to_url(back_path) if back_path else None
+    reference_image_url = _file_to_url(reference_image_path) if reference_image_path else None
 
     # Create job
     job_id = uuid.uuid4().hex[:12]
@@ -135,6 +136,7 @@ async def generate_video_endpoint(
             back_path=back_path,
             side_path=side_path,
             reference_image_path=reference_image_path,
+            reference_image_url=reference_image_url,
             request=request,
             front_url=front_url,
             side_url=side_url,
