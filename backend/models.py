@@ -81,6 +81,7 @@ class GenerationRequest(BaseModel):
 class JobStatus(str, Enum):
     PENDING = "pending"
     ANALYZING = "analyzing"
+    GENERATING_PROMPTS = "generating_prompts"
     GENERATING_BACKGROUND = "generating_background"
     GENERATING_VIDEO = "generating_video"
     COMPLETED = "completed"

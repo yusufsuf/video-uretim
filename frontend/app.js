@@ -238,7 +238,7 @@ function updateProgress(percent, message) {
     progressPct.textContent = `${percent}%`;
 }
 
-const STEP_ORDER = ["analyzing", "preprocessing", "generating_vto", "generating_video", "merging"];
+const STEP_ORDER = ["analyzing", "generating_prompts", "generating_background", "generating_video"];
 
 function resetSteps() {
     document.querySelectorAll(".step-item").forEach((el) => {

@@ -109,7 +109,7 @@ async def run_pipeline(
         logger.info("[%s] Analysis result: %s", job_id, analysis.garment_type)
 
         # ── Step 2: Generate multi-scene prompts ────────────────
-        _update_job(job_id, progress=20, message="Sahneler planlanıyor...")
+        _update_job(job_id, status=JobStatus.GENERATING_PROMPTS, progress=20, message="Sahneler planlanıyor...")
         logger.info("[%s] Step 2 – Generating multi-scene prompts (duration=%ds, scenes=%d)", job_id, duration, scene_count)
 
         scene_prompt = await generate_multi_scene_prompt(
