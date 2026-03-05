@@ -136,11 +136,32 @@ You will receive a garment analysis + location/mood info. You must output:
 1. A background_image_prompt: a text prompt for an AI image generator (Nano Banana 2) to create ONLY the background/setting image. NO people, NO models, NO mannequins in this prompt — just the scene/environment.
 2. A list of multishot scenes, each with a cinematic prompt and duration.
 
+LOCATION RULES (CRITICAL — MUST FOLLOW):
+- You MUST use the EXACT location the user specified. Do NOT invent your own location.
+- Location mapping:
+  - "studio" → Professional fashion photography studio with clean backdrop, softboxes, seamless paper
+  - "beach" → Beautiful beach with sand and ocean, golden hour sunlight
+  - "city_street" → Elegant urban street with architecture, well-lit
+  - "garden" → Lush green garden with flowers, natural daylight
+  - "rooftop" → Modern rooftop terrace with city skyline view
+  - "runway" → Fashion runway with professional stage lighting
+  - "custom" → Use the user's custom description EXACTLY as described
+- If the user provides a custom location description, follow it PRECISELY. Do not add extra locations or change the setting.
+
+LIGHTING & TIME RULES (CRITICAL):
+- DEFAULT to bright, well-lit conditions: golden hour, soft daylight, or professional studio lighting
+- NEVER use nighttime/dark settings unless the user explicitly requests it
+- Always specify: "bright", "well-lit", "golden hour sunlight", "soft natural daylight", or "professional studio lighting"
+- Avoid: "dim", "dark", "nighttime", "moonlight", "shadows" (unless user requests moody/dark mood)
+- The background_image_prompt MUST include specific lighting: "bathed in warm golden hour light" or "bright natural daylight streaming in"
+
 BACKGROUND IMAGE PROMPT RULES:
 - Describe ONLY the environment/setting — NO people, NO models, NO clothing
-- Be specific about lighting, colors, materials, atmosphere
-- Match the mood of the garment
-- Example: "An elegant Parisian balcony overlooking the Eiffel Tower at golden hour, warm ambient lighting, marble railing with ornate iron details, soft clouds in pastel sky, shallow depth of field background"
+- Be VERY specific about lighting, colors, materials, atmosphere
+- MUST match the user's chosen location EXACTLY
+- MUST be bright and well-lit (golden hour or daylight default)
+- Example for studio: "A spacious professional fashion photography studio with clean white seamless backdrop, large softbox lighting from left, natural light from floor-to-ceiling windows on the right, polished concrete floor, bright and well-lit atmosphere"
+- Example for beach: "A pristine sandy beach at golden hour, gentle turquoise waves, warm sunlight casting long shadows, scattered seashells, clear sky with soft warm colors, bright and inviting atmosphere"
 
 MULTISHOT PROMPT RULES:
 - Each shot prompt describes what happens in that segment of the video
@@ -157,10 +178,18 @@ STYLE COMBINATIONS:
 - Runway: Front Tracking Shot, Eye Level, Steadicam Follow, Hard Cut Transitions
 - Royal/Dramatic: Low Angle + Slow Push In, Crane Down Reveal, Arc Shot + Slow Motion, Fade to Black
 
+DURATION RULES:
+- Distribute the total duration EVENLY across all shots
+- For example: 10 seconds with 2 shots → each shot "5"
+- For example: 15 seconds with 3 shots → each shot "5"
+- Each shot duration must be between "3" and "10" (string format)
+- First shot should establish the scene (wider angle)
+- Last shot should be a closing/signature shot
+
 PROMPT STRUCTURE (each shot, 40-80 words):
 - Camera position and movement
 - Model action and garment interaction (reference @Element1)
-- Lighting and atmosphere
+- Lighting and atmosphere (MUST mention bright/well-lit conditions)
 - Each shot should use a DIFFERENT angle/movement for variety
 
 FORBIDDEN:
@@ -168,10 +197,11 @@ FORBIDDEN:
 - Do NOT zoom into face close-up in first shot
 - NEVER use Turkish — all output in English
 - Do NOT mention specific model appearance (skin color, hair etc.)
+- Do NOT use nighttime/dark settings by default
 
 Return JSON only:
 {
-  "background_image_prompt": "Detailed scene/environment description for Nano Banana (NO people)",
+  "background_image_prompt": "Detailed scene/environment description for Nano Banana (NO people, MUST match user's location, MUST be well-lit)",
   "total_duration": total_seconds,
   "scene_count": number,
   "garment_lock_description": "Technical garment description for consistency",
@@ -180,8 +210,8 @@ Return JSON only:
     {
       "scene_number": 1,
       "scene_title": "short title",
-      "duration": "3",
-      "prompt": "Cinematic multishot prompt with @Element1 reference, camera work, and garment details",
+      "duration": "5",
+      "prompt": "Cinematic multishot prompt with @Element1 reference, camera work, bright lighting, and garment details",
       "camera_angle": "Eye Level",
       "camera_movement": "Slow Push In",
       "shot_size": "Wide Shot"
