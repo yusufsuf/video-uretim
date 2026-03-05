@@ -46,10 +46,10 @@ app.add_middleware(
 # Serve generated outputs
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
 
-# Serve uploaded files (so Claid can fetch them via public URL)
+# Serve uploaded files (so fal.ai can fetch them via public URL)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
-# Serve model assets (full-body model photos for Claid)
+# Serve model/asset files
 _assets_dir = os.path.join(os.path.dirname(__file__), "assets")
 if os.path.isdir(_assets_dir):
     app.mount("/assets", StaticFiles(directory=_assets_dir), name="assets")
@@ -70,7 +70,7 @@ async def _save_upload(upload: UploadFile) -> str:
 def _file_to_url(path: str) -> str:
     """Convert a local file path to a public URL that external APIs can fetch.
 
-    Uses BASE_URL + /uploads/filename so Claid and other services can
+    Uses BASE_URL + /uploads/filename so fal.ai and other services can
     download the file via HTTP instead of receiving a huge data URI.
     """
     filename = os.path.basename(path)
@@ -82,15 +82,14 @@ def _file_to_url(path: str) -> str:
 @app.post("/api/generate", response_model=JobResponse)
 async def generate_video_endpoint(
     front_image: UploadFile = File(..., description="Elbise ön fotoğrafı"),
+    side_image: Optional[UploadFile] = File(None, description="Elbise yan fotoğrafı (opsiyonel)"),
     back_image: Optional[UploadFile] = File(None, description="Elbise arka fotoğrafı (opsiyonel)"),
     reference_image: Optional[UploadFile] = File(None, description="Referans stil/poz resmi (opsiyonel)"),
     reference_video: Optional[UploadFile] = File(None, description="Referans hareket videosu (opsiyonel)"),
     location: str = Form("studio"),
-    model_preset: str = Form("default"),
     custom_location: Optional[str] = Form(None),
-    camera_style: Optional[str] = Form(None),
-    model_action: Optional[str] = Form(None),
     mood: Optional[str] = Form(None),
+    generate_audio: str = Form("true"),
     duration: str = Form("10"),
     scene_count: str = Form("2"),
     aspect_ratio: str = Form("9:16"),
@@ -101,21 +100,16 @@ async def generate_video_endpoint(
 
     # Save uploads
     front_path = await _save_upload(front_image)
+    side_path = await _save_upload(side_image) if side_image else None
     back_path = await _save_upload(back_image) if back_image else None
 
-    reference_image_url = None
     reference_image_path = None
     if reference_image:
         reference_image_path = await _save_upload(reference_image)
-        reference_image_url = _file_to_url(reference_image_path)
 
-    reference_video_url = None
-    if reference_video:
-        ref_path = await _save_upload(reference_video)
-        reference_video_url = _file_to_url(ref_path)
-
-    # Convert local files to URLs for external APIs
+    # Convert local files to public URLs for external APIs
     front_url = _file_to_url(front_path)
+    side_url = _file_to_url(side_path) if side_path else None
     back_url = _file_to_url(back_path) if back_path else None
 
     # Create job
@@ -123,9 +117,8 @@ async def generate_video_endpoint(
     request = GenerationRequest(
         location=LocationPreset(location),
         custom_location=custom_location,
-        camera_style=camera_style,
-        model_action=model_action,
         mood=mood,
+        generate_audio=generate_audio.lower() == "true",
     )
 
     jobs[job_id] = JobResponse(
@@ -140,17 +133,17 @@ async def generate_video_endpoint(
             job_id=job_id,
             front_path=front_path,
             back_path=back_path,
-            reference_image_url=reference_image_url,
+            side_path=side_path,
             reference_image_path=reference_image_path,
-            reference_video_url=reference_video_url,
             request=request,
             front_url=front_url,
+            side_url=side_url,
             back_url=back_url,
             duration=int(duration),
             scene_count=int(scene_count),
             video_description=video_description,
-            model_preset=model_preset,
             aspect_ratio=aspect_ratio,
+            generate_audio=generate_audio.lower() == "true",
             watermark_path=await _save_upload(watermark_image) if watermark_image else None,
         )
     )

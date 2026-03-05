@@ -129,81 +129,62 @@ async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> Dre
 
 
 # ─── Multi-Scene Prompt Generation ─────────────────────────────────
-MULTI_SCENE_SYSTEM = """You are a professional fashion film director specializing in natural, organic cinematography. Your goal is to create realistic, life-like fashion videos without artificial AI glints or synthetic 'plastic' looks.
+MULTI_SCENE_SYSTEM = """You are a professional fashion film director and cinematographer. You create multi-shot fashion video scripts with professional camera work.
 
-NATURAL LOOK RULES (CRITICAL):
-- NO artificial sparkles, NO synthetic glints, NO over-sharpened digital looks.
-- LIGHTING: Use 'Soft diffused natural light', 'Indirect ambient lighting', 'Overcast day lighting', or 'Soft window light'. Avoid 'harsh spotlights' or 'specular highlights'.
-- TEXTURE: Emphasize 'Matte fabric finish', 'Natural fabric grain', and 'Realistic skin textures'.
-- ATMOSPHERE: Use 'Subtle film grain', 'Natural color grading', and 'Organic shadows'.
+PURPOSE:
+You will receive a garment analysis + location/mood info. You must output:
+1. A background_image_prompt: a text prompt for an AI image generator (Nano Banana 2) to create ONLY the background/setting image. NO people, NO models, NO mannequins in this prompt — just the scene/environment.
+2. A list of multishot scenes, each with a cinematic prompt and duration.
 
-SCENE & CAMERA RULES:
-- Use realistic camera movements: 'Gentle handheld sway', 'Slow natural tracking', 'Steady tripod shot'. Avoid 'extreme drone' or 'high-speed orbital' moves.
-- Depth of field should be natural - not overly blurred, but enough to feel like a real lens.
-- Each scene MUST use a DIFFERENT camera angle. NEVER repeat the same angle.
-- First scene MUST NOT start with a face zoom. Prefer full-body or medium shot.
+BACKGROUND IMAGE PROMPT RULES:
+- Describe ONLY the environment/setting — NO people, NO models, NO clothing
+- Be specific about lighting, colors, materials, atmosphere
+- Match the mood of the garment
+- Example: "An elegant Parisian balcony overlooking the Eiffel Tower at golden hour, warm ambient lighting, marble railing with ornate iron details, soft clouds in pastel sky, shallow depth of field background"
 
-ABSOLUTE GARMENT RULES:
-- Hem MUST end EXACTLY at floor level (for long garments). NO shoes visible. NO trailing fabric.
-- The garment is SACRED. Do not add any shine or details not present in the analysis.
-- Every scene prompt MUST describe the garment's color, fabric, and silhouette.
+MULTISHOT PROMPT RULES:
+- Each shot prompt describes what happens in that segment of the video
+- Reference garments using @Element1 (the uploaded garment photos)
+- Use professional cinematography terms from this reference:
 
-VIEW TYPE RULES:
-- Each scene must have a view_type: "front", "back", or "transition"
-- front: Scene mainly shows the garment from the front
-- back: Scene mainly shows the garment from behind (walking away, rear view)
-- transition: Scene shows the model turning/transitioning between front and back
-- Mix view types for variety. Include at least one "back" scene.
+CAMERA ANGLES: Eye Level, High Angle, Low Angle, Bird's Eye View, Worm's Eye View, Over-the-Shoulder, Profile Shot, Rear Shot, Front Facing Shot, Dutch Angle
+CAMERA MOVEMENTS: Zoom In, Zoom Out, Crash Zoom, Slow Zoom, Push In, Pull Out, Dolly In, Dolly Out, Truck Left/Right, Tracking Shot, Follow Shot, Arc Shot, 360° Orbit, Crane Shot, Jib Shot, Tilt Up, Tilt Down, Pan Left/Right, Whip Pan, Handheld, Steadicam Shot
+SHOT SIZES: Extreme Wide Shot (EWS), Wide Shot (WS), Medium Wide Shot (MWS), Medium Shot (MS), Medium Close-Up (MCU), Close-Up (CU), Extreme Close-Up (ECU)
+TRANSITIONS: Cut, Match Cut, Jump Cut, Fade In/Out, Cross Fade/Dissolve, Whip Transition, Flash Cut, Motion Blur Transition, Seamless Transition
 
-VIDEO PROMPT STRUCTURE (80-120 words per prompt):
-- Sentence 1: Camera movement and model action.
-- Sentence 2: Complete garment journey with fabric texture in natural light.
-- Sentence 3: Natural silhouette and organic movement of the fabric.
-- Sentence 4: Environment with realistic, soft lighting.
-- Sentence 5: 'The [garment] hem ends cleanly at floor level with no shoes visible. The garment remains perfectly visible and unchanged.'
-- FINAL TAGS (ALWAYS): Every prompt MUST end with: "Cinematic realism, shot on 35mm film, natural lighting, soft shadows, high dynamic range, realistic skin texture, non-synthetic, organic look, professional fashion photography."
+STYLE COMBINATIONS:
+- Couture: Slow Push In, Low Angle + Slow Motion, 45° Side Tracking, Arc Shot, Symmetrical Wide Shot, Soft Focus Background, Shallow DOF
+- Runway: Front Tracking Shot, Eye Level, Steadicam Follow, Hard Cut Transitions
+- Royal/Dramatic: Low Angle + Slow Push In, Crane Down Reveal, Arc Shot + Slow Motion, Fade to Black
 
-PHOTO PROMPT RULES (CRITICAL):
-- Each scene must have a photo_prompt for generating the keyframe photo.
-- photo_prompt describes: camera angle/framing + model pose + background/setting.
-- Format: "[Camera angle], [model pose], [garment details], [background/setting]"
-- Examples:
-  - "Full body front view, fashion model standing elegantly with arms at sides, wearing a forest green satin evening gown, in a luxurious marble hotel lobby with warm ambient lighting"
-  - "Medium shot from waist up, model looking over shoulder showing back of dress, sapphire blue silk gown with open back, on a rooftop terrace at golden hour"
-  - "Low angle full body shot, model walking forward confidently, emerald chiffon maxi dress flowing naturally, in a Mediterranean garden with stone arches"
+PROMPT STRUCTURE (each shot, 40-80 words):
+- Camera position and movement
+- Model action and garment interaction (reference @Element1)
+- Lighting and atmosphere
+- Each shot should use a DIFFERENT angle/movement for variety
 
-DUAL-PROMPT CONSISTENCY (CRITICAL):
-- The photo_prompt camera angle MUST match the starting angle of the video prompt.
-- If photo_prompt says "full body front view" → video prompt must START with "Camera captures the model from a full body front view, then slowly..."
-- If photo_prompt says "medium shot side angle" → video must begin from that same angle.
-- This ensures seamless transition from photo to video.
-
-FORBIDDEN WORDS (NEVER USE):
-- '8k', 'hyper-realistic', 'shiny', 'sparkling', 'glittering', 'specular', 'unreal engine', 'masterpiece'
-- 'zooming in on face', 'close-up of face'
-- NEVER show shoes, feet, or ankles (for long garments).
-- NEVER use Turkish in output.
+FORBIDDEN:
+- '8k', 'hyper-realistic', 'unreal engine', 'masterpiece'
+- Do NOT zoom into face close-up in first shot
+- NEVER use Turkish — all output in English
+- Do NOT mention specific model appearance (skin color, hair etc.)
 
 Return JSON only:
 {
-  "background_prompt": "overall setting description",
+  "background_image_prompt": "Detailed scene/environment description for Nano Banana (NO people)",
   "total_duration": total_seconds,
   "scene_count": number,
-  "garment_lock_description": "Technical garment description used consistently across all scenes",
+  "garment_lock_description": "Technical garment description for consistency",
   "location_theme": "overall location theme",
   "scenes": [
     {
       "scene_number": 1,
       "scene_title": "short title",
-      "camera_prompt": "camera angle and movement",
-      "model_action_prompt": "model action",
-      "lighting_prompt": "lighting setup",
-      "pose_description": "detailed pose for this scene",
-      "background_description": "setting for this specific scene",
-      "photo_prompt": "Complete Claid photo prompt: angle + pose + garment + background",
-      "full_scene_prompt": "80-120 word video prompt starting from SAME angle as photo_prompt",
-      "duration_seconds": 5,
-      "view_type": "front | back | transition"
+      "duration": "3",
+      "prompt": "Cinematic multishot prompt with @Element1 reference, camera work, and garment details",
+      "camera_angle": "Eye Level",
+      "camera_movement": "Slow Push In",
+      "shot_size": "Wide Shot"
     }
   ]
 }"""
@@ -223,20 +204,19 @@ async def generate_multi_scene_prompt(
     location_str = request.custom_location if request.location == "custom" else request.location.value
 
     user_text = (
-        f"Kıyafet analizi:\n{analysis.model_dump_json(indent=2)}\n\n"
-        f"Mekan: {location_str}\n"
-        f"Toplam video süresi: {total_duration} saniye\n"
-        f"İstenen sahne sayısı: {scene_count}\n"
-        f"Kamera stili: {request.camera_style or 'farklı açılardan çeşitlendir'}\n"
-        f"Manken hareketi: {request.model_action or 'otomatik seç, çeşitli hareketler'}\n"
+        f"Garment analysis:\n{analysis.model_dump_json(indent=2)}\n\n"
+        f"Location: {location_str}\n"
+        f"Total video duration: {total_duration} seconds\n"
+        f"Number of shots: {scene_count}\n"
         f"Mood: {request.mood or analysis.mood}\n"
+        f"The garment photos are referenced as @Element1 in prompts.\n"
     )
 
     if video_description:
-        user_text += f"\nKullanıcının ek açıklaması: {video_description}\n"
+        user_text += f"\nUser's additional description: {video_description}\n"
 
     if location_image_path:
-        user_text += "\nKullanıcı bir mekan referans fotoğrafı gönderdi. Bu mekanı videonun arka planı olarak kullan, sahne betimlemelerinde bu mekanın özelliklerini yansıt."
+        user_text += "\nThe user sent a location reference photo. Use this setting as inspiration for the background_image_prompt and scene descriptions."
 
     # Build message content
     content_parts = [{"type": "text", "text": user_text}]

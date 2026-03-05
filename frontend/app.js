@@ -5,23 +5,23 @@
 
 const API_BASE = "";
 
-// ─── DOM References ──────────────────────────────────────────────
+// ─── DOM References ──────────────────────────────────────────────────
 const frontZone = document.getElementById("front-zone");
+const sideZone = document.getElementById("side-zone");
 const backZone = document.getElementById("back-zone");
 const refimgZone = document.getElementById("refimg-zone");
 const videoZone = document.getElementById("video-zone");
 const frontInput = document.getElementById("front-input");
+const sideInput = document.getElementById("side-input");
 const backInput = document.getElementById("back-input");
 const refimgInput = document.getElementById("refimg-input");
 const videoInput = document.getElementById("video-input");
-const modelSel = document.getElementById("model-select");
 const locationSel = document.getElementById("location-select");
-const cameraSel = document.getElementById("camera-select");
-const actionSel = document.getElementById("action-select");
 const moodSel = document.getElementById("mood-select");
 const durationInput = document.getElementById("duration-input");
 const sceneCountInput = document.getElementById("scene-count-input");
 const aspectRatioSel = document.getElementById("aspect-ratio-select");
+const audioToggle = document.getElementById("audio-toggle");
 const watermarkInput = document.getElementById("watermark-input");
 const watermarkZone = document.getElementById("watermark-zone");
 const watermarkLabel = document.getElementById("watermark-label");
@@ -45,8 +45,9 @@ const newBtn = document.getElementById("new-btn");
 const errorMsg = document.getElementById("error-message");
 const errorText = document.getElementById("error-text");
 
-// ─── State ───────────────────────────────────────────────────────
+// ─── State ─────────────────────────────────────────────────────────
 let frontFile = null;
+let sideFile = null;
 let backFile = null;
 let refimgFile = null;
 let videoFile = null;
@@ -76,6 +77,7 @@ function setupUploadZone(zone, input, type) {
 
 function handleFileSelect(file, zone, type) {
     if (type === "front") frontFile = file;
+    else if (type === "side") sideFile = file;
     else if (type === "back") backFile = file;
     else if (type === "refimg") refimgFile = file;
     else videoFile = file;
@@ -93,7 +95,7 @@ function handleFileSelect(file, zone, type) {
         `;
     } else {
         zone.innerHTML = `
-            <span class="badge">${type === "front" ? "Ön" : "Arka"}</span>
+            <span class="badge">${{ front: "On", side: "Yan", back: "Arka", refimg: "Ref" }[type] || type}</span>
             <button class="remove-btn" onclick="event.stopPropagation(); removeFile('${type}')">✕</button>
             <img src="${URL.createObjectURL(file)}" class="preview-img" alt="Preview">
             <div class="upload-label">${file.name}</div>
@@ -104,15 +106,16 @@ function handleFileSelect(file, zone, type) {
 }
 
 function removeFile(type) {
-    const zones = { front: frontZone, back: backZone, refimg: refimgZone, video: videoZone };
-    const inputs = { front: frontInput, back: backInput, refimg: refimgInput, video: videoInput };
+    const zones = { front: frontZone, side: sideZone, back: backZone, refimg: refimgZone, video: videoZone };
+    const inputs = { front: frontInput, side: sideInput, back: backInput, refimg: refimgInput, video: videoInput };
     const zone = zones[type];
-    const plusIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14"/></svg>';
-    const imgIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 16l5-5 4 4 4-4 5 5"/></svg>';
-    const vidIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5,3 19,12 5,21"/></svg>';
+    const plusIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 5v14M5 12h14"/></svg>';
+    const imgIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 16l5-5 4 4 4-4 5 5"/></svg>';
+    const vidIcon = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5,3 19,12 5,21"/></svg>';
 
-    if (type === "front") { frontFile = null; resetZone(zone, plusIcon, "On Gorunum", "JPG, PNG veya WebP", "Zorunlu"); }
-    else if (type === "back") { backFile = null; resetZone(zone, plusIcon, "Arka Gorunum", "Tutarlilik icin onerilir", "Opsiyonel", true); }
+    if (type === "front") { frontFile = null; resetZone(zone, plusIcon, "On", "JPG, PNG, WebP", "Zorunlu"); }
+    else if (type === "side") { sideFile = null; resetZone(zone, plusIcon, "Yan", "Yan gorunum", "Opsiyonel", true); }
+    else if (type === "back") { backFile = null; resetZone(zone, plusIcon, "Arka", "Arka gorunum", "Opsiyonel", true); }
     else if (type === "refimg") { refimgFile = null; resetZone(zone, imgIcon, "Mekan / Referans", "Mekan veya stil referansi", "Opsiyonel", true); }
     else { videoFile = null; resetZone(zone, vidIcon, "Referans Video", "Hareket referansi MP4", "Opsiyonel", false, true); }
 
@@ -162,19 +165,18 @@ async function startGeneration() {
 
     const formData = new FormData();
     formData.append("front_image", frontFile);
+    if (sideFile) formData.append("side_image", sideFile);
     if (backFile) formData.append("back_image", backFile);
     if (refimgFile) formData.append("reference_image", refimgFile);
     if (videoFile) formData.append("reference_video", videoFile);
     formData.append("location", locationSel.value);
-    formData.append("model_preset", modelSel.value);
     formData.append("aspect_ratio", aspectRatioSel.value);
-    formData.append("duration", Math.max(3, Math.min(60, parseInt(durationInput.value) || 10)));
-    formData.append("scene_count", Math.max(1, Math.min(10, parseInt(sceneCountInput.value) || 2)));
+    formData.append("generate_audio", audioToggle.checked);
+    formData.append("duration", Math.max(3, Math.min(15, parseInt(durationInput.value) || 10)));
+    formData.append("scene_count", Math.max(1, Math.min(6, parseInt(sceneCountInput.value) || 2)));
     if (watermarkFile) formData.append("watermark_image", watermarkFile);
     if (videoDescInput.value.trim()) formData.append("video_description", videoDescInput.value.trim());
     if (locationSel.value === "custom") formData.append("custom_location", customLocIn.value);
-    if (cameraSel.value) formData.append("camera_style", cameraSel.value);
-    if (actionSel.value) formData.append("model_action", actionSel.value);
     if (moodSel.value) formData.append("mood", moodSel.value);
 
     try {
@@ -376,13 +378,11 @@ function refreshTemplateList() {
 function getCurrentSettings() {
     return {
         location: locationSel.value,
-        model_preset: modelSel.value,
-        camera_style: cameraSel.value,
-        model_action: actionSel.value,
         mood: moodSel.value,
         duration: durationInput.value,
         scene_count: sceneCountInput.value,
         aspect_ratio: aspectRatioSel.value,
+        generate_audio: audioToggle.checked,
         video_description: videoDescInput.value,
         custom_location: customLocIn.value,
     };
@@ -390,13 +390,11 @@ function getCurrentSettings() {
 
 function applySettings(s) {
     if (s.location) locationSel.value = s.location;
-    if (s.model_preset) modelSel.value = s.model_preset;
-    if (s.camera_style) cameraSel.value = s.camera_style;
-    if (s.model_action) actionSel.value = s.model_action;
     if (s.mood) moodSel.value = s.mood;
     if (s.duration) durationInput.value = s.duration;
     if (s.scene_count) sceneCountInput.value = s.scene_count;
     if (s.aspect_ratio) aspectRatioSel.value = s.aspect_ratio;
+    if (s.generate_audio !== undefined) audioToggle.checked = s.generate_audio;
     if (s.video_description) videoDescInput.value = s.video_description;
     if (s.custom_location) customLocIn.value = s.custom_location;
     // Toggle custom location visibility

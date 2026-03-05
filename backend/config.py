@@ -9,7 +9,6 @@ load_dotenv()
 class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     FAL_KEY: str = os.getenv("FAL_KEY", "")
-    CLAID_API_KEY: str = os.getenv("CLAID_API_KEY", "")
 
     # Public base URL (set to your Coolify domain in production)
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")

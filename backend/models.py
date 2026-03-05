@@ -44,27 +44,23 @@ class DressAnalysisResult(BaseModel):
 
 
 class SingleScenePrompt(BaseModel):
-    """Tek bir video sahnesi için prompt."""
+    """Tek bir video sahnesi (multishot shot) için prompt."""
     model_config = {"protected_namespaces": ()}
 
     scene_number: int = Field(description="Sahne numarası")
     scene_title: str = Field(default="", description="Kısa sahne başlığı")
-    camera_prompt: str = Field(description="Kamera açısı ve hareketi")
-    model_action_prompt: str = Field(description="Mankenin hareketi / pozu")
-    lighting_prompt: str = Field(description="Aydınlatma ayarı")
-    pose_description: str = Field(default="", description="Detaylı poz açıklaması (Claid için)")
-    background_description: str = Field(default="", description="Arka plan açıklaması (Claid için)")
-    photo_prompt: str = Field(default="", description="Claid fotoğraf prompt'u (açı + poz + arka plan)")
-    full_scene_prompt: str = Field(description="Kling video prompt'u (video hareketi)")
-    duration_seconds: int = Field(description="Bu sahnenin süresi (saniye)")
-    view_type: str = Field(default="front", description="front / back / transition")
+    duration: str = Field(description="Bu shot'un süresi (string, ör: '3')")
+    prompt: str = Field(description="Sinematik sahne prompt'u (kamera + hareket + detay)")
+    camera_angle: str = Field(default="", description="Kullanılan kamera açısı")
+    camera_movement: str = Field(default="", description="Kullanılan kamera hareketi")
+    shot_size: str = Field(default="", description="Çekim boyu (Wide, Medium, Close-Up vb.)")
 
 
 class MultiScenePrompt(BaseModel):
     """Çoklu sahne için üretilen prompt seti."""
     model_config = {"protected_namespaces": ()}
 
-    background_prompt: str = Field(description="Genel mekan tanımı")
+    background_image_prompt: str = Field(description="Nano Banana arka plan prompt'u (sadece mekan, insan yok)")
     total_duration: int = Field(description="Toplam video süresi")
     scene_count: int = Field(description="Sahne sayısı")
     scenes: List[SingleScenePrompt] = Field(description="Sahne listesi")
@@ -78,19 +74,15 @@ class GenerationRequest(BaseModel):
 
     location: LocationPreset = LocationPreset.STUDIO
     custom_location: Optional[str] = None
-    camera_style: Optional[str] = None
-    model_action: Optional[str] = None
     mood: Optional[str] = None
+    generate_audio: bool = True
 
 
 class JobStatus(str, Enum):
     PENDING = "pending"
     ANALYZING = "analyzing"
-    PREPROCESSING = "preprocessing"
-    GENERATING_VTO = "generating_vto"
-    GENERATING_PHOTO = "generating_photo"
+    GENERATING_BACKGROUND = "generating_background"
     GENERATING_VIDEO = "generating_video"
-    MERGING = "merging"
     COMPLETED = "completed"
     FAILED = "failed"
 
