@@ -12,6 +12,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
+ARG BUILD_DATE=unknown
 COPY backend/ .
 
 # Copy frontend into /app/frontend (served by FastAPI)

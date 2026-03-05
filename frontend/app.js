@@ -146,6 +146,13 @@ function updateGenerateBtn() {
     generateBtn.disabled = !frontFile;
 }
 
+// ─── Initialize Upload Zones ─────────────────────────────────────
+setupUploadZone(frontZone, frontInput, "front");
+setupUploadZone(sideZone, sideInput, "side");
+setupUploadZone(backZone, backInput, "back");
+setupUploadZone(refimgZone, refimgInput, "refimg");
+setupUploadZone(videoZone, videoInput, "video");
+
 // ─── Location Toggle ─────────────────────────────────────────────
 locationSel.addEventListener("change", () => {
     customLocGrp.style.display = locationSel.value === "custom" ? "flex" : "none";
