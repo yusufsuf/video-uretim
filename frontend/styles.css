@@ -1,31 +1,35 @@
 /* ── Design Tokens ─────────────────────────────────────────────── */
 :root {
     /* Light Theme (default) */
-    --bg-primary: #faf9f7;
-    --bg-secondary: #ffffff;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f7f7f7;
     --bg-card: #ffffff;
-    --bg-card-hover: #faf9f7;
+    --bg-card-hover: #f4f4f4;
     --bg-glass: rgba(255, 255, 255, 0.9);
-    --bg-sidebar: #1a1a1a;
-    --bg-sidebar-hover: #2a2a2a;
-    --border-subtle: #ece8e3;
-    --border-accent: #c4b5a3;
-    --border-sidebar: #333333;
+    --bg-sidebar: #f4f4f4;
+    --bg-sidebar-hover: #eaeaea;
+    --border-subtle: #e8e8e8;
+    --border-accent: #d0d0d0;
+    --border-sidebar: #e4e4e4;
 
-    --text-primary: #1a1a1a;
-    --text-secondary: #6b6560;
-    --text-muted: #a8a099;
-    --text-sidebar: #e8e4df;
-    --text-sidebar-muted: #8a8580;
+    --text-primary: #111111;
+    --text-secondary: #666666;
+    --text-muted: #999999;
+    --text-sidebar: #1a1a1a;
+    --text-sidebar-muted: #888888;
 
-    --accent: #1a1a1a;
+    --accent: #111111;
     --accent-warm: #c4a882;
-    --accent-soft: #e8dfd4;
+    --accent-soft: rgba(196, 168, 130, 0.12);
     --accent-success: #4a7c59;
     --accent-error: #b85450;
     --accent-highlight: #c4a882;
 
     --gradient-btn: linear-gradient(135deg, #c4a882 0%, #a78a6a 100%);
+
+    --nav-hover-bg: rgba(0, 0, 0, 0.04);
+    --nav-active-bg: rgba(0, 0, 0, 0.07);
+    --scrollbar-thumb: rgba(0, 0, 0, 0.15);
 
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
@@ -47,31 +51,37 @@
     --orb-opacity: 0;
 }
 
-/* ── Dark Theme ─────────────────────────────────────────────────── */
+/* ── Dark Theme (matches preview.html exactly) ──────────────────── */
 html[data-theme="dark"] {
     --bg-primary: #080808;
     --bg-secondary: #0f0f0f;
     --bg-card: #0f0f0f;
     --bg-card-hover: #141414;
     --bg-glass: rgba(15, 15, 15, 0.9);
-    --bg-sidebar: #050505;
+    --bg-sidebar: #080808;
     --bg-sidebar-hover: #111111;
     --border-subtle: #1e1e1e;
     --border-accent: #2a2a2a;
-    --border-sidebar: #1a1a1a;
+    --border-sidebar: #1e1e1e;
 
     --text-primary: #f0f0f0;
     --text-secondary: #888888;
     --text-muted: #444444;
-    --text-sidebar: #e0e0e0;
+    --text-sidebar: #f0f0f0;
     --text-sidebar-muted: #555555;
 
     --accent: #f0f0f0;
-    --accent-warm: #c4a882;
-    --accent-soft: rgba(196, 168, 130, 0.1);
+    --accent-warm: #e8e0d4;
+    --accent-soft: rgba(232, 224, 212, 0.08);
     --accent-success: #4a7c59;
     --accent-error: #b85450;
-    --accent-highlight: #c4a882;
+    --accent-highlight: #e8e0d4;
+
+    --gradient-btn: linear-gradient(135deg, #e8e0d4 0%, #c8bdb2 100%);
+
+    --nav-hover-bg: rgba(255, 255, 255, 0.04);
+    --nav-active-bg: rgba(255, 255, 255, 0.07);
+    --scrollbar-thumb: #333333;
 
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -88,24 +98,30 @@ html[data-theme="dark"] {
         --bg-card: #0f0f0f;
         --bg-card-hover: #141414;
         --bg-glass: rgba(15, 15, 15, 0.9);
-        --bg-sidebar: #050505;
+        --bg-sidebar: #080808;
         --bg-sidebar-hover: #111111;
         --border-subtle: #1e1e1e;
         --border-accent: #2a2a2a;
-        --border-sidebar: #1a1a1a;
+        --border-sidebar: #1e1e1e;
 
         --text-primary: #f0f0f0;
         --text-secondary: #888888;
         --text-muted: #444444;
-        --text-sidebar: #e0e0e0;
+        --text-sidebar: #f0f0f0;
         --text-sidebar-muted: #555555;
 
         --accent: #f0f0f0;
-        --accent-warm: #c4a882;
-        --accent-soft: rgba(196, 168, 130, 0.1);
+        --accent-warm: #e8e0d4;
+        --accent-soft: rgba(232, 224, 212, 0.08);
         --accent-success: #4a7c59;
         --accent-error: #b85450;
-        --accent-highlight: #c4a882;
+        --accent-highlight: #e8e0d4;
+
+        --gradient-btn: linear-gradient(135deg, #e8e0d4 0%, #c8bdb2 100%);
+
+        --nav-hover-bg: rgba(255, 255, 255, 0.04);
+        --nav-active-bg: rgba(255, 255, 255, 0.07);
+        --scrollbar-thumb: #333333;
 
         --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
         --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -272,7 +288,7 @@ body {
     overflow-y: auto;
     padding: 16px 16px 8px;
     scrollbar-width: thin;
-    scrollbar-color: #444 transparent;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 .sidebar-scroll::-webkit-scrollbar {
@@ -280,7 +296,7 @@ body {
 }
 
 .sidebar-scroll::-webkit-scrollbar-thumb {
-    background: #444;
+    background: var(--scrollbar-thumb);
     border-radius: 2px;
 }
 
@@ -1003,12 +1019,12 @@ textarea.form-input {
 
 .nav-item:hover {
     color: var(--text-sidebar);
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--nav-hover-bg);
 }
 
 .nav-item.active {
     color: var(--text-sidebar);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--nav-active-bg);
 }
 
 .nav-item.active::after {
