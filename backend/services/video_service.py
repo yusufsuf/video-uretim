@@ -3,8 +3,10 @@
 Generates fashion videos with multishot prompts and garment elements.
 """
 
+import asyncio
 import logging
 import os
+import subprocess
 import uuid
 from typing import List, Optional
 
@@ -77,6 +79,43 @@ async def generate_multishot_video(
 
     logger.info("Multishot video completed: %s", video_url[:100])
     return video_url
+
+
+# ─── Last-frame chaining helpers ─────────────────────────────────
+
+def extract_last_frame(video_path: str, output_dir: str) -> str:
+    """Extract the last frame of a video as a PNG file using FFmpeg."""
+    frame_path = os.path.join(output_dir, f"{uuid.uuid4().hex}_frame.png")
+    subprocess.run(
+        ["ffmpeg", "-y", "-sseof", "-0.5", "-i", video_path,
+         "-vframes", "1", "-q:v", "2", frame_path],
+        check=True, capture_output=True, timeout=30,
+    )
+    logger.info("Extracted last frame: %s", frame_path)
+    return frame_path
+
+
+async def upload_to_fal(file_path: str) -> str:
+    """Upload a local file to fal.ai CDN and return the public URL."""
+    url = await asyncio.to_thread(fal_client.upload_file, file_path)
+    logger.info("Uploaded to fal.ai: %s", url[:80])
+    return url
+
+
+def concatenate_clips(clip_paths: list, output_path: str) -> str:
+    """Concatenate video clips in order using FFmpeg concat demuxer."""
+    list_file = output_path.replace(".mp4", "_list.txt")
+    with open(list_file, "w") as f:
+        for p in clip_paths:
+            f.write(f"file '{os.path.abspath(p)}'\n")
+    subprocess.run(
+        ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
+         "-i", list_file, "-c", "copy", output_path],
+        check=True, capture_output=True, timeout=300,
+    )
+    os.remove(list_file)
+    logger.info("Concatenated %d clips → %s", len(clip_paths), output_path)
+    return output_path
 
 
 # ─── Download helper ──────────────────────────────────────────────

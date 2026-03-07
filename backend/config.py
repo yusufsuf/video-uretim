@@ -17,6 +17,7 @@ class Settings:
     UPLOAD_DIR: str = os.path.join(os.path.dirname(__file__), "uploads")
     OUTPUT_DIR: str = os.path.join(os.path.dirname(__file__), "outputs")
     DATA_DIR: str = os.path.join(os.path.dirname(__file__), "data")
+    TEMP_DIR: str = os.path.join(os.path.dirname(__file__), "temp")
 
 
 settings = Settings()
@@ -25,3 +26,4 @@ settings = Settings()
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
 os.makedirs(settings.DATA_DIR, exist_ok=True)
+os.makedirs(settings.TEMP_DIR, exist_ok=True)

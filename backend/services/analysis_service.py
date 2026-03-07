@@ -192,6 +192,16 @@ PROMPT STRUCTURE (each shot, 40-80 words):
 - Lighting and atmosphere (MUST mention bright/well-lit conditions)
 - Each shot should use a DIFFERENT angle/movement for variety
 
+SCENE CONTINUITY RULES (critical — videos are chained clip-to-clip, each clip starts from the last frame of the previous):
+- Scene 1 MUST clearly establish: model full body, garment front view, lighting, environment — this sets the visual anchor for all subsequent clips
+- Every scene after the first: begin the prompt with "Seamlessly continuing from previous shot,"
+- Reference @Element1 in EVERY scene prompt without exception (garment consistency lock)
+- Keep IDENTICAL lighting conditions across ALL scenes — do NOT shift bright→dim or warm→cool between scenes
+- Camera movement at the END of scene N should logically transition into scene N+1
+  Example: Scene 1 ends with a Dolly Back (wider frame) → Scene 2 begins with a Tracking Shot from that wider position
+- Do NOT introduce new environments, new backgrounds, or new lighting sources mid-sequence
+- The model's body position at the end of scene N should connect naturally with the start of scene N+1
+
 FORBIDDEN:
 - '8k', 'hyper-realistic', 'unreal engine', 'masterpiece'
 - Do NOT zoom into face close-up in first shot

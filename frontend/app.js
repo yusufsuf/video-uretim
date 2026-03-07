@@ -311,7 +311,7 @@ async function startGeneration() {
     formData.append("aspect_ratio",   aspectRatioSel.value);
     formData.append("generate_audio", audioToggle.checked);
     formData.append("duration",       Math.max(3, Math.min(15, parseInt(durationInput.value) || 10)));
-    formData.append("scene_count",    Math.max(1, Math.min(6, parseInt(sceneCountInput.value) || 2)));
+    formData.append("scene_count",    Math.max(1, Math.min(8, parseInt(sceneCountInput.value) || 2)));
     if (watermarkFile) formData.append("watermark_image", watermarkFile);
     if (videoDescInput.value.trim()) formData.append("video_description", videoDescInput.value.trim());
     if (locationSel.value === "custom") formData.append("custom_location", customLocIn.value);

@@ -24,9 +24,19 @@ from models import (
 )
 from services.analysis_service import analyse_dress, generate_multi_scene_prompt
 from services.nano_banana_service import generate_background
-from services.video_service import download_file, generate_multishot_video
+from services.video_service import (
+    download_file,
+    generate_multishot_video,
+    extract_last_frame,
+    upload_to_fal,
+    concatenate_clips,
+)
+import shutil
 
 logger = logging.getLogger(__name__)
+
+# Scenes per Kling API call — smaller chunks = higher consistency via last-frame chaining
+CHUNK_SIZE = 2
 
 # In-memory job store (replace with DB for production)
 jobs: dict[str, JobResponse] = {}
@@ -99,7 +109,7 @@ async def run_pipeline(
     try:
         # Clamp values
         duration = max(3, min(15, duration))
-        scene_count = max(1, min(6, scene_count))
+        scene_count = max(1, min(8, scene_count))
 
         # ── Step 1: Analyse the garment ─────────────────────────
         _update_job(job_id, status=JobStatus.ANALYZING, progress=5, message="Elbise analiz ediliyor...")
@@ -145,8 +155,7 @@ async def run_pipeline(
             logger.info("[%s] Background generated: %s", job_id, background_url[:100])
             _update_job(job_id, progress=50, message="Arka plan hazır. Video üretiliyor...")
 
-        # ── Step 4: Build elements + generate multishot video ────
-        _update_job(job_id, status=JobStatus.GENERATING_VIDEO, progress=55, message="Video üretiliyor...")
+        # ── Step 4: Build elements + generate multishot video (chained) ─
         logger.info("[%s] Step 4 – Generating multishot video", job_id)
 
         # Build element (garment photos)
@@ -162,30 +171,69 @@ async def run_pipeline(
         elements = [element]
         logger.info("[%s] Element: frontal=%s, refs=%d", job_id, front_url[:60], len(element["reference_image_urls"]))
 
-        # Build multi_prompt from scene prompts
-        multi_prompt = []
-        for scene in scene_prompt.scenes:
-            multi_prompt.append({
-                "duration": scene.duration,
-                "prompt": scene.prompt,
-            })
-        logger.info("[%s] Multi-prompt: %d shots", job_id, len(multi_prompt))
+        # Split scenes into chunks for last-frame chaining
+        all_scenes = scene_prompt.scenes
+        chunks = [all_scenes[i:i+CHUNK_SIZE] for i in range(0, len(all_scenes), CHUNK_SIZE)]
+        n_chunks = len(chunks)
+        logger.info("[%s] %d scenes → %d chunk(s) of max %d", job_id, len(all_scenes), n_chunks, CHUNK_SIZE)
 
-        # Generate video
-        video_url = await generate_multishot_video(
-            start_image_url=background_url,
-            multi_prompt=multi_prompt,
-            elements=elements,
-            duration=str(duration),
-            aspect_ratio=aspect_ratio,
-            generate_audio=generate_audio,
-        )
+        clip_paths = []
+        current_start_image = background_url
 
-        _update_job(job_id, progress=85, message="Video indiriliyior...")
+        for chunk_idx, chunk in enumerate(chunks):
+            chunk_duration = sum(int(s.duration) for s in chunk)
+            chunk_multi_prompt = [{"duration": s.duration, "prompt": s.prompt} for s in chunk]
+            chunk_progress = 55 + int((chunk_idx / n_chunks) * 28)
+            chunk_msg = (
+                f"Sahne grubu {chunk_idx + 1}/{n_chunks} üretiliyor..."
+                if n_chunks > 1 else "Video üretiliyor..."
+            )
+            _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
+                        progress=chunk_progress, message=chunk_msg)
+            logger.info("[%s] Chunk %d/%d: %d shots, %ds, start=%s...",
+                        job_id, chunk_idx + 1, n_chunks, len(chunk),
+                        chunk_duration, current_start_image[:60])
 
-        # Download final video
-        final_path = await download_file(video_url, settings.OUTPUT_DIR, extension=".mp4")
-        logger.info("[%s] Video downloaded: %s", job_id, final_path)
+            clip_url = await generate_multishot_video(
+                start_image_url=current_start_image,
+                multi_prompt=chunk_multi_prompt,
+                elements=elements,
+                duration=str(chunk_duration),
+                aspect_ratio=aspect_ratio,
+                generate_audio=generate_audio,
+            )
+
+            clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
+            clip_paths.append(clip_path)
+            logger.info("[%s] Chunk %d downloaded: %s", job_id, chunk_idx + 1, clip_path)
+
+            # Extract last frame for next chunk (not needed after the last chunk)
+            if chunk_idx < n_chunks - 1:
+                logger.info("[%s] Extracting last frame for chaining...", job_id)
+                last_frame_path = extract_last_frame(clip_path, settings.TEMP_DIR)
+                current_start_image = await upload_to_fal(last_frame_path)
+                try:
+                    os.remove(last_frame_path)
+                except Exception:
+                    pass
+                logger.info("[%s] Chain: next clip starts from %s", job_id, current_start_image[:80])
+
+        # Merge clips or move single clip to OUTPUT_DIR
+        merge_msg = "Sahneler birleştiriliyor..." if n_chunks > 1 else "Video indiriliyor..."
+        _update_job(job_id, progress=85, message=merge_msg)
+
+        final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
+        if n_chunks > 1:
+            concatenate_clips(clip_paths, final_path)
+            for p in clip_paths:
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+        else:
+            shutil.move(clip_paths[0], final_path)
+
+        logger.info("[%s] Final video: %s", job_id, final_path)
 
         # ── Step 5 (optional): Watermark overlay ─────────────────
         if watermark_path and os.path.isfile(watermark_path):
