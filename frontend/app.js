@@ -614,7 +614,7 @@ async function loadRecentVideos() {
                         : `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.75rem;">Hata</div>`
                     }
                     <div class="recent-item-overlay">
-                        <div>${isCompleted ? "✓ Tamamlandı" : "✕ Hata"}</div>
+                        <div>${item.analysis_summary || (isCompleted ? "✓ Tamamlandı" : "✕ Hata")}</div>
                         ${date ? `<div class="recent-item-tag">${date}</div>` : ""}
                     </div>
                 </div>`;
