@@ -28,6 +28,13 @@
     --gradient-btn: linear-gradient(135deg, #1a1a1a 0%, #333333 100%);
     --btn-text: #ffffff;
 
+    --input-bg: #f0f0f0;
+    --input-border: #d5d5d5;
+    --btn-secondary-bg: #f0f0f0;
+    --btn-secondary-border: #d5d5d5;
+    --border-dashed: #bbbbbb;
+    --toggle-track: #cccccc;
+
     --nav-hover-bg: rgba(0, 0, 0, 0.04);
     --nav-active-bg: rgba(0, 0, 0, 0.07);
     --scrollbar-thumb: rgba(0, 0, 0, 0.15);
@@ -81,6 +88,13 @@ html[data-theme="dark"] {
     --gradient-btn: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
     --btn-text: #0a0a0a;
 
+    --input-bg: #1e1e1e;
+    --input-border: #3a3a3a;
+    --btn-secondary-bg: #2a2a2a;
+    --btn-secondary-border: #3a3a3a;
+    --border-dashed: #444444;
+    --toggle-track: #444444;
+
     --nav-hover-bg: rgba(255, 255, 255, 0.04);
     --nav-active-bg: rgba(255, 255, 255, 0.07);
     --scrollbar-thumb: #333333;
@@ -121,6 +135,13 @@ html[data-theme="dark"] {
 
         --gradient-btn: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
         --btn-text: #0a0a0a;
+
+        --input-bg: #1e1e1e;
+        --input-border: #3a3a3a;
+        --btn-secondary-bg: #2a2a2a;
+        --btn-secondary-border: #3a3a3a;
+        --border-dashed: #444444;
+        --toggle-track: #444444;
 
         --nav-hover-bg: rgba(255, 255, 255, 0.04);
         --nav-active-bg: rgba(255, 255, 255, 0.07);
@@ -330,7 +351,7 @@ body {
 
 .upload-zone {
     position: relative;
-    border: 1.5px dashed #444;
+    border: 1.5px dashed var(--border-dashed);
     border-radius: var(--radius-md);
     padding: 16px 10px 12px;
     text-align: center;
@@ -422,7 +443,7 @@ body {
 /* ── Mini Upload (Watermark) ──────────────────────────────────── */
 .mini-upload {
     padding: 8px 10px;
-    border: 1.5px dashed #444;
+    border: 1.5px dashed var(--border-dashed);
     border-radius: var(--radius-sm);
     cursor: pointer;
     display: flex;
@@ -465,9 +486,9 @@ body {
     width: 100%;
     padding: 7px 10px;
     font-size: 0.75rem;
-    border: 1px solid #3a3a3a;
+    border: 1px solid var(--input-border);
     border-radius: var(--radius-sm);
-    background: #2a2a2a;
+    background: var(--input-bg);
     color: var(--text-sidebar);
     font-family: var(--font-body);
     transition: border-color var(--transition-fast);
@@ -505,9 +526,9 @@ textarea.form-input {
     padding: 6px 10px;
     font-size: 0.65rem;
     font-weight: 500;
-    border: 1px solid #3a3a3a;
+    border: 1px solid var(--btn-secondary-border);
     border-radius: var(--radius-sm);
-    background: #2a2a2a;
+    background: var(--btn-secondary-bg);
     color: var(--text-sidebar);
     cursor: pointer;
     white-space: nowrap;
@@ -515,7 +536,7 @@ textarea.form-input {
 }
 
 .template-btn:hover {
-    background: #3a3a3a;
+    background: var(--input-border);
 }
 
 .template-btn.primary {
@@ -573,7 +594,7 @@ textarea.form-input {
 .toggle-slider {
     position: absolute;
     inset: 0;
-    background: #444;
+    background: var(--toggle-track);
     border-radius: 22px;
     transition: background var(--transition-fast);
 }
