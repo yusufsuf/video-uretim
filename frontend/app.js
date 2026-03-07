@@ -190,6 +190,12 @@ wizardBackBtn?.addEventListener("click", () => {
 
 // ─── Upload Zone Interactions ────────────────────────────────────
 function setupUploadZone(zone, input, type) {
+    // Click → open file picker (always query current input in case zone was reset)
+    zone.addEventListener("click", (e) => {
+        if (e.target.classList.contains("remove-btn")) return;
+        const currentInput = zone.querySelector("input[type=file]");
+        if (currentInput) currentInput.click();
+    });
     zone.addEventListener("dragover", (e) => {
         e.preventDefault();
         zone.classList.add("active");
