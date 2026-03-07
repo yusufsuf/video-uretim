@@ -1,5 +1,6 @@
 /* ── Design Tokens ─────────────────────────────────────────────── */
 :root {
+    /* Light Theme (default) */
     --bg-primary: #faf9f7;
     --bg-secondary: #ffffff;
     --bg-card: #ffffff;
@@ -42,6 +43,156 @@
     --transition-smooth: 0.3s ease;
 
     --sidebar-width: 360px;
+
+    --orb-opacity: 0;
+}
+
+/* ── Dark Theme ─────────────────────────────────────────────────── */
+html[data-theme="dark"] {
+    --bg-primary: #080808;
+    --bg-secondary: #0f0f0f;
+    --bg-card: #0f0f0f;
+    --bg-card-hover: #141414;
+    --bg-glass: rgba(15, 15, 15, 0.9);
+    --bg-sidebar: #050505;
+    --bg-sidebar-hover: #111111;
+    --border-subtle: #1e1e1e;
+    --border-accent: #2a2a2a;
+    --border-sidebar: #1a1a1a;
+
+    --text-primary: #f0f0f0;
+    --text-secondary: #888888;
+    --text-muted: #444444;
+    --text-sidebar: #e0e0e0;
+    --text-sidebar-muted: #555555;
+
+    --accent: #f0f0f0;
+    --accent-warm: #c4a882;
+    --accent-soft: rgba(196, 168, 130, 0.1);
+    --accent-success: #4a7c59;
+    --accent-error: #b85450;
+    --accent-highlight: #c4a882;
+
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+
+    --orb-opacity: 0.12;
+}
+
+/* ── System Dark Theme ──────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]):not([data-theme="dark"]) {
+        --bg-primary: #080808;
+        --bg-secondary: #0f0f0f;
+        --bg-card: #0f0f0f;
+        --bg-card-hover: #141414;
+        --bg-glass: rgba(15, 15, 15, 0.9);
+        --bg-sidebar: #050505;
+        --bg-sidebar-hover: #111111;
+        --border-subtle: #1e1e1e;
+        --border-accent: #2a2a2a;
+        --border-sidebar: #1a1a1a;
+
+        --text-primary: #f0f0f0;
+        --text-secondary: #888888;
+        --text-muted: #444444;
+        --text-sidebar: #e0e0e0;
+        --text-sidebar-muted: #555555;
+
+        --accent: #f0f0f0;
+        --accent-warm: #c4a882;
+        --accent-soft: rgba(196, 168, 130, 0.1);
+        --accent-success: #4a7c59;
+        --accent-error: #b85450;
+        --accent-highlight: #c4a882;
+
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+        --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+
+        --orb-opacity: 0.12;
+    }
+}
+
+/* ── Orb Animasyonları ──────────────────────────────────────────── */
+.orb-container {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: var(--orb-opacity);
+    transition: opacity 0.5s ease;
+    animation: floatOrb linear infinite;
+}
+
+.orb-1 {
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, #7c5cbf, transparent 70%);
+    top: -200px;
+    left: -100px;
+    animation-duration: 25s;
+}
+
+.orb-2 {
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, #f5f0e8, transparent 70%);
+    top: 30%;
+    right: -150px;
+    opacity: calc(var(--orb-opacity) * 0.6);
+    animation-duration: 32s;
+    animation-delay: -8s;
+}
+
+.orb-3 {
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, #4a3870, transparent 70%);
+    bottom: -100px;
+    left: 40%;
+    opacity: calc(var(--orb-opacity) * 0.85);
+    animation-duration: 20s;
+    animation-delay: -14s;
+}
+
+@keyframes floatOrb {
+    0%   { transform: translate(0px, 0px) scale(1); }
+    25%  { transform: translate(40px, -30px) scale(1.05); }
+    50%  { transform: translate(20px, 50px) scale(0.97); }
+    75%  { transform: translate(-30px, 20px) scale(1.03); }
+    100% { transform: translate(0px, 0px) scale(1); }
+}
+
+/* ── Tema Toggle Butonu ─────────────────────────────────────────── */
+.theme-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all var(--transition-fast);
+    margin-left: 8px;
+}
+
+.theme-toggle-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+    border-color: var(--border-accent);
 }
 
 /* ── Reset & Base ──────────────────────────────────────────────── */
@@ -769,8 +920,8 @@ textarea.form-input {
     align-items: center;
     gap: 10px;
     padding: 14px 18px;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
+    background: rgba(184, 84, 80, 0.08);
+    border: 1px solid rgba(184, 84, 80, 0.3);
     border-radius: var(--radius-md);
     color: var(--accent-error);
     font-size: 0.82rem;

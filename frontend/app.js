@@ -5,6 +5,41 @@
 
 const API_BASE = "";
 
+// ─── Tema Yönetimi ────────────────────────────────────────────────────
+const THEME_KEY = "antigravity_theme";
+
+function applyTheme(theme) {
+    const html = document.documentElement;
+    if (theme === "system") {
+        html.removeAttribute("data-theme");
+    } else {
+        html.setAttribute("data-theme", theme);
+    }
+    const icons = { dark: "☾", light: "☀", system: "◐" };
+    const btn = document.getElementById("theme-toggle");
+    if (btn) btn.querySelector(".theme-icon").textContent = icons[theme] || "◐";
+    localStorage.setItem(THEME_KEY, theme);
+}
+
+function cycleTheme() {
+    const current = localStorage.getItem(THEME_KEY) || "system";
+    const next = { system: "dark", dark: "light", light: "system" };
+    applyTheme(next[current] || "system");
+}
+
+// İlk yükleme
+applyTheme(localStorage.getItem(THEME_KEY) || "system");
+
+// Sistem teması değişince ikonu güncelle
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if ((localStorage.getItem(THEME_KEY) || "system") === "system") {
+        const btn = document.getElementById("theme-toggle");
+        if (btn) btn.querySelector(".theme-icon").textContent = "◐";
+    }
+});
+
+document.getElementById("theme-toggle")?.addEventListener("click", cycleTheme);
+
 // ─── DOM References ──────────────────────────────────────────────────
 const frontZone = document.getElementById("front-zone");
 const sideZone = document.getElementById("side-zone");
