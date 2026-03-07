@@ -5,14 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Elbise fotoğraflarından profesyonel AI moda videoları üretin.">
-    <title>Fashion Video AI</title>
+    <title>Antigravity — Video Studio</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap"
-        rel="stylesheet">
-    <meta name="version" content="2.1.0">
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <meta name="version" content="3.0.0">
+    <link rel="stylesheet" href="styles.css?v=4">
 </head>
 
 <body>
@@ -26,338 +24,361 @@
 
     <div class="app-layout">
 
-        <!-- ── LEFT SIDEBAR ────────────────────────────────── -->
+        <!-- ── SIDEBAR ─────────────────────────────────────── -->
         <aside class="sidebar">
-
-            <!-- Brand -->
             <div class="sidebar-brand">
-                <div class="brand-mark">F</div>
-                <span class="brand-name">Fashion Video AI</span>
+                <div class="brand-mark">A</div>
+                <div>
+                    <div class="brand-name">Antigravity</div>
+                    <div class="brand-sub">Video Studio</div>
+                </div>
             </div>
 
-            <!-- Sidebar scrollable content -->
-            <div class="sidebar-scroll">
-
-                <!-- Upload Section -->
-                <div class="sidebar-section">
-                    <div class="section-title">Elbise Fotografi</div>
-                    <div class="upload-grid triple">
-                        <div class="upload-zone" id="front-zone"
-                            onclick="document.getElementById('front-input').click()">
-                            <span class="badge">Zorunlu</span>
-                            <div class="upload-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="1.5">
-                                    <path d="M12 5v14M5 12h14" />
-                                </svg>
-                            </div>
-                            <div class="upload-label">On</div>
-                            <div class="upload-hint">JPG, PNG, WebP</div>
-                            <input type="file" id="front-input" accept="image/*">
-                        </div>
-                        <div class="upload-zone" id="side-zone" onclick="document.getElementById('side-input').click()">
-                            <span class="badge muted">Opsiyonel</span>
-                            <div class="upload-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="1.5">
-                                    <path d="M12 5v14M5 12h14" />
-                                </svg>
-                            </div>
-                            <div class="upload-label">Yan</div>
-                            <div class="upload-hint">Yan gorunum</div>
-                            <input type="file" id="side-input" accept="image/*">
-                        </div>
-                        <div class="upload-zone" id="back-zone" onclick="document.getElementById('back-input').click()">
-                            <span class="badge muted">Opsiyonel</span>
-                            <div class="upload-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="1.5">
-                                    <path d="M12 5v14M5 12h14" />
-                                </svg>
-                            </div>
-                            <div class="upload-label">Arka</div>
-                            <div class="upload-hint">Arka gorunum</div>
-                            <input type="file" id="back-input" accept="image/*">
-                        </div>
-                    </div>
-
-                    <div class="upload-grid" style="margin-top: 8px;">
-                        <div class="upload-zone" id="refimg-zone"
-                            onclick="document.getElementById('refimg-input').click()">
-                            <span class="badge muted">Opsiyonel</span>
-                            <div class="upload-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="1.5">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                                    <path d="M3 16l5-5 4 4 4-4 5 5" />
-                                </svg>
-                            </div>
-                            <div class="upload-label">Mekan / Referans</div>
-                            <div class="upload-hint">Mekan veya stil referansi</div>
-                            <input type="file" id="refimg-input" accept="image/*">
-                        </div>
-                        <div class="upload-zone video-upload-zone" id="video-zone"
-                            onclick="document.getElementById('video-input').click()">
-                            <span class="badge muted">Opsiyonel</span>
-                            <div class="upload-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="1.5">
-                                    <polygon points="5,3 19,12 5,21" />
-                                </svg>
-                            </div>
-                            <div class="upload-label">Referans Video</div>
-                            <div class="upload-hint">Hareket referansi MP4</div>
-                            <input type="file" id="video-input" accept="video/*">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Settings Section -->
-                <div class="sidebar-section">
-                    <div class="section-title">Video Ayarlari</div>
-
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label class="form-label">Mekan</label>
-                            <select class="form-select" id="location-select">
-                                <option value="studio">Studyo</option>
-                                <option value="beach">Sahil</option>
-                                <option value="city_street">Sehir Sokagi</option>
-                                <option value="garden">Bahce</option>
-                                <option value="rooftop">Cati Kati</option>
-                                <option value="runway">Podyum</option>
-                                <option value="custom">Ozel Mekan</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Mood</label>
-                            <select class="form-select" id="mood-select">
-                                <option value="">Otomatik</option>
-                                <option value="luxury">Luks</option>
-                                <option value="casual">Gunluk</option>
-                                <option value="energetic">Enerjik</option>
-                                <option value="romantic">Romantik</option>
-                                <option value="edgy">Cesur</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Video Suresi (sn)</label>
-                            <input type="number" class="form-input" id="duration-input" min="3" max="15" value="10"
-                                step="1">
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Sahne Sayisi</label>
-                            <input type="number" class="form-input" id="scene-count-input" min="1" max="6" value="2"
-                                step="1">
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Video Formati</label>
-                            <select class="form-select" id="aspect-ratio-select">
-                                <option value="9:16">Dikey (9:16)</option>
-                                <option value="16:9">Yatay (16:9)</option>
-                                <option value="1:1">Kare (1:1)</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Ses Uretimi</label>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="audio-toggle" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Watermark / Logo</label>
-                            <div class="upload-zone mini-upload" id="watermark-zone">
-                                <input type="file" id="watermark-input" accept="image/png,image/webp" hidden>
-                                <span class="mini-upload-label" id="watermark-label">Logo Yukle (PNG)</span>
-                            </div>
-                        </div>
-
-                        <div class="form-group full-width">
-                            <label class="form-label">Video Aciklamasi (Opsiyonel)</label>
-                            <textarea class="form-input" id="video-description" rows="3"
-                                placeholder="Orn: Ilk sahne yakin cekim detay, sonra tam boy yuruyus..."></textarea>
-                        </div>
-
-                        <div class="form-group full-width" id="custom-location-group" style="display: none;">
-                            <label class="form-label">Ozel Mekan Tanimi</label>
-                            <input type="text" class="form-input" id="custom-location"
-                                placeholder="Orn: Toskana'da bir uzum bagi, gun batimi...">
-                        </div>
-                    </div>
-
-                    <!-- Template Controls -->
-                    <div class="template-controls">
-                        <select class="form-select" id="template-select" style="flex: 1;">
-                            <option value="">Sablon Sec...</option>
-                        </select>
-                        <button type="button" id="load-template-btn" class="template-btn">Yukle</button>
-                        <button type="button" id="save-template-btn" class="template-btn primary">Kaydet</button>
-                        <button type="button" id="delete-template-btn" class="template-btn danger">Sil</button>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Generate Button (sticky bottom) -->
-            <div class="sidebar-footer">
-                <button class="generate-btn" id="generate-btn" disabled>
-                    <span class="btn-content">
-                        <span>Video Olustur</span>
-                    </span>
+            <nav class="sidebar-nav">
+                <a class="nav-item active" id="nav-dashboard" href="#">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    Dashboard
+                </a>
+                <button class="nav-item" id="nav-new-video">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                    Yeni Video
                 </button>
-            </div>
+                <button class="nav-item" id="nav-defile">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Defile Modu
+                </button>
+                <a class="nav-item" href="/gallery">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                    Galeri
+                </a>
+                <button class="nav-item" id="nav-brand">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                    Marka Ayarları
+                </button>
+            </nav>
 
+            <div class="sidebar-bottom">
+                <div class="user-chip">
+                    <div class="user-avatar">AG</div>
+                    <div class="user-info">
+                        <div class="user-name">Antigravity</div>
+                        <div class="user-plan">Pro Plan</div>
+                    </div>
+                </div>
+            </div>
         </aside>
 
         <!-- ── MAIN CONTENT ────────────────────────────────── -->
         <main class="main-content">
 
-            <!-- Top Bar -->
+            <!-- Topbar -->
             <div class="topbar">
-                <div class="topbar-left">
-                    <span class="topbar-title">Creations</span>
-                </div>
-                <div class="topbar-right">
+                <span class="topbar-title">Dashboard</span>
+                <div class="topbar-actions">
                     <a href="/gallery" class="topbar-link">Video Galeri</a>
+                    <button id="open-wizard-btn" class="btn-primary-sm">+ Yeni Video</button>
                     <button id="theme-toggle" class="theme-toggle-btn" title="Tema değiştir">
                         <span class="theme-icon">◐</span>
                     </button>
                 </div>
             </div>
 
-            <!-- Content Area -->
-            <div class="content-area">
+            <!-- Dashboard -->
+            <div class="content-area" id="dashboard-view">
 
-                <!-- Progress Section -->
-                <div class="card progress-section" id="progress-section">
-                    <div class="card-title">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path
-                                d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                        </svg>
-                        <span>Islem Durumu</span>
+                <div class="dash-section-header">
+                    <div class="dash-section-title">Ne üretmek istiyorsunuz?</div>
+                    <div class="dash-section-sub">Bir mod seçin ve başlayın</div>
+                </div>
+
+                <div class="mode-cards">
+                    <div class="mode-card" id="card-single-video">
+                        <div class="mode-card-icon">✦</div>
+                        <div class="mode-card-title">Tek Video</div>
+                        <div class="mode-card-desc">Bir elbise yükle, sahne seç, video üret.</div>
+                    </div>
+                    <div class="mode-card mode-card-soon">
+                        <div class="mode-card-icon">◈</div>
+                        <div class="mode-card-title">Defile Modu <span class="soon-badge">Yakında</span></div>
+                        <div class="mode-card-desc">Birden fazla elbiseyi sırayla birleştir.</div>
+                    </div>
+                    <div class="mode-card mode-card-soon">
+                        <div class="mode-card-icon">⊞</div>
+                        <div class="mode-card-title">Toplu İşlem <span class="soon-badge">Yakında</span></div>
+                        <div class="mode-card-desc">Birden fazla elbise kuyruğa al.</div>
+                    </div>
+                </div>
+
+                <div class="dash-section-header" style="margin-top: 16px;">
+                    <div class="dash-section-title">Son Videolar</div>
+                    <a href="/gallery" class="dash-section-link">Tümünü gör →</a>
+                </div>
+
+                <div class="recent-grid" id="recent-videos-grid">
+                    <div class="recent-empty">
+                        <div class="recent-empty-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                        </div>
+                        <div class="recent-empty-text">Henüz video üretilmedi</div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ── WIZARD MODAL ───────────────────────────────────────── -->
+    <div class="wizard-overlay" id="wizard-modal" style="display:none">
+        <div class="wizard" id="wizard-container">
+
+            <div class="wizard-header">
+                <div class="wizard-header-left">
+                    <span class="wizard-title">Yeni Video Üret</span>
+                    <span class="wizard-step-label" id="wizard-step-label">Adım 1 / 4</span>
+                </div>
+                <button class="wizard-close" id="wizard-close">✕</button>
+            </div>
+
+            <div class="wizard-body">
+
+                <!-- Adım 1: Görseller -->
+                <div class="wizard-step" id="step-1">
+                    <div class="wizard-step-title">Elbise Fotoğrafları</div>
+                    <div class="wizard-step-sub">En az ön fotoğraf zorunludur.</div>
+
+                    <div class="upload-zone upload-zone-lg" id="front-zone" style="margin-top:16px">
+                        <input type="file" id="front-input" accept="image/*">
+                        <div class="upload-zone-inner">
+                            <div class="upload-icon">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            </div>
+                            <div class="upload-label">Ön Fotoğraf</div>
+                            <div class="upload-hint">JPG, PNG, WebP · Maks 10MB</div>
+                        </div>
+                        <span class="badge">Zorunlu</span>
                     </div>
 
-                    <div class="progress-bar-container">
-                        <div class="progress-bar" id="progress-bar"></div>
-                    </div>
-                    <div class="progress-info">
-                        <span class="progress-status" id="progress-status">Baslatiliyor...</span>
-                        <span class="progress-percent" id="progress-percent">0%</span>
+                    <div class="upload-grid triple" style="margin-top:10px">
+                        <div class="upload-zone" id="back-zone">
+                            <input type="file" id="back-input" accept="image/*">
+                            <div class="upload-zone-inner">
+                                <div class="upload-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+                                <div class="upload-label">Arka</div>
+                                <div class="upload-hint">Arka görünüm</div>
+                            </div>
+                            <span class="badge muted">Opsiyonel</span>
+                        </div>
+                        <div class="upload-zone" id="side-zone">
+                            <input type="file" id="side-input" accept="image/*">
+                            <div class="upload-zone-inner">
+                                <div class="upload-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+                                <div class="upload-label">Yan</div>
+                                <div class="upload-hint">Yan görünüm</div>
+                            </div>
+                            <span class="badge muted">Opsiyonel</span>
+                        </div>
+                        <div class="upload-zone" id="refimg-zone">
+                            <input type="file" id="refimg-input" accept="image/*">
+                            <div class="upload-zone-inner">
+                                <div class="upload-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg></div>
+                                <div class="upload-label">Mekan / Referans</div>
+                                <div class="upload-hint">Mekan veya stil referansı</div>
+                            </div>
+                            <span class="badge muted">Opsiyonel</span>
+                        </div>
                     </div>
 
-                    <div class="steps-timeline" id="steps-timeline">
-                        <div class="step-item" data-step="analyzing">
-                            <div class="step-icon">1</div>
-                            <span class="step-label">Elbise analiz ediliyor</span>
+                    <div class="upload-grid" style="margin-top:10px">
+                        <div class="upload-zone" id="video-zone">
+                            <input type="file" id="video-input" accept="video/*">
+                            <div class="upload-zone-inner">
+                                <div class="upload-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23,7 16,12 23,17"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+                                <div class="upload-label">Referans Video</div>
+                                <div class="upload-hint">Hareket referansı MP4</div>
+                            </div>
+                            <span class="badge muted">Opsiyonel</span>
                         </div>
-                        <div class="step-item" data-step="generating_prompts">
-                            <div class="step-icon">2</div>
-                            <span class="step-label">Sahneler planlaniyor</span>
+                    </div>
+                </div>
+
+                <!-- Adım 2: Lokasyon & Mood -->
+                <div class="wizard-step" id="step-2" style="display:none">
+                    <div class="wizard-step-title">Lokasyon & Mood</div>
+                    <div class="wizard-step-sub">Videonun geçeceği ortamı ve atmosferi seçin.</div>
+
+                    <div class="form-grid" style="margin-top:20px">
+                        <div class="form-group full-width">
+                            <label class="form-label">Mekan</label>
+                            <select class="form-select" id="location-select">
+                                <option value="studio">Stüdyo</option>
+                                <option value="beach">Sahil</option>
+                                <option value="city_street">Şehir Sokağı</option>
+                                <option value="garden">Bahçe</option>
+                                <option value="rooftop">Çatı Katı</option>
+                                <option value="runway">Podyum</option>
+                                <option value="custom">Özel Mekan...</option>
+                            </select>
                         </div>
-                        <div class="step-item" data-step="generating_background">
-                            <div class="step-icon">3</div>
-                            <span class="step-label">Arka plan uretiliyor</span>
+                        <div class="form-group full-width" id="custom-location-group" style="display:none">
+                            <label class="form-label">Özel Mekan Açıklaması</label>
+                            <input type="text" class="form-input" id="custom-location" placeholder="Örn: Paris Eyfel Kulesi önü, gün batımı...">
                         </div>
-                        <div class="step-item" data-step="generating_video">
-                            <div class="step-icon">4</div>
-                            <span class="step-label">Video uretiliyor</span>
+                        <div class="form-group full-width">
+                            <label class="form-label">Mood / Atmosfer</label>
+                            <select class="form-select" id="mood-select">
+                                <option value="">Otomatik</option>
+                                <option value="luxury">Lüks & Sofistike</option>
+                                <option value="casual">Gündelik & Rahat</option>
+                                <option value="energetic">Enerjik & Dinamik</option>
+                                <option value="romantic">Romantik & Zarif</option>
+                                <option value="edgy">Edgy & Modern</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Adım 3: Video Ayarları -->
+                <div class="wizard-step" id="step-3" style="display:none">
+                    <div class="wizard-step-title">Video Ayarları</div>
+                    <div class="wizard-step-sub">Süre, format ve diğer tercihlerinizi belirleyin.</div>
+
+                    <div class="form-grid" style="margin-top:20px">
+                        <div class="form-group">
+                            <label class="form-label">Video Süresi (sn)</label>
+                            <input type="number" class="form-input" id="duration-input" min="3" max="15" value="10">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Sahne Sayısı</label>
+                            <input type="number" class="form-input" id="scene-count-input" min="1" max="6" value="2">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Video Formatı</label>
+                            <select class="form-select" id="aspect-ratio-select">
+                                <option value="9:16">Dikey (9:16)</option>
+                                <option value="16:9">Yatay (16:9)</option>
+                                <option value="1:1">Kare (1:1)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Ses Üretimi</label>
+                            <div style="display:flex;align-items:center;gap:8px;padding-top:6px">
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="audio-toggle" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                                <span style="font-size:0.75rem;color:var(--text-secondary)">Açık</span>
+                            </div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label class="form-label">Video Açıklaması (Opsiyonel)</label>
+                            <textarea class="form-input" id="video-description" rows="2" placeholder="Örn: İlk sahne yakın çekim detay, sonra tam boy yürüyüş..."></textarea>
+                        </div>
+                        <div class="form-group full-width">
+                            <label class="form-label">Watermark / Logo</label>
+                            <div class="mini-upload" id="watermark-zone">
+                                <input type="file" id="watermark-input" accept="image/png">
+                                <span class="mini-upload-label" id="watermark-label">Logo Yükle (PNG)</span>
+                            </div>
+                        </div>
+                        <div class="form-group full-width">
+                            <label class="form-label">Şablon</label>
+                            <div class="template-controls">
+                                <select class="form-select" id="template-select" style="flex:1">
+                                    <option value="">Şablon Seç...</option>
+                                </select>
+                                <button class="template-btn" id="load-template-btn">Yükle</button>
+                                <button class="template-btn primary" id="save-template-btn">Kaydet</button>
+                                <button class="template-btn danger" id="delete-template-btn">Sil</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Adım 4: Üretim -->
+                <div class="wizard-step" id="step-4" style="display:none">
+                    <div class="wizard-step-title" id="step4-title">Video Üretmeye Hazır</div>
+                    <div class="wizard-step-sub" id="step4-sub">Ayarlarınız kaydedildi. Üretimi başlatın.</div>
+
+                    <div class="error-message" id="error-message" style="margin-top:16px">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                        <span id="error-text"></span>
+                    </div>
+
+                    <div class="progress-section" id="progress-section" style="margin-top:16px">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="progress-bar"></div>
+                        </div>
+                        <div class="progress-info">
+                            <span class="progress-status" id="progress-status">Başlatılıyor...</span>
+                            <span class="progress-percent" id="progress-percent">0%</span>
+                        </div>
+                        <div class="steps-timeline" id="steps-timeline">
+                            <div class="step-item" data-step="analyzing">
+                                <div class="step-icon">1</div>
+                                <span class="step-label">Elbise analiz ediliyor</span>
+                            </div>
+                            <div class="step-item" data-step="generating_prompts">
+                                <div class="step-icon">2</div>
+                                <span class="step-label">Sahneler planlanıyor</span>
+                            </div>
+                            <div class="step-item" data-step="generating_background">
+                                <div class="step-icon">3</div>
+                                <span class="step-label">Arka plan üretiliyor</span>
+                            </div>
+                            <div class="step-item" data-step="generating_video">
+                                <div class="step-icon">4</div>
+                                <span class="step-label">Video üretiliyor</span>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Analysis Panel -->
-                    <div class="analysis-panel" id="analysis-panel">
-                        <div class="card-title" style="font-size: 0.85rem; margin-top: 20px;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <circle cx="11" cy="11" r="8" />
-                                <path d="M21 21l-4.35-4.35" />
-                            </svg>
-                            <span>Elbise Analizi</span>
+                    <div class="analysis-panel" id="analysis-panel" style="margin-top:16px">
+                        <div class="card-title" style="font-size:0.85rem">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            Elbise Analizi
                         </div>
                         <div class="analysis-grid" id="analysis-grid"></div>
                     </div>
 
-                    <!-- Prompt Panel -->
-                    <div class="prompt-panel" id="prompt-panel">
-                        <div class="card-title" style="font-size: 0.85rem; margin-top: 16px;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                                <polyline points="14,2 14,8 20,8" />
-                            </svg>
-                            <span>Sahne Promptu</span>
+                    <div class="prompt-panel" id="prompt-panel" style="margin-top:16px">
+                        <div class="card-title" style="font-size:0.85rem">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                            Sahne Planı
                         </div>
                         <div class="prompt-text" id="prompt-text"></div>
                     </div>
-                </div>
 
-                <!-- Result Section -->
-                <div class="card result-section" id="result-section">
-                    <div class="card-title">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <polygon points="23,7 16,12 23,17" />
-                            <rect x="1" y="5" width="15" height="14" rx="2" />
-                        </svg>
-                        <span>Sonuc</span>
-                    </div>
-
-                    <div class="result-video-wrapper">
-                        <video id="result-video" controls loop autoplay muted></video>
-                    </div>
-
-                    <div class="result-actions">
-                        <button class="action-btn btn-download" id="download-btn">
-                            Indir
-                        </button>
-                        <button class="action-btn btn-whatsapp" id="whatsapp-btn">
-                            WhatsApp
-                        </button>
-                        <button class="action-btn btn-new" id="new-btn">
-                            Yeni Video
-                        </button>
+                    <div class="result-section" id="result-section" style="margin-top:16px">
+                        <div class="result-video-wrapper">
+                            <video id="result-video" controls playsinline></video>
+                        </div>
+                        <div class="result-actions">
+                            <button class="action-btn btn-download" id="download-btn">⬇ İndir</button>
+                            <button class="action-btn btn-whatsapp" id="whatsapp-btn">📱 WhatsApp</button>
+                            <button class="action-btn" id="new-btn">+ Yeni Video</button>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Error -->
-                <div class="error-message" id="error-message">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                        <line x1="12" y1="9" x2="12" y2="13" />
-                        <line x1="12" y1="17" x2="12.01" y2="17" />
-                    </svg>
-                    <span id="error-text"></span>
-                </div>
+            </div><!-- /wizard-body -->
 
-                <!-- Empty State (when no job is running) -->
-                <div class="empty-state" id="empty-state">
-                    <div class="empty-icon">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="1">
-                            <polygon points="23,7 16,12 23,17" />
-                            <rect x="1" y="5" width="15" height="14" rx="2" />
-                        </svg>
-                    </div>
-                    <h3>Henuz video uretilmedi</h3>
-                    <p>Sol panelden elbise fotografinizi yukleyin ve ayarlari yaparak video uretmeye baslayin.</p>
+            <div class="wizard-footer" id="wizard-footer">
+                <div class="step-dots" id="step-dots">
+                    <div class="dot active"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
+                    <div class="dot"></div>
                 </div>
-
+                <div class="wizard-footer-actions">
+                    <button class="wizard-btn-ghost" id="wizard-back-btn" style="display:none">← Geri</button>
+                    <button class="wizard-btn-primary" id="wizard-next-btn" disabled>Devam →</button>
+                </div>
             </div>
 
-        </main>
+        </div><!-- /wizard -->
+    </div><!-- /wizard-overlay -->
 
-    </div>
-
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=4"></script>
 </body>
 
 </html>
