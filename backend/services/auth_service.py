@@ -23,31 +23,56 @@ def _fresh_auth_client() -> Client:
 # ─── Auth ──────────────────────────────────────────────────────────
 
 async def register_user(email: str, password: str, full_name: str) -> dict:
-    auth = _fresh_auth_client()
+    db = _admin_client()
+    print(f"[register] attempt: {email}")
     try:
         res = await asyncio.to_thread(
-            lambda: auth.auth.sign_up({
+            lambda: db.auth.admin.create_user({
                 "email": email,
                 "password": password,
-                "options": {"data": {"full_name": full_name}},
+                "email_confirm": True,
+                "user_metadata": {"full_name": full_name},
             })
         )
+        print(f"[register] create_user result: user={res.user}")
     except Exception as e:
+        print(f"[register] create_user exception: {e}")
+        err = str(e).lower()
+        if "already registered" in err or "already exists" in err or "duplicate" in err:
+            raise HTTPException(status_code=400, detail="Bu e-posta adresi zaten kayıtlı.")
         raise HTTPException(status_code=400, detail=f"Kayıt hatası: {e}")
 
     if res.user is None:
+        print("[register] res.user is None")
         raise HTTPException(status_code=400, detail="Kayıt başarısız.")
 
-    # Admin e-postası → otomatik onayla
-    if settings.ADMIN_EMAIL and email.lower() == settings.ADMIN_EMAIL.lower():
-        uid = str(res.user.id)
-        db = _admin_client()
-        await asyncio.to_thread(
-            lambda: db.table("profiles")
-            .update({"approved": True, "role": "admin"})
-            .eq("id", uid)
-            .execute()
-        )
+    uid = str(res.user.id)
+    is_admin = bool(settings.ADMIN_EMAIL and email.lower() == settings.ADMIN_EMAIL.lower())
+
+    # profiles tablosuna manuel insert (admin.create_user trigger'ı tetiklemeyebilir)
+    profile_data = {
+        "id": uid,
+        "email": email,
+        "full_name": full_name,
+        "approved": is_admin,
+        "role": "admin" if is_admin else "user",
+    }
+
+    def _upsert_profile(*_: object, **__: object) -> None:
+        db.table("profiles").upsert(profile_data).execute()
+
+    def _delete_user(*_: object, **__: object) -> None:
+        db.auth.admin.delete_user(uid)
+
+    try:
+        await asyncio.to_thread(_upsert_profile)
+    except Exception as e:
+        # Auth kullanıcısı oluştu ama profil yazılamadı — geri al
+        try:
+            await asyncio.to_thread(_delete_user)
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Profil oluşturulamadı: {e}")
 
     return {"message": "Kayıt başarılı. Lütfen admin onayını bekleyin."}
 
