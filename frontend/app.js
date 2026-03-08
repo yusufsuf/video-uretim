@@ -85,8 +85,6 @@ const sideInput    = document.getElementById("side-input");
 const backInput    = document.getElementById("back-input");
 const refimgInput  = document.getElementById("refimg-input");
 const videoInput   = document.getElementById("video-input");
-const locationSel  = document.getElementById("location-select");
-const moodSel      = document.getElementById("mood-select");
 const durationInput    = document.getElementById("duration-input");
 const sceneCountInput  = document.getElementById("scene-count-input");
 const aspectRatioSel   = document.getElementById("aspect-ratio-select");
@@ -95,8 +93,6 @@ const watermarkInput   = document.getElementById("watermark-input");
 const watermarkZone    = document.getElementById("watermark-zone");
 const watermarkLabel   = document.getElementById("watermark-label");
 const videoDescInput   = document.getElementById("video-description");
-const customLocGrp     = document.getElementById("custom-location-group");
-const customLocIn      = document.getElementById("custom-location");
 const progressSec  = document.getElementById("progress-section");
 const progressBar  = document.getElementById("progress-bar");
 const progressStat = document.getElementById("progress-status");
@@ -133,7 +129,7 @@ let watermarkFile = null;
 let currentJobId   = null;
 let pollInterval   = null;
 let currentWizardStep = 1;
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 3;
 let generationStarted = false;
 
 // ─── Wizard Management ──────────────────────────────────────────────
@@ -320,10 +316,6 @@ setupUploadZone(backZone,   backInput,   "back");
 setupUploadZone(refimgZone, refimgInput, "refimg");
 setupUploadZone(videoZone,  videoInput,  "video");
 
-// ─── Location Toggle ─────────────────────────────────────────────
-locationSel.addEventListener("change", () => {
-    customLocGrp.style.display = locationSel.value === "custom" ? "flex" : "none";
-});
 
 // ─── Generate ────────────────────────────────────────────────────
 async function startGeneration() {
@@ -343,15 +335,13 @@ async function startGeneration() {
     if (backFile)   formData.append("back_image",      backFile);
     if (refimgFile) formData.append("reference_image", refimgFile);
     if (videoFile)  formData.append("reference_video", videoFile);
-    formData.append("location",       locationSel.value);
+    formData.append("location",       "studio");
     formData.append("aspect_ratio",   aspectRatioSel.value);
     formData.append("generate_audio", audioToggle.checked);
     formData.append("duration",       Math.max(3, Math.min(15, parseInt(durationInput.value) || 10)));
     formData.append("scene_count",    Math.max(1, Math.min(8, parseInt(sceneCountInput.value) || 2)));
     if (watermarkFile) formData.append("watermark_image", watermarkFile);
     if (videoDescInput.value.trim()) formData.append("video_description", videoDescInput.value.trim());
-    if (locationSel.value === "custom") formData.append("custom_location", customLocIn.value);
-    if (moodSel.value) formData.append("mood", moodSel.value);
 
     try {
         const resp = await fetch(`${API_BASE}/api/generate`, { method: "POST", body: formData, headers: getAuthHeaders() });
@@ -562,27 +552,20 @@ function refreshTemplateList() {
 
 function getCurrentSettings() {
     return {
-        location:        locationSel.value,
-        mood:            moodSel.value,
         duration:        durationInput.value,
         scene_count:     sceneCountInput.value,
         aspect_ratio:    aspectRatioSel.value,
         generate_audio:  audioToggle.checked,
         video_description: videoDescInput.value,
-        custom_location: customLocIn.value,
     };
 }
 
 function applySettings(s) {
-    if (s.location)      locationSel.value = s.location;
-    if (s.mood)          moodSel.value = s.mood;
     if (s.duration)      durationInput.value = s.duration;
     if (s.scene_count)   sceneCountInput.value = s.scene_count;
     if (s.aspect_ratio)  aspectRatioSel.value = s.aspect_ratio;
     if (s.generate_audio !== undefined) audioToggle.checked = s.generate_audio;
     if (s.video_description) videoDescInput.value = s.video_description;
-    if (s.custom_location)   customLocIn.value = s.custom_location;
-    customLocGrp.style.display = locationSel.value === "custom" ? "flex" : "none";
 }
 
 saveTemplateBtn?.addEventListener("click", () => {
