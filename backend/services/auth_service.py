@@ -52,8 +52,8 @@ async def login_user(email: str, password: str) -> dict:
         res = await asyncio.to_thread(
             lambda: c.auth.sign_in_with_password({"email": email, "password": password})
         )
-    except Exception:
-        raise HTTPException(status_code=401, detail="E-posta veya şifre hatalı.")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Login hatası: {e}")
 
     uid = str(res.user.id)
     profile_res = await asyncio.to_thread(
