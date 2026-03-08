@@ -243,6 +243,18 @@ async def generate_multi_scene_prompt(
 
     location_str = request.custom_location if request.location == "custom" else request.location.value
 
+    # Map user-friendly camera move names to cinematography terms
+    _cam_move_map = {
+        "orbit":     "360° Orbit / Arc Shot",
+        "dolly_in":  "Dolly In (Push In)",
+        "dolly_out": "Dolly Out (Pull Out)",
+        "pan":       "Pan Left/Right",
+        "tilt_up":   "Tilt Up",
+        "tracking":  "Tracking Shot / Follow Shot",
+        "crane":     "Crane Shot (rising)",
+        "static":    "Handheld / Static",
+    }
+
     user_text = (
         f"Garment analysis:\n{analysis.model_dump_json(indent=2)}\n\n"
         f"Location: {location_str}\n"
@@ -251,6 +263,19 @@ async def generate_multi_scene_prompt(
         f"Mood: {request.mood or analysis.mood}\n"
         f"The garment photos are referenced as @Element1 in prompts.\n"
     )
+
+    if request.shots:
+        user_text += "\n[CRITICAL] Per-shot configuration — you MUST follow this EXACTLY:\n"
+        for i, shot in enumerate(request.shots):
+            cam_term = _cam_move_map.get(shot.camera_move, shot.camera_move)
+            user_text += f"  Shot {i + 1}: camera_movement=\"{cam_term}\", duration={shot.duration}s"
+            if shot.description:
+                user_text += f", additional_instruction=\"{shot.description}\""
+            user_text += "\n"
+        user_text += (
+            "Each scene's 'camera_movement' field MUST match the specified movement above. "
+            "Each scene's 'duration' field MUST match the specified seconds above exactly.\n"
+        )
 
     if video_description:
         user_text += f"\nUser's additional description: {video_description}\n"

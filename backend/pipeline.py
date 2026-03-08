@@ -174,6 +174,11 @@ async def run_pipeline(
         elements = [element]
         logger.info("[%s] Element: frontal=%s, refs=%d", job_id, front_url[:60], len(element["reference_image_urls"]))
 
+        # If user provided per-shot configs, override GPT's durations (safeguard)
+        if request.shots and len(request.shots) == len(scene_prompt.scenes):
+            for scene, shot in zip(scene_prompt.scenes, request.shots):
+                scene.duration = str(shot.duration)
+
         # Split scenes into chunks for last-frame chaining
         all_scenes = scene_prompt.scenes
         chunks = [all_scenes[i:i+CHUNK_SIZE] for i in range(0, len(all_scenes), CHUNK_SIZE)]

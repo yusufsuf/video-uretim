@@ -68,6 +68,13 @@ class MultiScenePrompt(BaseModel):
     location_theme: str = Field(default="", description="Genel mekan teması")
 
 
+class ShotConfig(BaseModel):
+    """Per-shot configuration from user for multishot video."""
+    camera_move: str = Field(default="dolly_in", description="Camera movement type (orbit, dolly_in, dolly_out, pan, tilt_up, tracking, crane, static)")
+    duration: int = Field(default=5, description="Shot duration in seconds", ge=3, le=10)
+    description: Optional[str] = Field(default=None, description="Additional description for this shot")
+
+
 class GenerationRequest(BaseModel):
     """Frontend'den gelen video üretim talebi."""
     model_config = {"protected_namespaces": ()}
@@ -76,6 +83,7 @@ class GenerationRequest(BaseModel):
     custom_location: Optional[str] = None
     mood: Optional[str] = None
     generate_audio: bool = True
+    shots: Optional[List["ShotConfig"]] = None
 
 
 class JobStatus(str, Enum):

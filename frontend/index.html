@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <meta name="version" content="3.0.0">
-    <link rel="stylesheet" href="styles.css?v=8">
+    <link rel="stylesheet" href="styles.css?v=9">
 </head>
 
 <body>
@@ -152,7 +152,7 @@
             <div class="wizard-header">
                 <div class="wizard-header-left">
                     <span class="wizard-title">Yeni Video Üret</span>
-                    <span class="wizard-step-label" id="wizard-step-label">Adım 1 / 4</span>
+                    <span class="wizard-step-label" id="wizard-step-label">Adım 1 / 3</span>
                 </div>
                 <button class="wizard-close" id="wizard-close">✕</button>
             </div>
@@ -221,61 +221,68 @@
                     </div>
                 </div>
 
-                <!-- Adım 2: Video Ayarları -->
+                <!-- Adım 2: Multishot Tasarımı -->
                 <div class="wizard-step" id="step-2" style="display:none">
-                    <div class="wizard-step-title">Video Ayarları</div>
-                    <div class="wizard-step-sub">Süre, format ve diğer tercihlerinizi belirleyin.</div>
+                    <div class="wizard-step-title">Video Tasarımı</div>
+                    <div class="wizard-step-sub">Her sahne için kamera hareketi ve süre belirleyin.</div>
 
-                    <div class="form-grid" style="margin-top:20px">
-                        <div class="form-group">
-                            <label class="form-label">Video Süresi (sn)</label>
-                            <input type="number" class="form-input" id="duration-input" min="3" max="15" value="10">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Sahne Sayısı</label>
-                            <input type="number" class="form-input" id="scene-count-input" min="1" max="8" value="2">
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Video Formatı</label>
-                            <select class="form-select" id="aspect-ratio-select">
-                                <option value="9:16">Dikey (9:16)</option>
-                                <option value="16:9">Yatay (16:9)</option>
-                                <option value="1:1">Kare (1:1)</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Ses Üretimi</label>
-                            <div style="display:flex;align-items:center;gap:8px;padding-top:6px">
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="audio-toggle" checked>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                                <span style="font-size:0.75rem;color:var(--text-secondary)">Açık</span>
+                    <!-- Format + Audio row -->
+                    <div style="display:flex;gap:12px;margin-top:16px;align-items:flex-end;flex-wrap:wrap">
+                        <div>
+                            <div class="form-label" style="margin-bottom:6px">Format</div>
+                            <div class="ratio-cards" id="ratio-cards">
+                                <div class="ratio-card active" data-ratio="9:16">
+                                    <div class="ratio-preview ratio-916"></div>
+                                    <span>Dikey</span>
+                                </div>
+                                <div class="ratio-card" data-ratio="16:9">
+                                    <div class="ratio-preview ratio-169"></div>
+                                    <span>Yatay</span>
+                                </div>
+                                <div class="ratio-card" data-ratio="1:1">
+                                    <div class="ratio-preview ratio-11"></div>
+                                    <span>Kare</span>
+                                </div>
                             </div>
                         </div>
-                        <div class="form-group full-width">
-                            <label class="form-label">Video Açıklaması (Opsiyonel)</label>
-                            <textarea class="form-input" id="video-description" rows="2" placeholder="Örn: İlk sahne yakın çekim detay, sonra tam boy yürüyüş..."></textarea>
-                        </div>
-                        <div class="form-group full-width">
-                            <label class="form-label">Watermark / Logo</label>
-                            <div class="mini-upload" id="watermark-zone">
-                                <input type="file" id="watermark-input" accept="image/png">
-                                <span class="mini-upload-label" id="watermark-label">Logo Yükle (PNG)</span>
-                            </div>
-                        </div>
-                        <div class="form-group full-width">
-                            <label class="form-label">Şablon</label>
-                            <div class="template-controls">
-                                <select class="form-select" id="template-select" style="flex:1">
-                                    <option value="">Şablon Seç...</option>
-                                </select>
-                                <button class="template-btn" id="load-template-btn">Yükle</button>
-                                <button class="template-btn primary" id="save-template-btn">Kaydet</button>
-                                <button class="template-btn danger" id="delete-template-btn">Sil</button>
-                            </div>
+                        <div>
+                            <div class="form-label" style="margin-bottom:6px">Ses</div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="audio-toggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
                         </div>
                     </div>
+
+                    <!-- Shots Designer -->
+                    <div style="margin-top:16px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                            <div>
+                                <span style="font-size:0.8rem;font-weight:600;color:var(--text-primary)">Sahneler</span>
+                                <span id="total-duration-label" style="font-size:0.72rem;color:var(--text-secondary);margin-left:8px">• 10sn toplam</span>
+                            </div>
+                            <button class="wizard-btn-ghost" id="add-shot-btn">+ Sahne Ekle</button>
+                        </div>
+                        <div id="shots-container"></div>
+                    </div>
+
+                    <!-- Advanced settings -->
+                    <details style="margin-top:12px">
+                        <summary style="font-size:0.73rem;color:var(--text-secondary);cursor:pointer;user-select:none;padding:4px 0">Gelişmiş Ayarlar</summary>
+                        <div class="form-grid" style="margin-top:10px">
+                            <div class="form-group full-width">
+                                <label class="form-label">Video Açıklaması (Opsiyonel)</label>
+                                <textarea class="form-input" id="video-description" rows="2" placeholder="Örn: İlk sahne yakın çekim detay, sonra tam boy yürüyüş..."></textarea>
+                            </div>
+                            <div class="form-group full-width">
+                                <label class="form-label">Watermark / Logo</label>
+                                <div class="mini-upload" id="watermark-zone">
+                                    <input type="file" id="watermark-input" accept="image/png">
+                                    <span class="mini-upload-label" id="watermark-label">Logo Yükle (PNG)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
                 </div>
 
                 <!-- Adım 3: Üretim -->
@@ -351,7 +358,6 @@
                     <div class="dot active"></div>
                     <div class="dot"></div>
                     <div class="dot"></div>
-                    <div class="dot"></div>
                 </div>
                 <div class="wizard-footer-actions">
                     <button class="wizard-btn-ghost" id="wizard-back-btn" style="display:none">← Geri</button>
@@ -362,7 +368,7 @@
         </div><!-- /wizard -->
     </div><!-- /wizard-overlay -->
 
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');

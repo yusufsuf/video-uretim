@@ -85,9 +85,6 @@ const sideInput    = document.getElementById("side-input");
 const backInput    = document.getElementById("back-input");
 const refimgInput  = document.getElementById("refimg-input");
 const videoInput   = document.getElementById("video-input");
-const durationInput    = document.getElementById("duration-input");
-const sceneCountInput  = document.getElementById("scene-count-input");
-const aspectRatioSel   = document.getElementById("aspect-ratio-select");
 const audioToggle      = document.getElementById("audio-toggle");
 const watermarkInput   = document.getElementById("watermark-input");
 const watermarkZone    = document.getElementById("watermark-zone");
@@ -132,17 +129,127 @@ let currentWizardStep = 1;
 const TOTAL_STEPS = 3;
 let generationStarted = false;
 
+// ─── Multishot State ────────────────────────────────────────────────
+let shots = [
+    { camera_move: "dolly_in", duration: 5, description: "" },
+    { camera_move: "orbit",    duration: 5, description: "" },
+];
+let selectedAspectRatio = "9:16";
+
+const CAM_MOVES = [
+    { value: "dolly_in",  label: "Dolly In",  animClass: "cam-anim-dolly-in" },
+    { value: "dolly_out", label: "Dolly Out", animClass: "cam-anim-dolly-out" },
+    { value: "orbit",     label: "Orbit",     animClass: "cam-anim-orbit" },
+    { value: "pan",       label: "Pan",       animClass: "cam-anim-pan" },
+    { value: "tilt_up",   label: "Tilt Up",   animClass: "cam-anim-tilt" },
+    { value: "tracking",  label: "Tracking",  animClass: "cam-anim-tracking" },
+    { value: "crane",     label: "Crane",     animClass: "cam-anim-crane" },
+    { value: "static",    label: "Static",    animClass: "cam-anim-static" },
+];
+
+function getTotalDuration() {
+    return shots.reduce((sum, s) => sum + s.duration, 0);
+}
+
+function updateTotalDurationLabel() {
+    const label = document.getElementById("total-duration-label");
+    if (label) label.textContent = `• ${getTotalDuration()}sn toplam`;
+}
+
+function renderShots() {
+    const container = document.getElementById("shots-container");
+    if (!container) return;
+
+    container.innerHTML = shots.map((shot, idx) => `
+        <div class="shot-card">
+            <div class="shot-card-header">
+                <span class="shot-card-title">Sahne ${idx + 1} · <span class="shot-dur-label">${shot.duration}sn</span></span>
+                ${shots.length > 1
+                    ? `<button class="shot-remove-btn" onclick="removeShot(${idx})">✕</button>`
+                    : ""}
+            </div>
+            <div class="cam-grid">
+                ${CAM_MOVES.map(cm => `
+                    <button class="cam-btn${shot.camera_move === cm.value ? " active" : ""}"
+                            onclick="selectCamMove(${idx}, '${cm.value}')"
+                            title="${cm.label}">
+                        <div class="cam-anim ${cm.animClass}"></div>
+                        <span>${cm.label}</span>
+                    </button>
+                `).join("")}
+            </div>
+            <div style="margin-top:10px">
+                <div style="display:flex;justify-content:space-between;font-size:0.71rem;color:var(--text-secondary);margin-bottom:4px">
+                    <span>Süre</span>
+                    <span class="shot-dur-label">${shot.duration}sn</span>
+                </div>
+                <input type="range" class="shot-dur-slider" min="3" max="10" value="${shot.duration}"
+                       oninput="updateShotDuration(${idx}, this.value, this.closest('.shot-card'))">
+            </div>
+            <textarea class="form-input shot-desc" rows="1"
+                      placeholder="Bu sahne için ek açıklama... (opsiyonel)"
+                      oninput="updateShotDesc(${idx}, this.value)">${shot.description || ""}</textarea>
+        </div>
+    `).join("");
+
+    updateTotalDurationLabel();
+}
+
+function selectCamMove(idx, move) {
+    shots[idx].camera_move = move;
+    renderShots();
+}
+
+function updateShotDuration(idx, val, card) {
+    shots[idx].duration = parseInt(val);
+    if (card) {
+        card.querySelectorAll(".shot-dur-label").forEach(el => el.textContent = val + "sn");
+    }
+    updateTotalDurationLabel();
+}
+
+function updateShotDesc(idx, val) {
+    shots[idx].description = val;
+}
+
+function addShot() {
+    const defaults = ["dolly_in", "dolly_out", "orbit", "pan", "tilt_up", "tracking", "crane", "static"];
+    shots.push({ camera_move: defaults[shots.length % defaults.length], duration: 5, description: "" });
+    renderShots();
+}
+
+function removeShot(idx) {
+    if (shots.length <= 1) return;
+    shots.splice(idx, 1);
+    renderShots();
+}
+
+// Expose to global scope for inline onclick handlers
+window.selectCamMove = selectCamMove;
+window.updateShotDuration = updateShotDuration;
+window.updateShotDesc = updateShotDesc;
+window.removeShot = removeShot;
+
+// ─── Aspect Ratio Cards ──────────────────────────────────────────────
+document.querySelectorAll(".ratio-card").forEach(card => {
+    card.addEventListener("click", () => {
+        document.querySelectorAll(".ratio-card").forEach(c => c.classList.remove("active"));
+        card.classList.add("active");
+        selectedAspectRatio = card.dataset.ratio;
+    });
+});
+
+document.getElementById("add-shot-btn")?.addEventListener("click", addShot);
+
 // ─── Wizard Management ──────────────────────────────────────────────
 function openWizard() {
-    // Reset step 4 state if re-opening after completion
     if (!generationStarted) {
         currentWizardStep = 1;
         showWizardStep(1);
         step4Title.textContent = "Video Üretmeye Hazır";
         step4Sub.textContent = "Ayarlarınız kaydedildi. Üretimi başlatın.";
     } else {
-        // Generation in progress, go to step 4
-        showWizardStep(4);
+        showWizardStep(3);
     }
     wizardModal.style.display = "flex";
     document.body.style.overflow = "hidden";
@@ -167,6 +274,9 @@ function showWizardStep(step) {
     wizardStepLabel.textContent = `Adım ${step} / ${TOTAL_STEPS}`;
     updateStepDots(step);
     updateWizardFooterButtons(step);
+
+    // Render shots when step 2 becomes visible
+    if (step === 2) renderShots();
 }
 
 function updateStepDots(step) {
@@ -177,7 +287,7 @@ function updateStepDots(step) {
 
 function updateWizardFooterButtons(step) {
     wizardBackBtn.style.display = step === 1 ? "none" : "inline-flex";
-    if (step === 4) {
+    if (step === TOTAL_STEPS) {
         wizardNextBtn.textContent = "Video Üret";
         wizardNextBtn.disabled = false;
     } else {
@@ -199,13 +309,12 @@ document.getElementById("nav-new-video")?.addEventListener("click", openWizard);
 document.getElementById("card-single-video")?.addEventListener("click", openWizard);
 document.getElementById("wizard-close")?.addEventListener("click", closeWizard);
 
-// Close on overlay background click
 wizardModal?.addEventListener("click", (e) => {
     if (e.target === wizardModal) closeWizard();
 });
 
 wizardNextBtn?.addEventListener("click", () => {
-    if (currentWizardStep < 4) {
+    if (currentWizardStep < TOTAL_STEPS) {
         currentWizardStep++;
         showWizardStep(currentWizardStep);
     } else {
@@ -222,7 +331,6 @@ wizardBackBtn?.addEventListener("click", () => {
 
 // ─── Upload Zone Interactions ────────────────────────────────────
 function setupUploadZone(zone, input, type) {
-    // Click → open file picker (always query current input in case zone was reset)
     zone.addEventListener("click", (e) => {
         if (e.target.classList.contains("remove-btn")) return;
         const currentInput = zone.querySelector("input[type=file]");
@@ -335,13 +443,19 @@ async function startGeneration() {
     if (backFile)   formData.append("back_image",      backFile);
     if (refimgFile) formData.append("reference_image", refimgFile);
     if (videoFile)  formData.append("reference_video", videoFile);
-    formData.append("location",       "studio");
-    formData.append("aspect_ratio",   aspectRatioSel.value);
-    formData.append("generate_audio", audioToggle.checked);
-    formData.append("duration",       Math.max(3, Math.min(15, parseInt(durationInput.value) || 10)));
-    formData.append("scene_count",    Math.max(1, Math.min(8, parseInt(sceneCountInput.value) || 2)));
+
+    // Shots — serialize to JSON
+    formData.append("shots",         JSON.stringify(shots));
+    formData.append("duration",      String(getTotalDuration()));
+    formData.append("scene_count",   String(shots.length));
+    formData.append("aspect_ratio",  selectedAspectRatio);
+    formData.append("generate_audio", audioToggle ? audioToggle.checked : true);
+    formData.append("location",      "studio");
+
     if (watermarkFile) formData.append("watermark_image", watermarkFile);
-    if (videoDescInput.value.trim()) formData.append("video_description", videoDescInput.value.trim());
+    if (videoDescInput && videoDescInput.value.trim()) {
+        formData.append("video_description", videoDescInput.value.trim());
+    }
 
     try {
         const resp = await fetch(`${API_BASE}/api/generate`, { method: "POST", body: formData, headers: getAuthHeaders() });
@@ -445,9 +559,9 @@ function showAnalysis(analysis) {
 function showPrompt(scenePrompt) {
     if (promptPanel.classList.contains("active")) return;
     let html = `<div style="margin-bottom:8px;font-weight:600;font-style:normal;color:var(--text-primary);font-size:0.8rem;">${scenePrompt.scene_count} sahne • ${scenePrompt.total_duration}s</div>`;
-    html += `<div style="margin-bottom:8px;font-size:0.75rem;color:var(--text-muted);">${scenePrompt.background_prompt}</div>`;
+    html += `<div style="margin-bottom:8px;font-size:0.75rem;color:var(--text-muted);">${scenePrompt.background_prompt || ""}</div>`;
     scenePrompt.scenes.forEach(s => {
-        html += `<div style="margin-bottom:6px;padding:8px;background:var(--bg-card);border-radius:6px;border:1px solid var(--border-subtle);font-size:0.7rem;line-height:1.6;"><strong>Sahne ${s.scene_number}</strong> (${s.duration_seconds}s) — ${s.full_scene_prompt.substring(0, 150)}...</div>`;
+        html += `<div style="margin-bottom:6px;padding:8px;background:var(--bg-card);border-radius:6px;border:1px solid var(--border-subtle);font-size:0.7rem;line-height:1.6;"><strong>Sahne ${s.scene_number}</strong> (${s.duration}s) — ${(s.prompt || "").substring(0, 150)}...</div>`;
     });
     promptText.innerHTML = html;
     promptPanel.classList.add("active");
@@ -494,7 +608,11 @@ newBtn?.addEventListener("click", () => {
     currentJobId = null;
     generationStarted = false;
     pollInterval = null;
-    // Reset step 4 labels and go back to step 1
+    // Reset shots to default
+    shots = [
+        { camera_move: "dolly_in", duration: 5, description: "" },
+        { camera_move: "orbit",    duration: 5, description: "" },
+    ];
     step4Title.textContent = "Video Üretmeye Hazır";
     step4Sub.textContent = "Ayarlarınız kaydedildi. Üretimi başlatın.";
     currentWizardStep = 1;
@@ -514,88 +632,13 @@ function hideError() {
 }
 
 // ─── Watermark Upload ─────────────────────────────────────────────
-watermarkZone?.addEventListener("click", () => watermarkInput.click());
+watermarkZone?.addEventListener("click", () => watermarkInput && watermarkInput.click());
 watermarkInput?.addEventListener("change", () => {
     if (watermarkInput.files[0]) {
         watermarkFile = watermarkInput.files[0];
-        watermarkLabel.textContent = `✅ ${watermarkFile.name}`;
+        if (watermarkLabel) watermarkLabel.textContent = `✅ ${watermarkFile.name}`;
     }
 });
-
-// ─── Prompt Templates (localStorage) ─────────────────────────────
-const templateSelect   = document.getElementById("template-select");
-const saveTemplateBtn  = document.getElementById("save-template-btn");
-const loadTemplateBtn  = document.getElementById("load-template-btn");
-const deleteTemplateBtn = document.getElementById("delete-template-btn");
-
-const TEMPLATE_KEY = "fashionvideo_templates";
-
-function getTemplates() {
-    try { return JSON.parse(localStorage.getItem(TEMPLATE_KEY) || "{}"); }
-    catch { return {}; }
-}
-
-function saveTemplates(templates) {
-    localStorage.setItem(TEMPLATE_KEY, JSON.stringify(templates));
-}
-
-function refreshTemplateList() {
-    const templates = getTemplates();
-    templateSelect.innerHTML = '<option value="">📋 Şablon Seç...</option>';
-    Object.keys(templates).forEach(name => {
-        const opt = document.createElement("option");
-        opt.value = name;
-        opt.textContent = name;
-        templateSelect.appendChild(opt);
-    });
-}
-
-function getCurrentSettings() {
-    return {
-        duration:        durationInput.value,
-        scene_count:     sceneCountInput.value,
-        aspect_ratio:    aspectRatioSel.value,
-        generate_audio:  audioToggle.checked,
-        video_description: videoDescInput.value,
-    };
-}
-
-function applySettings(s) {
-    if (s.duration)      durationInput.value = s.duration;
-    if (s.scene_count)   sceneCountInput.value = s.scene_count;
-    if (s.aspect_ratio)  aspectRatioSel.value = s.aspect_ratio;
-    if (s.generate_audio !== undefined) audioToggle.checked = s.generate_audio;
-    if (s.video_description) videoDescInput.value = s.video_description;
-}
-
-saveTemplateBtn?.addEventListener("click", () => {
-    const name = prompt("Şablon adı girin:");
-    if (!name || !name.trim()) return;
-    const templates = getTemplates();
-    templates[name.trim()] = getCurrentSettings();
-    saveTemplates(templates);
-    refreshTemplateList();
-    templateSelect.value = name.trim();
-});
-
-loadTemplateBtn?.addEventListener("click", () => {
-    const name = templateSelect.value;
-    if (!name) return;
-    const templates = getTemplates();
-    if (templates[name]) applySettings(templates[name]);
-});
-
-deleteTemplateBtn?.addEventListener("click", () => {
-    const name = templateSelect.value;
-    if (!name) return;
-    if (!confirm(`"${name}" şablonunu silmek istediğinize emin misiniz?`)) return;
-    const templates = getTemplates();
-    delete templates[name];
-    saveTemplates(templates);
-    refreshTemplateList();
-});
-
-refreshTemplateList();
 
 // ─── Dashboard: Son Videolar ──────────────────────────────────────
 async function loadRecentVideos() {

@@ -17,9 +17,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+import json
+
 from config import settings
 from dependencies import get_current_user
-from models import GenerationRequest, JobResponse, JobStatus, LocationPreset
+from models import GenerationRequest, JobResponse, JobStatus, LocationPreset, ShotConfig
 from pipeline import jobs, run_pipeline, _load_history
 from routes.auth_router import router as auth_router
 from routes.admin_router import router as admin_router
@@ -161,9 +163,23 @@ async def generate_video_endpoint(
     scene_count: str = Form("2"),
     aspect_ratio: str = Form("9:16"),
     video_description: Optional[str] = Form(None),
+    shots: Optional[str] = Form(None),
     watermark_image: Optional[UploadFile] = File(None, description="Watermark/logo PNG"),
 ):
     """Start a new fashion video generation job."""
+
+    # Parse shots JSON from frontend multishot designer
+    shots_list: Optional[list] = None
+    if shots:
+        try:
+            raw = json.loads(shots)
+            shots_list = [ShotConfig(**s) for s in raw]
+        except Exception:
+            shots_list = None
+
+    # When shots are provided, derive duration and scene_count from them
+    effective_duration = sum(s.duration for s in shots_list) if shots_list else int(duration)
+    effective_scene_count = len(shots_list) if shots_list else int(scene_count)
 
     # Save uploads
     front_path = await _save_upload(front_image)
@@ -187,6 +203,7 @@ async def generate_video_endpoint(
         custom_location=custom_location,
         mood=mood,
         generate_audio=generate_audio.lower() == "true",
+        shots=shots_list,
     )
 
     jobs[job_id] = JobResponse(
@@ -208,8 +225,8 @@ async def generate_video_endpoint(
             front_url=front_url,
             side_url=side_url,
             back_url=back_url,
-            duration=int(duration),
-            scene_count=int(scene_count),
+            duration=effective_duration,
+            scene_count=effective_scene_count,
             video_description=video_description,
             aspect_ratio=aspect_ratio,
             generate_audio=generate_audio.lower() == "true",
