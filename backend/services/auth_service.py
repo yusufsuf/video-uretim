@@ -62,8 +62,8 @@ async def login_user(email: str, password: str) -> dict:
             raise HTTPException(status_code=401, detail="E-posta veya şifre hatalı.")
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Login hatası: {e}")
+    except Exception:
+        raise HTTPException(status_code=401, detail="E-posta veya şifre hatalı.")
 
     uid = str(res.user.id)
     db = _admin_client()
