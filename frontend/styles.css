@@ -1836,3 +1836,151 @@ textarea.form-input {
     font-size: 0.72rem;
     padding: 5px 12px;
 }
+
+/* ── Library Picker Button ──────────────────────────────────────── */
+.lib-pick-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: 1px dashed var(--border-subtle);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+    width: 100%;
+    justify-content: center;
+    margin-top: 6px;
+}
+.lib-pick-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/* ── Library Picker Modal ───────────────────────────────────────── */
+.lib-picker-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.lib-picker {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+.lib-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+.lib-picker-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.lib-picker-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px 0;
+    flex-shrink: 0;
+}
+.lib-picker-tab {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 4px 10px 6px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    border-radius: 4px 4px 0 0;
+}
+.lib-picker-tab:hover {
+    color: var(--text-primary);
+}
+.lib-picker-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+}
+.lib-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+    padding: 12px;
+    overflow-y: auto;
+    flex: 1;
+}
+.lib-picker-item {
+    cursor: pointer;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    transition: border-color 0.15s, transform 0.1s;
+    background: var(--bg-secondary);
+}
+.lib-picker-item:hover {
+    border-color: var(--accent);
+    transform: scale(1.03);
+}
+.lib-picker-item img {
+    width: 100%;
+    aspect-ratio: 3/4;
+    object-fit: cover;
+    display: block;
+}
+.lib-picker-item-name {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    padding: 4px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.lib-picker-footer {
+    padding: 8px 14px 12px;
+    border-top: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+    text-align: right;
+}
+.lib-picker-footer a {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+.lib-picker-footer a:hover {
+    color: var(--accent);
+}
+.lib-picker-loading,
+.lib-picker-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 32px 16px;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.6;
+}
+.lib-picker-empty a {
+    color: var(--accent);
+    text-decoration: none;
+}

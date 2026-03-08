@@ -86,6 +86,17 @@ class GenerationRequest(BaseModel):
     shots: Optional[List["ShotConfig"]] = None
 
 
+class LibraryItem(BaseModel):
+    """Kullanıcının görsel kütüphanesindeki tek bir öğe."""
+    id: str
+    user_id: str
+    name: str
+    category: str  # character | background | style
+    image_url: str
+    storage_path: str
+    created_at: Optional[str] = None
+
+
 class JobStatus(str, Enum):
     PENDING = "pending"
     ANALYZING = "analyzing"

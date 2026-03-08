@@ -25,6 +25,7 @@ from models import GenerationRequest, JobResponse, JobStatus, LocationPreset, Sh
 from pipeline import jobs, run_pipeline, _load_history
 from routes.auth_router import router as auth_router
 from routes.admin_router import router as admin_router
+from routes.library_router import router as library_router
 
 # ─── Logging ───────────────────────────────────────────────────────
 logging.basicConfig(
@@ -50,6 +51,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/auth")
 app.include_router(admin_router, prefix="/admin")
+app.include_router(library_router, prefix="/library")
 
 # Serve generated outputs
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
@@ -164,6 +166,9 @@ async def generate_video_endpoint(
     aspect_ratio: str = Form("9:16"),
     video_description: Optional[str] = Form(None),
     shots: Optional[str] = Form(None),
+    library_front_url: Optional[str] = Form(None),
+    library_background_url: Optional[str] = Form(None),
+    library_style_url: Optional[str] = Form(None),
     watermark_image: Optional[UploadFile] = File(None, description="Watermark/logo PNG"),
 ):
     """Start a new fashion video generation job."""
@@ -181,20 +186,37 @@ async def generate_video_endpoint(
     effective_duration = sum(s.duration for s in shots_list) if shots_list else int(duration)
     effective_scene_count = len(shots_list) if shots_list else int(scene_count)
 
-    # Save uploads
-    front_path = await _save_upload(front_image)
-    side_path = await _save_upload(side_image) if side_image else None
-    back_path = await _save_upload(back_image) if back_image else None
+    # Save uploads — library URLs bypass local file handling
+    if front_image and not library_front_url:
+        front_path = await _save_upload(front_image)
+        front_url = _file_to_url(front_path)
+    elif library_front_url:
+        front_path = library_front_url   # URL passed directly to analysis / Kling
+        front_url = library_front_url
+    else:
+        from fastapi import HTTPException as _HTTPException
+        raise _HTTPException(status_code=400, detail="Ön fotoğraf zorunludur.")
+
+    side_path = None
+    side_url = None
+    if side_image:
+        side_path = await _save_upload(side_image)
+        side_url = _file_to_url(side_path)
+
+    back_path = None
+    back_url = None
+    if back_image:
+        back_path = await _save_upload(back_image)
+        back_url = _file_to_url(back_path)
 
     reference_image_path = None
+    reference_image_url = None
     if reference_image:
         reference_image_path = await _save_upload(reference_image)
-
-    # Convert local files to public URLs for external APIs
-    front_url = _file_to_url(front_path)
-    side_url = _file_to_url(side_path) if side_path else None
-    back_url = _file_to_url(back_path) if back_path else None
-    reference_image_url = _file_to_url(reference_image_path) if reference_image_path else None
+        reference_image_url = _file_to_url(reference_image_path)
+    elif library_background_url:
+        # Library background bypasses Nano Banana — use directly
+        reference_image_url = library_background_url
 
     # Create job
     job_id = uuid.uuid4().hex[:12]
@@ -230,6 +252,7 @@ async def generate_video_endpoint(
             video_description=video_description,
             aspect_ratio=aspect_ratio,
             generate_audio=generate_audio.lower() == "true",
+            library_style_url=library_style_url or None,
             watermark_path=await _save_upload(watermark_image) if watermark_image else None,
         )
     )
@@ -259,6 +282,11 @@ async def get_gallery():
 @app.get("/gallery")
 async def gallery_page():
     return FileResponse(os.path.join(_get_frontend_dir(), "gallery.html"), media_type="text/html")
+
+
+@app.get("/library")
+async def library_page():
+    return FileResponse(os.path.join(_get_frontend_dir(), "library.html"), media_type="text/html")
 
 
 @app.get("/login")

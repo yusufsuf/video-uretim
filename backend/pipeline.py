@@ -106,6 +106,7 @@ async def run_pipeline(
     video_description: Optional[str] = None,
     aspect_ratio: str = "9:16",
     generate_audio: bool = True,
+    library_style_url: Optional[str] = None,
     watermark_path: Optional[str] = None,
 ):
     """Execute the full pipeline asynchronously."""
@@ -133,6 +134,7 @@ async def run_pipeline(
             scene_count=scene_count,
             video_description=video_description,
             location_image_path=reference_image_path,
+            style_image_url=library_style_url,
         )
         _update_job(job_id, scene_prompt=scene_prompt, progress=30, message=f"{scene_prompt.scene_count} sahne planlandı.")
         logger.info("[%s] Planned %d scenes", job_id, scene_prompt.scene_count)

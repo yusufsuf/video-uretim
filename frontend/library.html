@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antigravity — Kütüphane</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=9">
+    <style>
+        .lib-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .lib-tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--input-bg);
+            border-radius: var(--radius-md);
+            padding: 3px;
+        }
+        .lib-tab {
+            padding: 5px 14px;
+            border-radius: calc(var(--radius-md) - 3px);
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-family: var(--font-body);
+            transition: all var(--transition-fast);
+        }
+        .lib-tab.active {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-sm);
+        }
+        .lib-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 12px;
+        }
+        .lib-item {
+            position: relative;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            aspect-ratio: 1;
+            cursor: default;
+        }
+        .lib-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .lib-item-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(0deg, rgba(0,0,0,0.7) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 8px;
+            gap: 4px;
+        }
+        .lib-item:hover .lib-item-overlay { opacity: 1; }
+        .lib-item-name {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .lib-item-cat {
+            font-size: 0.6rem;
+            color: rgba(255,255,255,0.7);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .lib-item-del {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 24px; height: 24px;
+            background: rgba(0,0,0,0.55);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            color: #fff;
+            font-size: 0.6rem;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0;
+            transition: opacity var(--transition-fast), background var(--transition-fast);
+        }
+        .lib-item:hover .lib-item-del { opacity: 1; }
+        .lib-item-del:hover { background: var(--accent-error); }
+
+        .lib-upload-card {
+            border: 2px dashed var(--border-dashed);
+            border-radius: var(--radius-md);
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            background: none;
+            font-family: var(--font-body);
+        }
+        .lib-upload-card:hover {
+            border-color: var(--border-accent);
+            color: var(--text-secondary);
+            background: var(--accent-soft);
+        }
+        .lib-empty {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 48px 20px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* Upload modal */
+        .upload-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .upload-modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-xl);
+            padding: 24px;
+            width: 100%;
+            max-width: 380px;
+        }
+        .upload-modal-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+        .upload-drop-zone {
+            border: 2px dashed var(--border-dashed);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            margin-bottom: 12px;
+        }
+        .upload-drop-zone:hover, .upload-drop-zone.drag-over {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+        }
+        .upload-drop-zone img.preview {
+            max-height: 120px;
+            border-radius: 8px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        (function () {
+            if (!localStorage.getItem('auth_token')) {
+                window.location.replace('/login');
+            }
+        })();
+    </script>
+
+    <div class="orb-container">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <div class="app-layout">
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-mark">A</div>
+                <div class="brand-name">Video Studio</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a class="nav-item" href="/">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    Dashboard
+                </a>
+                <a class="nav-item" href="/gallery">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                    Galeri
+                </a>
+                <a class="nav-item active" href="/library">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M8 7h8M8 11h8M8 15h4"/></svg>
+                    Kütüphane
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <div class="topbar">
+                <button class="hamburger-btn" id="hamburger-btn" aria-label="Menü">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
+                <span class="topbar-title">Kütüphane</span>
+                <div class="topbar-actions">
+                    <a href="/" class="topbar-link">Dashboard</a>
+                    <button id="theme-toggle" class="theme-toggle-btn" title="Tema değiştir">
+                        <span class="theme-icon">◐</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <div class="lib-header">
+                    <div class="lib-tabs">
+                        <button class="lib-tab active" data-cat="">Tümü</button>
+                        <button class="lib-tab" data-cat="character">Elbiseler</button>
+                        <button class="lib-tab" data-cat="background">Arka Planlar</button>
+                        <button class="lib-tab" data-cat="style">Stiller</button>
+                    </div>
+                    <button class="btn-primary-sm" id="open-upload-btn">+ Görsel Ekle</button>
+                </div>
+
+                <div class="lib-grid" id="lib-grid">
+                    <div class="lib-empty">Yükleniyor...</div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="upload-modal-overlay" id="upload-modal" style="display:none">
+        <div class="upload-modal">
+            <div class="upload-modal-title">Görsel Ekle</div>
+
+            <div class="upload-drop-zone" id="upload-drop-zone">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <div>Görsel seç veya sürükle</div>
+                <div style="font-size:0.65rem;margin-top:4px;color:var(--text-muted)">JPG, PNG, WebP</div>
+                <input type="file" id="upload-file-input" accept="image/*" style="display:none">
+            </div>
+
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label class="form-label">İsim</label>
+                    <input type="text" class="form-input" id="upload-name" placeholder="Ör: Kırmızı Elbise, Saray Bahçesi...">
+                </div>
+                <div class="form-group full-width">
+                    <label class="form-label">Kategori</label>
+                    <select class="form-select" id="upload-category">
+                        <option value="character">Elbise / Karakter</option>
+                        <option value="background">Arka Plan</option>
+                        <option value="style">Stil Referansı</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:16px">
+                <button class="wizard-btn-ghost" id="cancel-upload-btn" style="flex:1">İptal</button>
+                <button class="wizard-btn-primary" id="confirm-upload-btn" style="flex:1" disabled>Yükle</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="library.js?v=1"></script>
+    <script>
+        // Sidebar + theme
+        (function () {
+            const btn = document.getElementById('hamburger-btn');
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            btn.addEventListener('click', () => {
+                sidebar.classList.toggle('sidebar-open');
+                backdrop.classList.toggle('active');
+            });
+            backdrop.addEventListener('click', () => {
+                sidebar.classList.remove('sidebar-open');
+                backdrop.classList.remove('active');
+            });
+
+            const THEME_KEY = "antigravity_theme";
+            function applyTheme(t) {
+                const icons = { dark: "☾", light: "☀", system: "◐" };
+                document.documentElement[t === "system" ? "removeAttribute" : "setAttribute"]("data-theme", t);
+                const btn = document.getElementById("theme-toggle");
+                if (btn) btn.querySelector(".theme-icon").textContent = icons[t] || "◐";
+                localStorage.setItem(THEME_KEY, t);
+            }
+            applyTheme(localStorage.getItem(THEME_KEY) || "system");
+            document.getElementById("theme-toggle")?.addEventListener("click", () => {
+                const cur = localStorage.getItem(THEME_KEY) || "system";
+                applyTheme({ system: "dark", dark: "light", light: "system" }[cur] || "system");
+            });
+        })();
+    </script>
+</body>
+</html>

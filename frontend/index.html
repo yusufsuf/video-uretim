@@ -68,6 +68,10 @@
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
                     Galeri
                 </a>
+                <a class="nav-item" href="/library">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M8 7h8M8 11h8M8 15h4"/></svg>
+                    Kütüphane
+                </a>
                 <button class="nav-item" id="nav-brand">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
                     Marka Ayarları
@@ -197,6 +201,12 @@
                         </div>
                     </div>
 
+                    <!-- Library shortcut for garment photos -->
+                    <button class="lib-pick-btn" id="lib-pick-character-btn" onclick="openLibraryPicker('front', 'character')">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M8 7h8M8 11h8M8 15h4"/></svg>
+                        Kütüphaneden Elbise Seç
+                    </button>
+
                     <div class="wizard-section-divider">Opsiyonel Referanslar</div>
 
                     <div class="upload-grid" style="margin-top:8px">
@@ -219,6 +229,12 @@
                             <span class="badge muted">Opsiyonel</span>
                         </div>
                     </div>
+
+                    <!-- Library shortcut for background/style -->
+                    <button class="lib-pick-btn" id="lib-pick-bg-btn" onclick="openLibraryPicker('background', 'background')">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M8 7h8M8 11h8M8 15h4"/></svg>
+                        Kütüphaneden Arka Plan / Stil Seç
+                    </button>
                 </div>
 
                 <!-- Adım 2: Multishot Tasarımı -->
@@ -367,6 +383,23 @@
 
         </div><!-- /wizard -->
     </div><!-- /wizard-overlay -->
+
+    <!-- ── LIBRARY PICKER MODAL ──────────────────────────────── -->
+    <div class="lib-picker-overlay" id="lib-picker-modal" style="display:none">
+        <div class="lib-picker">
+            <div class="lib-picker-header">
+                <span class="lib-picker-title" id="lib-picker-title">Görsel Seç</span>
+                <button class="wizard-close" id="lib-picker-close">✕</button>
+            </div>
+            <div class="lib-picker-tabs" id="lib-picker-tabs"></div>
+            <div class="lib-picker-grid" id="lib-picker-grid">
+                <div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text-muted);font-size:0.8rem">Yükleniyor...</div>
+            </div>
+            <div class="lib-picker-footer">
+                <a href="/library" target="_blank" style="font-size:0.72rem;color:var(--text-secondary)">Kütüphaneyi Yönet →</a>
+            </div>
+        </div>
+    </div>
 
     <script src="app.js?v=10"></script>
     <script>

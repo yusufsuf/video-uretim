@@ -26,6 +26,15 @@ def _encode_image(image_path: str) -> str:
     return f"data:{mime};base64,{data}"
 
 
+def _image_content(path_or_url: str, detail: str = "high") -> dict:
+    """Return an image_url content block for GPT-4o.
+    Accepts either a local file path (encodes to base64) or an HTTP URL (passes directly).
+    """
+    if path_or_url.startswith("http://") or path_or_url.startswith("https://"):
+        return {"url": path_or_url, "detail": detail}
+    return {"url": _encode_image(path_or_url), "detail": detail}
+
+
 # ─── Dress Analysis ────────────────────────────────────────────────
 ANALYSIS_SYSTEM = """You are an elite fashion garment analyst specializing in haute couture construction and evening wear. You receive TWO photos of the same garment: FRONT view and BACK view. Your job is to describe this garment with such precision that an AI image/video generator can recreate it perfectly from your description alone.
 
@@ -81,17 +90,11 @@ async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> Dre
     """Analyse one or two garment images and return structured data."""
 
     image_contents = [
-        {
-            "type": "image_url",
-            "image_url": {"url": _encode_image(front_path), "detail": "high"},
-        }
+        {"type": "image_url", "image_url": _image_content(front_path)},
     ]
     if back_path:
         image_contents.append(
-            {
-                "type": "image_url",
-                "image_url": {"url": _encode_image(back_path), "detail": "high"},
-            }
+            {"type": "image_url", "image_url": _image_content(back_path)}
         )
 
     label = "Bu elbise fotoğraflarını analiz et. İlk fotoğraf ön görünüm"
@@ -237,6 +240,7 @@ async def generate_multi_scene_prompt(
     scene_count: int = 2,
     video_description: Optional[str] = None,
     location_image_path: Optional[str] = None,
+    style_image_url: Optional[str] = None,
 ) -> MultiScenePrompt:
     """Create multi-scene prompts for the video generator."""
     import re
@@ -283,13 +287,22 @@ async def generate_multi_scene_prompt(
     if location_image_path:
         user_text += "\nThe user sent a location reference photo. Use this setting as inspiration for the background_image_prompt and scene descriptions."
 
+    if style_image_url:
+        user_text += "\nThe user also sent a style reference image. Use its visual mood, color palette, and atmosphere as inspiration for all scene prompts."
+
     # Build message content
     content_parts = [{"type": "text", "text": user_text}]
 
     if location_image_path:
         content_parts.append({
             "type": "image_url",
-            "image_url": {"url": _encode_image(location_image_path), "detail": "high"},
+            "image_url": _image_content(location_image_path),
+        })
+
+    if style_image_url:
+        content_parts.append({
+            "type": "image_url",
+            "image_url": _image_content(style_image_url),
         })
 
     response = await client.chat.completions.create(

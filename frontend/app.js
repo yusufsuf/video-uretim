@@ -129,6 +129,11 @@ let currentWizardStep = 1;
 const TOTAL_STEPS = 3;
 let generationStarted = false;
 
+// Library URL state
+let libraryFrontUrl = null;
+let libraryBgUrl    = null;
+let libraryStyleUrl = null;
+
 // ─── Multishot State ────────────────────────────────────────────────
 let shots = [
     { camera_move: "dolly_in", duration: 5, description: "" },
@@ -299,9 +304,148 @@ function updateWizardFooterButtons(step) {
 
 function updateNextBtn() {
     if (currentWizardStep === 1) {
-        wizardNextBtn.disabled = !frontFile;
+        wizardNextBtn.disabled = !frontFile && !libraryFrontUrl;
     }
 }
+
+// ─── Library Picker ─────────────────────────────────────────────
+let _libPickerTarget = null; // 'front' | 'background' | 'style'
+let _libPickerActiveTab = null;
+
+const LIB_TAB_MAP = {
+    character:  [{ val: "character",  label: "Elbiseler" }],
+    background: [{ val: "background", label: "Arka Planlar" }, { val: "style", label: "Stiller" }],
+};
+
+async function openLibraryPicker(targetZone, defaultCategory) {
+    _libPickerTarget = targetZone;
+    _libPickerActiveTab = defaultCategory;
+
+    const modal   = document.getElementById("lib-picker-modal");
+    const title   = document.getElementById("lib-picker-title");
+    const tabs    = document.getElementById("lib-picker-tabs");
+    const grid    = document.getElementById("lib-picker-grid");
+    const closeBtn = document.getElementById("lib-picker-close");
+
+    title.textContent = targetZone === "front" ? "Elbise Seç" : "Arka Plan / Stil Seç";
+
+    // Render tabs
+    const tabDefs = LIB_TAB_MAP[defaultCategory] || [{ val: defaultCategory, label: defaultCategory }];
+    tabs.innerHTML = tabDefs.map(t =>
+        `<button class="lib-picker-tab${t.val === defaultCategory ? " active" : ""}" data-cat="${t.val}">${t.label}</button>`
+    ).join("");
+    tabs.querySelectorAll(".lib-picker-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+            tabs.querySelectorAll(".lib-picker-tab").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            _libPickerActiveTab = btn.dataset.cat;
+            _fetchAndRenderLibrary(_libPickerActiveTab, grid);
+        });
+    });
+
+    // Show modal
+    modal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+
+    // Close button
+    closeBtn.onclick = () => closeLibraryPicker();
+
+    // Click outside closes
+    modal.onclick = (e) => { if (e.target === modal) closeLibraryPicker(); };
+
+    // Load items
+    await _fetchAndRenderLibrary(defaultCategory, grid);
+}
+
+function closeLibraryPicker() {
+    const modal = document.getElementById("lib-picker-modal");
+    modal.style.display = "none";
+    document.body.style.overflow = "";
+}
+
+async function _fetchAndRenderLibrary(category, grid) {
+    grid.innerHTML = `<div class="lib-picker-loading">Yükleniyor...</div>`;
+    try {
+        const resp = await fetch(`/library/items?category=${category}`, { headers: getAuthHeaders() });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const items = await resp.json();
+        if (!items.length) {
+            grid.innerHTML = `<div class="lib-picker-empty">Bu kategoride henüz öğe yok.<br><a href="/library" target="_blank">Kütüphaneye git →</a></div>`;
+            return;
+        }
+        grid.innerHTML = items.map(item => `
+            <div class="lib-picker-item" data-id="${item.id}" data-url="${item.image_url}" data-cat="${item.category}" onclick="selectLibraryItem(${JSON.stringify(JSON.stringify(item))})">
+                <img src="${item.image_url}" alt="${item.name}" loading="lazy">
+                <div class="lib-picker-item-name">${item.name}</div>
+            </div>
+        `).join("");
+    } catch (err) {
+        grid.innerHTML = `<div class="lib-picker-empty">Yüklenemedi: ${err.message}</div>`;
+    }
+}
+
+function selectLibraryItem(itemJson) {
+    const item = JSON.parse(itemJson);
+    const target = _libPickerTarget;
+
+    if (target === "front") {
+        // Clear any uploaded file and use library URL
+        libraryFrontUrl = item.image_url;
+        frontFile = null;
+        // Update front zone UI
+        const zone = frontZone;
+        zone.classList.add("has-file");
+        zone.innerHTML = `
+            <span class="badge">Ön</span>
+            <button class="remove-btn" onclick="event.stopPropagation(); clearLibraryFront()">✕</button>
+            <img src="${item.image_url}" class="preview-img" alt="${item.name}">
+            <div class="upload-label">${item.name} <span style="font-size:0.65rem;opacity:0.6">(kütüphane)</span></div>
+        `;
+    } else if (item.category === "background") {
+        libraryBgUrl = item.image_url;
+        // Update refimg zone UI
+        const zone = refimgZone;
+        refimgFile = null;
+        zone.classList.add("has-file");
+        zone.innerHTML = `
+            <span class="badge muted">Arka Plan</span>
+            <button class="remove-btn" onclick="event.stopPropagation(); clearLibraryBg()">✕</button>
+            <img src="${item.image_url}" class="preview-img" alt="${item.name}">
+            <div class="upload-label">${item.name} <span style="font-size:0.65rem;opacity:0.6">(kütüphane)</span></div>
+        `;
+    } else if (item.category === "style") {
+        libraryStyleUrl = item.image_url;
+        const zone = refimgZone;
+        refimgFile = null;
+        zone.classList.add("has-file");
+        zone.innerHTML = `
+            <span class="badge muted">Stil</span>
+            <button class="remove-btn" onclick="event.stopPropagation(); clearLibraryBg()">✕</button>
+            <img src="${item.image_url}" class="preview-img" alt="${item.name}">
+            <div class="upload-label">${item.name} <span style="font-size:0.65rem;opacity:0.6">(kütüphane)</span></div>
+        `;
+    }
+
+    closeLibraryPicker();
+    updateNextBtn();
+}
+
+function clearLibraryFront() {
+    libraryFrontUrl = null;
+    removeFile("front");
+}
+
+function clearLibraryBg() {
+    libraryBgUrl = null;
+    libraryStyleUrl = null;
+    removeFile("refimg");
+}
+
+// Expose library picker functions globally (used by inline onclick in index.html)
+window.openLibraryPicker = openLibraryPicker;
+window.selectLibraryItem = selectLibraryItem;
+window.clearLibraryFront = clearLibraryFront;
+window.clearLibraryBg = clearLibraryBg;
 
 // ─── Wizard Events ──────────────────────────────────────────────────
 document.getElementById("open-wizard-btn")?.addEventListener("click", openWizard);
@@ -438,11 +582,14 @@ async function startGeneration() {
     updateProgress(0, "Başlatılıyor...");
 
     const formData = new FormData();
-    formData.append("front_image", frontFile);
-    if (sideFile)   formData.append("side_image",      sideFile);
-    if (backFile)   formData.append("back_image",      backFile);
-    if (refimgFile) formData.append("reference_image", refimgFile);
-    if (videoFile)  formData.append("reference_video", videoFile);
+    if (frontFile)          formData.append("front_image",            frontFile);
+    if (sideFile)           formData.append("side_image",             sideFile);
+    if (backFile)           formData.append("back_image",             backFile);
+    if (refimgFile)         formData.append("reference_image",        refimgFile);
+    if (videoFile)          formData.append("reference_video",        videoFile);
+    if (libraryFrontUrl)    formData.append("library_front_url",      libraryFrontUrl);
+    if (libraryBgUrl)       formData.append("library_background_url", libraryBgUrl);
+    if (libraryStyleUrl)    formData.append("library_style_url",      libraryStyleUrl);
 
     // Shots — serialize to JSON
     formData.append("shots",         JSON.stringify(shots));
@@ -608,6 +755,9 @@ newBtn?.addEventListener("click", () => {
     currentJobId = null;
     generationStarted = false;
     pollInterval = null;
+    libraryFrontUrl = null;
+    libraryBgUrl    = null;
+    libraryStyleUrl = null;
     // Reset shots to default
     shots = [
         { camera_move: "dolly_in", duration: 5, description: "" },
