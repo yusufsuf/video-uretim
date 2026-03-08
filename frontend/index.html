@@ -41,8 +41,11 @@
 
     <div class="app-layout">
 
+        <!-- Mobile sidebar backdrop -->
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
         <!-- ── SIDEBAR ─────────────────────────────────────── -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-brand">
                 <div class="brand-mark">A</div>
                 <div class="brand-name">Video Studio</div>
@@ -78,6 +81,9 @@
 
             <!-- Topbar -->
             <div class="topbar">
+                <button class="hamburger-btn" id="hamburger-btn" aria-label="Menü">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                </button>
                 <span class="topbar-title">Dashboard</span>
                 <div class="topbar-actions">
                     <a href="/gallery" class="topbar-link">Video Galeri</a>
@@ -391,6 +397,28 @@
     </div><!-- /wizard-overlay -->
 
     <script src="app.js?v=9"></script>
+    <script>
+        (function () {
+            const btn = document.getElementById('hamburger-btn');
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            function openSidebar() {
+                sidebar.classList.add('sidebar-open');
+                backdrop.classList.add('active');
+            }
+            function closeSidebar() {
+                sidebar.classList.remove('sidebar-open');
+                backdrop.classList.remove('active');
+            }
+            btn.addEventListener('click', function () {
+                sidebar.classList.contains('sidebar-open') ? closeSidebar() : openSidebar();
+            });
+            backdrop.addEventListener('click', closeSidebar);
+            sidebar.querySelectorAll('.nav-item').forEach(function (item) {
+                item.addEventListener('click', closeSidebar);
+            });
+        })();
+    </script>
 </body>
 
 </html>
