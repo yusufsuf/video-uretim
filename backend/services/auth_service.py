@@ -10,18 +10,23 @@ from config import settings
 
 
 @lru_cache(maxsize=1)
-def _client() -> Client:
-    """Service-role client — bypasses RLS, used for all server-side ops."""
+def _admin_client() -> Client:
+    """Service-role client for DB queries — never used for user sign_in/sign_up."""
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
+
+
+def _fresh_auth_client() -> Client:
+    """Fresh anon client for user auth ops — prevents session contamination."""
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
 
 
 # ─── Auth ──────────────────────────────────────────────────────────
 
 async def register_user(email: str, password: str, full_name: str) -> dict:
-    c = _client()
+    auth = _fresh_auth_client()
     try:
         res = await asyncio.to_thread(
-            lambda: c.auth.sign_up({
+            lambda: auth.auth.sign_up({
                 "email": email,
                 "password": password,
                 "options": {"data": {"full_name": full_name}},
@@ -36,8 +41,9 @@ async def register_user(email: str, password: str, full_name: str) -> dict:
     # Admin e-postası → otomatik onayla
     if settings.ADMIN_EMAIL and email.lower() == settings.ADMIN_EMAIL.lower():
         uid = str(res.user.id)
+        db = _admin_client()
         await asyncio.to_thread(
-            lambda: c.table("profiles")
+            lambda: db.table("profiles")
             .update({"approved": True, "role": "admin"})
             .eq("id", uid)
             .execute()
@@ -47,10 +53,10 @@ async def register_user(email: str, password: str, full_name: str) -> dict:
 
 
 async def login_user(email: str, password: str) -> dict:
-    c = _client()
+    auth = _fresh_auth_client()
     try:
         res = await asyncio.to_thread(
-            lambda: c.auth.sign_in_with_password({"email": email, "password": password})
+            lambda: auth.auth.sign_in_with_password({"email": email, "password": password})
         )
         if not res.user or not res.session:
             raise HTTPException(status_code=401, detail="E-posta veya şifre hatalı.")
@@ -60,9 +66,10 @@ async def login_user(email: str, password: str) -> dict:
         raise HTTPException(status_code=401, detail=f"Login hatası: {e}")
 
     uid = str(res.user.id)
+    db = _admin_client()
     try:
         profile_res = await asyncio.to_thread(
-            lambda: c.table("profiles").select("*").eq("id", uid).execute()
+            lambda: db.table("profiles").select("*").eq("id", uid).execute()
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Profil sorgu hatası: {e}")
@@ -86,15 +93,15 @@ async def login_user(email: str, password: str) -> dict:
 
 
 async def get_profile_by_token(token: str) -> dict:
-    c = _client()
+    db = _admin_client()
     try:
-        res = await asyncio.to_thread(lambda: c.auth.get_user(token))
+        res = await asyncio.to_thread(lambda: db.auth.get_user(token))
     except Exception:
         raise HTTPException(status_code=401, detail="Geçersiz veya süresi dolmuş token.")
 
     uid = str(res.user.id)
     profile_res = await asyncio.to_thread(
-        lambda: c.table("profiles").select("*").eq("id", uid).execute()
+        lambda: db.table("profiles").select("*").eq("id", uid).execute()
     )
     profiles = profile_res.data if profile_res else []
     if not profiles:
@@ -109,24 +116,24 @@ async def get_profile_by_token(token: str) -> dict:
 # ─── Admin ─────────────────────────────────────────────────────────
 
 async def get_all_users() -> list:
-    c = _client()
+    db = _admin_client()
     res = await asyncio.to_thread(
-        lambda: c.table("profiles").select("*").order("created_at", desc=True).execute()
+        lambda: db.table("profiles").select("*").order("created_at", desc=True).execute()
     )
     return res.data or []
 
 
 async def approve_user(user_id: str) -> dict:
-    c = _client()
+    db = _admin_client()
     await asyncio.to_thread(
-        lambda: c.table("profiles").update({"approved": True}).eq("id", user_id).execute()
+        lambda: db.table("profiles").update({"approved": True}).eq("id", user_id).execute()
     )
     return {"message": "Kullanıcı onaylandı."}
 
 
 async def reject_user(user_id: str) -> dict:
-    c = _client()
+    db = _admin_client()
     await asyncio.to_thread(
-        lambda: c.auth.admin.delete_user(user_id)
+        lambda: db.auth.admin.delete_user(user_id)
     )
     return {"message": "Kullanıcı reddedildi ve silindi."}
