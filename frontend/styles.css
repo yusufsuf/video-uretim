@@ -1403,6 +1403,15 @@ textarea.form-input {
     color: var(--text-secondary);
 }
 
+.wizard-section-divider {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-top: 14px;
+}
+
 /* Upload Zone — Büyük (Adım 1 ön görsel) */
 .upload-zone-lg {
     padding: 32px 20px !important;
