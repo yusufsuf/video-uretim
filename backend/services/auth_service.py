@@ -62,14 +62,15 @@ async def login_user(email: str, password: str) -> dict:
     uid = str(res.user.id)
     try:
         profile_res = await asyncio.to_thread(
-            lambda: c.table("profiles").select("*").eq("id", uid).maybe_single().execute()
+            lambda: c.table("profiles").select("*").eq("id", uid).execute()
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Profil sorgu hatası: {e}")
 
-    profile = profile_res.data
-    if not profile:
+    profiles = profile_res.data if profile_res else []
+    if not profiles:
         raise HTTPException(status_code=401, detail="Kullanıcı profili bulunamadı.")
+    profile = profiles[0]
     if not profile["approved"]:
         raise HTTPException(status_code=403, detail="Hesabınız henüz onaylanmadı.")
 
@@ -93,11 +94,12 @@ async def get_profile_by_token(token: str) -> dict:
 
     uid = str(res.user.id)
     profile_res = await asyncio.to_thread(
-        lambda: c.table("profiles").select("*").eq("id", uid).maybe_single().execute()
+        lambda: c.table("profiles").select("*").eq("id", uid).execute()
     )
-    profile = profile_res.data
-    if not profile:
+    profiles = profile_res.data if profile_res else []
+    if not profiles:
         raise HTTPException(status_code=401, detail="Kullanıcı profili bulunamadı.")
+    profile = profiles[0]
     if not profile["approved"]:
         raise HTTPException(status_code=403, detail="Hesabınız henüz onaylanmadı.")
 
