@@ -12,14 +12,17 @@ import os
 import uuid
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import Depends, FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
+from dependencies import get_current_user
 from models import GenerationRequest, JobResponse, JobStatus, LocationPreset
 from pipeline import jobs, run_pipeline, _load_history
+from routes.auth_router import router as auth_router
+from routes.admin_router import router as admin_router
 
 # ─── Logging ───────────────────────────────────────────────────────
 logging.basicConfig(
@@ -42,6 +45,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth_router, prefix="/auth")
+app.include_router(admin_router, prefix="/admin")
 
 # Serve generated outputs
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
@@ -141,6 +147,7 @@ def _file_to_url(path: str) -> str:
 # ─── Endpoints ─────────────────────────────────────────────────────
 @app.post("/api/generate", response_model=JobResponse)
 async def generate_video_endpoint(
+    _user: dict = Depends(get_current_user),
     front_image: UploadFile = File(..., description="Elbise ön fotoğrafı"),
     side_image: Optional[UploadFile] = File(None, description="Elbise yan fotoğrafı (opsiyonel)"),
     back_image: Optional[UploadFile] = File(None, description="Elbise arka fotoğrafı (opsiyonel)"),
@@ -214,7 +221,7 @@ async def generate_video_endpoint(
 
 
 @app.get("/api/status/{job_id}", response_model=JobResponse)
-async def get_job_status(job_id: str):
+async def get_job_status(job_id: str, _user: dict = Depends(get_current_user)):
     """Poll the status of a generation job."""
     if job_id not in jobs:
         return JobResponse(
@@ -234,16 +241,27 @@ async def get_gallery():
 
 @app.get("/gallery")
 async def gallery_page():
-    """Serve the gallery page."""
-    gallery_path = os.path.join(_get_frontend_dir(), "gallery.html")
-    return FileResponse(gallery_path, media_type="text/html")
+    return FileResponse(os.path.join(_get_frontend_dir(), "gallery.html"), media_type="text/html")
+
+
+@app.get("/login")
+async def login_page():
+    return FileResponse(os.path.join(_get_frontend_dir(), "login.html"), media_type="text/html")
+
+
+@app.get("/register")
+async def register_page():
+    return FileResponse(os.path.join(_get_frontend_dir(), "register.html"), media_type="text/html")
+
+
+@app.get("/admin-panel")
+async def admin_page():
+    return FileResponse(os.path.join(_get_frontend_dir(), "admin.html"), media_type="text/html")
 
 
 @app.get("/")
 async def root():
-    """Serve the frontend index.html."""
-    index_path = os.path.join(_get_frontend_dir(), "index.html")
-    return FileResponse(index_path, media_type="text/html")
+    return FileResponse(os.path.join(_get_frontend_dir(), "index.html"), media_type="text/html")
 
 
 def _get_frontend_dir() -> str:

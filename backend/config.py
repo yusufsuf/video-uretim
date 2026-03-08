@@ -13,6 +13,12 @@ class Settings:
     # Public base URL (set to your Coolify domain in production)
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
 
+    # Supabase
+    SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
+    SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")
+    SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
+    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "")
+
     # Directories
     UPLOAD_DIR: str = os.path.join(os.path.dirname(__file__), "uploads")
     OUTPUT_DIR: str = os.path.join(os.path.dirname(__file__), "outputs")

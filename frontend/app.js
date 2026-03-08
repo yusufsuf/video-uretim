@@ -5,6 +5,42 @@
 
 const API_BASE = "";
 
+// ─── Auth ──────────────────────────────────────────────────────────────────
+function getAuthHeaders() {
+    const token = localStorage.getItem("auth_token");
+    return token ? { "Authorization": "Bearer " + token } : {};
+}
+
+function handleAuthError(status) {
+    if (status === 401) {
+        localStorage.removeItem("auth_token");
+        window.location.href = "/login";
+        return true;
+    }
+    if (status === 403) {
+        document.getElementById("pending-overlay").style.display = "flex";
+        return true;
+    }
+    return false;
+}
+
+// Verify token on load and populate user chip
+(async function initAuth() {
+    const token = localStorage.getItem("auth_token");
+    if (!token) { window.location.replace("/login"); return; }
+    try {
+        const res = await fetch("/auth/me", { headers: getAuthHeaders() });
+        if (handleAuthError(res.status)) return;
+        const user = await res.json();
+        const nameEl = document.querySelector(".user-name");
+        const avatarEl = document.querySelector(".user-avatar");
+        if (nameEl) nameEl.textContent = user.full_name || user.email;
+        if (avatarEl) avatarEl.textContent = (user.full_name || user.email).slice(0, 2).toUpperCase();
+    } catch {
+        // network error — keep user on page, will fail gracefully on API calls
+    }
+})();
+
 // ─── Tema Yönetimi ────────────────────────────────────────────────────
 const THEME_KEY = "antigravity_theme";
 
@@ -318,7 +354,7 @@ async function startGeneration() {
     if (moodSel.value) formData.append("mood", moodSel.value);
 
     try {
-        const resp = await fetch(`${API_BASE}/api/generate`, { method: "POST", body: formData });
+        const resp = await fetch(`${API_BASE}/api/generate`, { method: "POST", body: formData, headers: getAuthHeaders() });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const job = await resp.json();
         currentJobId = job.job_id;
@@ -341,7 +377,7 @@ function startPolling() {
 async function pollStatus() {
     if (!currentJobId) return;
     try {
-        const resp = await fetch(`${API_BASE}/api/status/${currentJobId}`);
+        const resp = await fetch(`${API_BASE}/api/status/${currentJobId}`, { headers: getAuthHeaders() });
         const job = await resp.json();
 
         updateProgress(job.progress, job.message);
@@ -583,7 +619,7 @@ async function loadRecentVideos() {
     const grid = document.getElementById("recent-videos-grid");
     if (!grid) return;
     try {
-        const resp = await fetch("/api/gallery");
+        const resp = await fetch("/api/gallery", { headers: getAuthHeaders() });
         const data = await resp.json();
         const items = (data.items || []).slice(0, 4);
 

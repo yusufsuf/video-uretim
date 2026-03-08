@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giriş — Antigravity Video Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #080808;
+            --card: #0f0f0f;
+            --border: #1e1e1e;
+            --border-accent: #2a2a2a;
+            --text: #f0f0f0;
+            --text-muted: #666666;
+            --input-bg: #1a1a1a;
+            --input-border: #2e2e2e;
+            --gradient-btn: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+            --btn-text: #0a0a0a;
+            --error: #b85450;
+            --font: 'Inter', sans-serif;
+            --font-display: 'Outfit', sans-serif;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .auth-card {
+            width: 100%;
+            max-width: 400px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 40px 36px;
+            margin: 20px;
+        }
+
+        .auth-logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 32px;
+        }
+
+        .auth-logo-mark {
+            width: 34px;
+            height: 34px;
+            background: #ffffff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1rem;
+            color: #0a0a0a;
+            flex-shrink: 0;
+        }
+
+        .auth-logo-name {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--text);
+            letter-spacing: -0.02em;
+        }
+
+        .auth-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.4rem;
+            color: var(--text);
+            letter-spacing: -0.02em;
+            margin-bottom: 6px;
+        }
+
+        .auth-sub {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-bottom: 28px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            background: var(--input-bg);
+            color: var(--text);
+            font-family: var(--font);
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+
+        .form-input:focus {
+            border-color: #555;
+        }
+
+        .form-input::placeholder {
+            color: #444;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 11px;
+            margin-top: 8px;
+            background: var(--gradient-btn);
+            color: var(--btn-text);
+            border: none;
+            border-radius: 8px;
+            font-family: var(--font);
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            letter-spacing: 0.01em;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .auth-footer {
+            text-align: center;
+            margin-top: 22px;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        .auth-footer a {
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+
+        .error-box {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: rgba(184, 84, 80, 0.1);
+            border: 1px solid rgba(184, 84, 80, 0.3);
+            border-radius: 8px;
+            color: #d97370;
+            font-size: 0.78rem;
+            margin-bottom: 16px;
+        }
+
+        .error-box.show {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+
+<div class="auth-card">
+    <div class="auth-logo">
+        <div class="auth-logo-mark">A</div>
+        <div class="auth-logo-name">Video Studio</div>
+    </div>
+
+    <h1 class="auth-title">Giriş Yap</h1>
+    <p class="auth-sub">Hesabınıza erişmek için giriş yapın.</p>
+
+    <div class="error-box" id="error-box">
+        <span>⚠</span>
+        <span id="error-msg"></span>
+    </div>
+
+    <form id="login-form">
+        <div class="form-group">
+            <label class="form-label" for="email">E-posta</label>
+            <input class="form-input" type="email" id="email" placeholder="ornek@mail.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+            <label class="form-label" for="password">Şifre</label>
+            <input class="form-input" type="password" id="password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button class="submit-btn" type="submit" id="submit-btn">Giriş Yap</button>
+    </form>
+
+    <div class="auth-footer">
+        Hesabın yok mu? <a href="/register">Kayıt ol</a>
+    </div>
+</div>
+
+<script>
+    // Already logged in → redirect
+    if (localStorage.getItem('auth_token')) {
+        window.location.href = '/';
+    }
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submit-btn');
+        const errorBox = document.getElementById('error-box');
+        const errorMsg = document.getElementById('error-msg');
+
+        errorBox.classList.remove('show');
+        btn.disabled = true;
+        btn.textContent = 'Giriş yapılıyor…';
+
+        try {
+            const res = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: document.getElementById('email').value.trim(),
+                    password: document.getElementById('password').value,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                errorMsg.textContent = data.detail || 'Giriş başarısız.';
+                errorBox.classList.add('show');
+                return;
+            }
+
+            localStorage.setItem('auth_token', data.access_token);
+            localStorage.setItem('auth_user', JSON.stringify(data.user));
+            window.location.href = '/';
+        } catch {
+            errorMsg.textContent = 'Bağlantı hatası. Lütfen tekrar deneyin.';
+            errorBox.classList.add('show');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Giriş Yap';
+        }
+    });
+</script>
+
+</body>
+</html>

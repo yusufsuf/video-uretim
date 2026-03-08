@@ -160,6 +160,14 @@
 
 <body>
 
+    <script>
+        (function () {
+            if (!localStorage.getItem('auth_token')) {
+                window.location.replace('/login');
+            }
+        })();
+    </script>
+
     <!-- Arka Plan Orb Animasyonları -->
     <div class="orb-container">
         <div class="orb orb-1"></div>
