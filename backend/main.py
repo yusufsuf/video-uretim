@@ -152,7 +152,7 @@ def _file_to_url(path: str) -> str:
 @app.post("/api/generate", response_model=JobResponse)
 async def generate_video_endpoint(
     _user: dict = Depends(get_current_user),
-    front_image: UploadFile = File(..., description="Elbise ön fotoğrafı"),
+    front_image: Optional[UploadFile] = File(None, description="Elbise ön fotoğrafı"),
     side_image: Optional[UploadFile] = File(None, description="Elbise yan fotoğrafı (opsiyonel)"),
     back_image: Optional[UploadFile] = File(None, description="Elbise arka fotoğrafı (opsiyonel)"),
     reference_image: Optional[UploadFile] = File(None, description="Referans stil/poz resmi (opsiyonel)"),
