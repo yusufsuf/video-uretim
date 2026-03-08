@@ -167,6 +167,8 @@ async def generate_video_endpoint(
     video_description: Optional[str] = Form(None),
     shots: Optional[str] = Form(None),
     library_front_url: Optional[str] = Form(None),
+    library_side_url: Optional[str] = Form(None),
+    library_back_url: Optional[str] = Form(None),
     library_background_url: Optional[str] = Form(None),
     library_style_url: Optional[str] = Form(None),
     watermark_image: Optional[UploadFile] = File(None, description="Watermark/logo PNG"),
@@ -202,12 +204,18 @@ async def generate_video_endpoint(
     if side_image:
         side_path = await _save_upload(side_image)
         side_url = _file_to_url(side_path)
+    elif library_side_url:
+        side_path = library_side_url
+        side_url = library_side_url
 
     back_path = None
     back_url = None
     if back_image:
         back_path = await _save_upload(back_image)
         back_url = _file_to_url(back_path)
+    elif library_back_url:
+        back_path = library_back_url
+        back_url = library_back_url
 
     reference_image_path = None
     reference_image_url = None

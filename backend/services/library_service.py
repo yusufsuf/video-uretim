@@ -26,7 +26,7 @@ async def get_items(user_id: str, category: Optional[str] = None) -> list:
             q = q.eq("category", category)
         return q.execute()
 
-    res = await asyncio.to_thread(_query)
+    res = await asyncio.to_thread(_query)  # type: ignore[arg-type]
     return res.data or []
 
 
@@ -34,55 +34,82 @@ async def add_item(
     user_id: str,
     name: str,
     category: str,
-    file_bytes: bytes,
-    content_type: str,
-    ext: str,
+    primary_bytes: bytes,
+    primary_content_type: str,
+    primary_ext: str,
+    extra_files: list = [],  # [(bytes, content_type, ext), ...]
 ) -> dict:
-    """Upload image to Supabase Storage and insert a record into library_items."""
-    storage_path = f"{user_id}/{uuid.uuid4().hex}{ext}"
+    """Upload images to Supabase Storage and insert a record into library_items.
 
-    def _upload():
+    extra_files: list of (bytes, content_type, ext) tuples for side/back/additional images.
+    For character: extra_files[0]=side, extra_files[1]=back.
+    For background: extra_files[0..2] = additional background images.
+    """
+    primary_path = f"{user_id}/{uuid.uuid4().hex}{primary_ext}"
+
+    def _upload_primary():
         _db().storage.from_(BUCKET).upload(
-            path=storage_path,
-            file=file_bytes,
-            file_options={"content-type": content_type},
+            path=primary_path, file=primary_bytes,
+            file_options={"content-type": primary_content_type},
         )
 
-    def _public_url() -> str:
-        return _db().storage.from_(BUCKET).get_public_url(storage_path)
+    def _get_url(path: str) -> str:
+        return _db().storage.from_(BUCKET).get_public_url(path)  # type: ignore[return-value]
 
-    def _insert(image_url: str) -> dict:
-        res = _db().table("library_items").insert({
+    await asyncio.to_thread(_upload_primary)  # type: ignore[arg-type]
+    image_url: str = _get_url(primary_path)
+
+    # Upload extra files
+    extra_urls: list[str] = []
+    extra_storage_paths: list[str] = []
+
+    for fb, ct, ex in extra_files:
+        epath = f"{user_id}/{uuid.uuid4().hex}{ex}"
+
+        def _upload_extra(_path=epath, _bytes=fb, _ct=ct):  # capture loop vars
+            _db().storage.from_(BUCKET).upload(
+                path=_path, file=_bytes, file_options={"content-type": _ct},
+            )
+
+        await asyncio.to_thread(_upload_extra)  # type: ignore[arg-type]
+        extra_urls.append(_get_url(epath))
+        extra_storage_paths.append(epath)
+
+    def _insert():
+        return _db().table("library_items").insert({
             "user_id": user_id,
             "name": name,
             "category": category,
             "image_url": image_url,
-            "storage_path": storage_path,
+            "storage_path": primary_path,
+            "extra_urls": extra_urls,
+            "extra_storage_paths": extra_storage_paths,
         }).execute()
-        return res.data[0] if res.data else {}
 
-    await asyncio.to_thread(_upload)
-    image_url = await asyncio.to_thread(_public_url)
-    item = await asyncio.to_thread(_insert, image_url)
-    return item
+    res = await asyncio.to_thread(_insert)  # type: ignore[arg-type]
+    return (res.data or [{}])[0]
 
 
 async def delete_item(user_id: str, item_id: str) -> None:
-    """Delete a library item (verifies ownership first)."""
+    """Delete a library item and all its storage files (verifies ownership first)."""
     def _fetch():
         return _db().table("library_items").select("*").eq("id", item_id).eq("user_id", user_id).execute()
 
-    res = await asyncio.to_thread(_fetch)
+    res = await asyncio.to_thread(_fetch)  # type: ignore[arg-type]
     if not res.data:
         raise HTTPException(status_code=404, detail="Öğe bulunamadı.")
 
-    storage_path = res.data[0]["storage_path"]
+    row = res.data[0]
+    paths_to_remove = [row["storage_path"]]
+    for p in (row.get("extra_storage_paths") or []):
+        if p:
+            paths_to_remove.append(p)
 
     def _remove_storage():
-        _db().storage.from_(BUCKET).remove([storage_path])
+        _db().storage.from_(BUCKET).remove(paths_to_remove)
 
     def _delete_row():
         _db().table("library_items").delete().eq("id", item_id).execute()
 
-    await asyncio.to_thread(_remove_storage)
-    await asyncio.to_thread(_delete_row)
+    await asyncio.to_thread(_remove_storage)  # type: ignore[arg-type]
+    await asyncio.to_thread(_delete_row)  # type: ignore[arg-type]

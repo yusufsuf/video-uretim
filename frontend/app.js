@@ -131,6 +131,8 @@ let generationStarted = false;
 
 // Library URL state
 let libraryFrontUrl = null;
+let librarySideUrl  = null;
+let libraryBackUrl  = null;
 let libraryBgUrl    = null;
 let libraryStyleUrl = null;
 
@@ -401,6 +403,31 @@ function selectLibraryItem(itemJson) {
             <img src="${item.image_url}" class="preview-img" alt="${item.name}">
             <div class="upload-label">${item.name} <span style="font-size:0.65rem;opacity:0.6">(kütüphane)</span></div>
         `;
+
+        // Auto-populate side and back zones from extra_urls
+        const extras = item.extra_urls || [];
+        if (extras.length >= 1) {
+            librarySideUrl = extras[0];
+            sideFile = null;
+            sideZone.classList.add("has-file");
+            sideZone.innerHTML = `
+                <span class="badge muted">Yan</span>
+                <button class="remove-btn" onclick="event.stopPropagation(); clearLibrarySide()">✕</button>
+                <img src="${extras[0]}" class="preview-img" alt="Yan">
+                <div class="upload-label">Yan görünüm <span style="font-size:0.65rem;opacity:0.6">(kütüphane)</span></div>
+            `;
+        }
+        if (extras.length >= 2) {
+            libraryBackUrl = extras[1];
+            backFile = null;
+            backZone.classList.add("has-file");
+            backZone.innerHTML = `
+                <span class="badge muted">Arka</span>
+                <button class="remove-btn" onclick="event.stopPropagation(); clearLibraryBack()">✕</button>
+                <img src="${extras[1]}" class="preview-img" alt="Arka">
+                <div class="upload-label">Arka görünüm <span style="font-size:0.65rem;opacity:0.6">(kütüphane)</span></div>
+            `;
+        }
     } else if (item.category === "background") {
         libraryBgUrl = item.image_url;
         // Update refimg zone UI
@@ -432,7 +459,21 @@ function selectLibraryItem(itemJson) {
 
 function clearLibraryFront() {
     libraryFrontUrl = null;
+    librarySideUrl  = null;
+    libraryBackUrl  = null;
     removeFile("front");
+    removeFile("side");
+    removeFile("back");
+}
+
+function clearLibrarySide() {
+    librarySideUrl = null;
+    removeFile("side");
+}
+
+function clearLibraryBack() {
+    libraryBackUrl = null;
+    removeFile("back");
 }
 
 function clearLibraryBg() {
@@ -445,7 +486,9 @@ function clearLibraryBg() {
 window.openLibraryPicker = openLibraryPicker;
 window.selectLibraryItem = selectLibraryItem;
 window.clearLibraryFront = clearLibraryFront;
-window.clearLibraryBg = clearLibraryBg;
+window.clearLibrarySide  = clearLibrarySide;
+window.clearLibraryBack  = clearLibraryBack;
+window.clearLibraryBg    = clearLibraryBg;
 
 // ─── Wizard Events ──────────────────────────────────────────────────
 document.getElementById("open-wizard-btn")?.addEventListener("click", openWizard);
@@ -588,6 +631,8 @@ async function startGeneration() {
     if (refimgFile)         formData.append("reference_image",        refimgFile);
     if (videoFile)          formData.append("reference_video",        videoFile);
     if (libraryFrontUrl)    formData.append("library_front_url",      libraryFrontUrl);
+    if (librarySideUrl)     formData.append("library_side_url",       librarySideUrl);
+    if (libraryBackUrl)     formData.append("library_back_url",       libraryBackUrl);
     if (libraryBgUrl)       formData.append("library_background_url", libraryBgUrl);
     if (libraryStyleUrl)    formData.append("library_style_url",      libraryStyleUrl);
 
@@ -756,6 +801,8 @@ newBtn?.addEventListener("click", () => {
     generationStarted = false;
     pollInterval = null;
     libraryFrontUrl = null;
+    librarySideUrl  = null;
+    libraryBackUrl  = null;
     libraryBgUrl    = null;
     libraryStyleUrl = null;
     // Reset shots to default

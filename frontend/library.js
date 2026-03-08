@@ -11,7 +11,30 @@ function getAuthHeaders() {
 
 // ─── State ────────────────────────────────────────────────────────
 let currentCategory = "";
-let uploadFile = null;
+let uploadFiles = [null, null, null, null]; // [primary, extra1, extra2, extra3]
+
+const SLOT_DEFS = {
+    character:  [
+        { label: "Ön Görünüm",  required: true },
+        { label: "Yan Görünüm", required: false },
+        { label: "Arka Görünüm",required: false },
+    ],
+    background: [
+        { label: "Görsel 1", required: true },
+        { label: "Görsel 2", required: false },
+        { label: "Görsel 3", required: false },
+        { label: "Görsel 4", required: false },
+    ],
+    style: [
+        { label: "Stil Görseli", required: true },
+    ],
+};
+
+const SLOT_HINTS = {
+    character:  "Ön görünüm zorunlu, yan ve arka opsiyonel — daha iyi tutarlılık için 3 açı önerilir",
+    background: "1 zorunlu, en fazla 4 görsel yükleyebilirsiniz",
+    style:      "Renk paleti, kompozisyon ve atmosfer referansı için tek görsel",
+};
 
 // ─── Load items ──────────────────────────────────────────────────
 async function loadItems(category) {
@@ -46,16 +69,40 @@ function renderGrid(items) {
     if (items.length === 0) {
         grid.innerHTML = uploadCard + `<div class="lib-empty" style="grid-column:2/-1">Henüz görsel eklenmedi.</div>`;
     } else {
-        grid.innerHTML = uploadCard + items.map(item => `
-            <div class="lib-item">
-                <img src="${item.image_url}" alt="${item.name}" loading="lazy">
-                <div class="lib-item-overlay">
-                    <div class="lib-item-name">${item.name}</div>
-                    <div class="lib-item-cat">${catLabels[item.category] || item.category}</div>
-                </div>
-                <button class="lib-item-del" onclick="deleteItem('${item.id}', event)" title="Sil">✕</button>
-            </div>
-        `).join("");
+        grid.innerHTML = uploadCard + items.map(item => {
+            const extras = item.extra_urls || [];
+            let thumbsHtml = "";
+
+            if (item.category === "character" && extras.length > 0) {
+                // Side-by-side: front + side/back column
+                thumbsHtml = `
+                    <div class="lib-item-views">
+                        <img src="${item.image_url}" class="primary" alt="">
+                        <div class="extras">
+                            ${extras.slice(0, 2).map(u => `<img src="${u}" alt="">`).join("")}
+                        </div>
+                    </div>`;
+            } else if (item.category === "background" && extras.length > 0) {
+                // 2×2 grid
+                const all = [item.image_url, ...extras].slice(0, 4);
+                thumbsHtml = `
+                    <div class="lib-item-bg-grid">
+                        ${all.map(u => `<img src="${u}" alt="">`).join("")}
+                    </div>`;
+            } else {
+                thumbsHtml = `<img src="${item.image_url}" alt="${item.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover">`;
+            }
+
+            return `
+                <div class="lib-item">
+                    ${thumbsHtml}
+                    <div class="lib-item-overlay">
+                        <div class="lib-item-name">${item.name}</div>
+                        <div class="lib-item-cat">${catLabels[item.category] || item.category}${extras.length > 0 ? ` · ${extras.length + 1} görsel` : ""}</div>
+                    </div>
+                    <button class="lib-item-del" onclick="deleteItem('${item.id}', event)" title="Sil">✕</button>
+                </div>`;
+        }).join("");
     }
 
     document.getElementById("upload-card-btn")?.addEventListener("click", openUploadModal);
@@ -79,11 +126,12 @@ window.deleteItem = deleteItem;
 
 // ─── Upload Modal ────────────────────────────────────────────────
 function openUploadModal() {
-    uploadFile = null;
+    uploadFiles = [null, null, null, null];
     document.getElementById("upload-name").value = "";
-    document.getElementById("upload-category").value = "character";
+    const catSel = document.getElementById("upload-category");
+    catSel.value = currentCategory || "character";
     document.getElementById("confirm-upload-btn").disabled = true;
-    resetDropZone();
+    renderUploadSlots(catSel.value);
     document.getElementById("upload-modal").style.display = "flex";
 }
 
@@ -91,42 +139,107 @@ function closeUploadModal() {
     document.getElementById("upload-modal").style.display = "none";
 }
 
-function resetDropZone() {
-    const zone = document.getElementById("upload-drop-zone");
-    zone.innerHTML = `
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <div>Görsel seç veya sürükle</div>
-        <div style="font-size:0.65rem;margin-top:4px;color:var(--text-muted)">JPG, PNG, WebP</div>
-        <input type="file" id="upload-file-input" accept="image/*" style="display:none">
+// ─── Upload Slots ─────────────────────────────────────────────────
+function renderUploadSlots(category) {
+    const defs = SLOT_DEFS[category] || SLOT_DEFS.style;
+    const cols = defs.length === 1 ? "cols-1" : defs.length === 2 ? "cols-2" : defs.length === 4 ? "cols-2" : "cols-3";
+
+    const container = document.getElementById("upload-slots-container");
+    container.innerHTML = `
+        <div class="upload-slots-grid ${cols}">
+            ${defs.map((def, i) => `
+                <div class="upload-slot" id="slot-${i}" data-index="${i}">
+                    <div class="upload-slot-icon">+</div>
+                    <div class="upload-slot-label">${def.label}${def.required ? ' <span class="slot-required">*</span>' : ""}</div>
+                    <input type="file" accept="image/*" class="slot-file-input" style="display:none">
+                </div>
+            `).join("")}
+        </div>
     `;
-    setupDropZone();
+
+    // Hint text
+    const hint = document.getElementById("upload-hint");
+    if (hint) hint.textContent = SLOT_HINTS[category] || "";
+
+    // Attach events
+    container.querySelectorAll(".upload-slot").forEach(slot => {
+        const idx = parseInt(slot.dataset.index);
+        const input = slot.querySelector(".slot-file-input");
+        slot.addEventListener("click", (e) => {
+            if (e.target.classList.contains("slot-clear-btn")) return;
+            input.click();
+        });
+        input.addEventListener("change", () => {
+            if (input.files[0]) handleSlotFile(idx, input.files[0]);
+        });
+    });
 }
 
-function setupDropZone() {
-    const zone = document.getElementById("upload-drop-zone");
-    const input = document.getElementById("upload-file-input");
+function handleSlotFile(idx, file) {
+    uploadFiles[idx] = file;
+    const slot = document.getElementById(`slot-${idx}`);
+    if (!slot) return;
 
-    zone.addEventListener("click", () => input.click());
-    zone.addEventListener("dragover", e => { e.preventDefault(); zone.classList.add("drag-over"); });
-    zone.addEventListener("dragleave", () => zone.classList.remove("drag-over"));
-    zone.addEventListener("drop", e => {
-        e.preventDefault();
-        zone.classList.remove("drag-over");
-        if (e.dataTransfer.files[0]) selectFile(e.dataTransfer.files[0]);
+    const defs = SLOT_DEFS[document.getElementById("upload-category").value] || SLOT_DEFS.style;
+    const label = defs[idx]?.label || `Görsel ${idx + 1}`;
+    const objUrl = URL.createObjectURL(file);
+
+    slot.classList.add("has-file");
+    slot.innerHTML = `
+        <img src="${objUrl}" class="slot-preview" alt="">
+        <div class="slot-name-bar">${label}</div>
+        <button class="slot-clear-btn" onclick="clearSlot(event,${idx})">✕</button>
+        <input type="file" accept="image/*" class="slot-file-input" style="display:none">
+    `;
+    // Re-attach input handler
+    const newInput = slot.querySelector(".slot-file-input");
+    newInput.addEventListener("change", () => {
+        if (newInput.files[0]) handleSlotFile(idx, newInput.files[0]);
     });
+    slot.addEventListener("click", (e) => {
+        if (e.target.classList.contains("slot-clear-btn")) return;
+        newInput.click();
+    });
+
+    updateConfirmBtn();
+}
+
+function clearSlot(e, idx) {
+    e.stopPropagation();
+    uploadFiles[idx] = null;
+    const slot = document.getElementById(`slot-${idx}`);
+    if (!slot) return;
+    const defs = SLOT_DEFS[document.getElementById("upload-category").value] || SLOT_DEFS.style;
+    const def = defs[idx];
+    slot.classList.remove("has-file");
+    slot.innerHTML = `
+        <div class="upload-slot-icon">+</div>
+        <div class="upload-slot-label">${def?.label || `Görsel ${idx + 1}`}${def?.required ? ' <span class="slot-required">*</span>' : ""}</div>
+        <input type="file" accept="image/*" class="slot-file-input" style="display:none">
+    `;
+    const input = slot.querySelector(".slot-file-input");
     input.addEventListener("change", () => {
-        if (input.files[0]) selectFile(input.files[0]);
+        if (input.files[0]) handleSlotFile(idx, input.files[0]);
     });
+    slot.addEventListener("click", (e2) => {
+        if (e2.target.classList.contains("slot-clear-btn")) return;
+        input.click();
+    });
+    updateConfirmBtn();
+}
+window.clearSlot = clearSlot;
+
+function updateConfirmBtn() {
+    // Enabled only when the primary (first) slot has a file
+    document.getElementById("confirm-upload-btn").disabled = !uploadFiles[0];
 }
 
-function selectFile(file) {
-    uploadFile = file;
-    const zone = document.getElementById("upload-drop-zone");
-    const url = URL.createObjectURL(file);
-    zone.innerHTML = `<img src="${url}" class="preview" style="max-height:120px;border-radius:8px;object-fit:contain">
-        <div style="font-size:0.68rem;margin-top:6px;color:var(--text-secondary)">${file.name}</div>`;
-    document.getElementById("confirm-upload-btn").disabled = false;
-}
+// ─── Category change re-renders slots ────────────────────────────
+document.getElementById("upload-category")?.addEventListener("change", (e) => {
+    uploadFiles = [null, null, null, null];
+    renderUploadSlots(e.target.value);
+    updateConfirmBtn();
+});
 
 document.getElementById("open-upload-btn")?.addEventListener("click", openUploadModal);
 document.getElementById("cancel-upload-btn")?.addEventListener("click", closeUploadModal);
@@ -134,18 +247,22 @@ document.getElementById("upload-modal")?.addEventListener("click", e => {
     if (e.target === document.getElementById("upload-modal")) closeUploadModal();
 });
 
+// ─── Upload Submit ────────────────────────────────────────────────
 document.getElementById("confirm-upload-btn")?.addEventListener("click", async () => {
-    if (!uploadFile) return;
-    const name = document.getElementById("upload-name").value.trim() || uploadFile.name;
+    if (!uploadFiles[0]) return;
+    const name = document.getElementById("upload-name").value.trim() || uploadFiles[0].name;
     const category = document.getElementById("upload-category").value;
     const btn = document.getElementById("confirm-upload-btn");
     btn.disabled = true;
     btn.textContent = "Yükleniyor...";
 
     const formData = new FormData();
-    formData.append("file", uploadFile);
-    formData.append("name", name);
+    formData.append("file",     uploadFiles[0]);
+    formData.append("name",     name);
     formData.append("category", category);
+    if (uploadFiles[1]) formData.append("file2", uploadFiles[1]);
+    if (uploadFiles[2]) formData.append("file3", uploadFiles[2]);
+    if (uploadFiles[3]) formData.append("file4", uploadFiles[3]);
 
     try {
         const res = await fetch(`${API}/library/items`, {
@@ -178,5 +295,4 @@ document.querySelectorAll(".lib-tab").forEach(tab => {
 });
 
 // ─── Init ─────────────────────────────────────────────────────────
-setupDropZone();
 loadItems("");
