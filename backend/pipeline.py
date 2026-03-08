@@ -12,8 +12,11 @@ import logging
 import os
 import subprocess
 import uuid
+from datetime import datetime
+from functools import lru_cache
 from typing import Optional
 
+from supabase import create_client, Client
 from config import settings
 from models import (
     DressAnalysisResult,
@@ -38,42 +41,42 @@ logger = logging.getLogger(__name__)
 # Scenes per Kling API call — smaller chunks = higher consistency via last-frame chaining
 CHUNK_SIZE = 2
 
-# In-memory job store (replace with DB for production)
+# In-memory job store
 jobs: dict[str, JobResponse] = {}
 
-HISTORY_FILE = os.path.join(settings.DATA_DIR, "job_history.json")
+
+@lru_cache(maxsize=1)
+def _get_supabase() -> Client:
+    return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 
 def _load_history() -> list[dict]:
-    """Load job history from disk."""
-    if os.path.exists(HISTORY_FILE):
-        try:
-            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
-                import json
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            return []
-    return []
+    """Load job history from Supabase jobs table."""
+    try:
+        db = _get_supabase()
+        res = db.table("jobs").select("*").order("created_at", desc=True).limit(100).execute()
+        return res.data or []
+    except Exception as e:
+        logger.error("Failed to load history: %s", e)
+        return []
 
 
 def _save_to_history(job: JobResponse):
-    """Append a completed job to the persistent history file."""
-    import json
-    from datetime import datetime
-
-    history = _load_history()
-    entry = job.model_dump()
-    entry["created_at"] = datetime.now().isoformat()
-    if entry.get("analysis"):
-        entry["analysis_summary"] = f"{entry['analysis'].get('garment_type', '')} - {entry['analysis'].get('color', '')}"
-    entry.pop("analysis", None)
-    entry.pop("scene_prompt", None)
-
-    history.insert(0, entry)
-    history = history[:100]
-
-    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(history, f, ensure_ascii=False, indent=2)
+    """Save completed job to Supabase jobs table."""
+    try:
+        db = _get_supabase()
+        entry: dict = {
+            "job_id": job.job_id,
+            "status": job.status.value,
+            "message": job.message,
+            "result_url": job.result_url,
+            "created_at": datetime.now().isoformat(),
+        }
+        if job.analysis:
+            entry["analysis_summary"] = f"{job.analysis.garment_type} - {job.analysis.color}"
+        db.table("jobs").insert(entry).execute()
+    except Exception as e:
+        logger.error("Failed to save history: %s", e)
 
 
 def _update_job(job_id: str, **kwargs):
@@ -255,14 +258,31 @@ async def run_pipeline(
             except Exception as wm_err:
                 logger.warning("[%s] Watermark failed (continuing without): %s", job_id, wm_err)
 
-        relative = final_path.replace("\\", "/")
+        # Supabase Storage'a yükle
+        result_url = None
+        try:
+            _update_job(job_id, progress=96, message="Video yükleniyor...")
+            db = _get_supabase()
+            filename = os.path.basename(final_path)
+            with open(final_path, "rb") as f:
+                db.storage.from_("videos").upload(
+                    path=filename,
+                    file=f.read(),
+                    file_options={"content-type": "video/mp4"},
+                )
+            result_url = db.storage.from_("videos").get_public_url(filename)
+            logger.info("[%s] Uploaded to Supabase Storage: %s", job_id, result_url)
+        except Exception as upload_err:
+            logger.warning("[%s] Supabase upload failed, falling back to local URL: %s", job_id, upload_err)
+            relative = final_path.replace("\\", "/")
+            result_url = f"/outputs/{relative.split('/outputs/')[-1]}"
 
         _update_job(
             job_id,
             status=JobStatus.COMPLETED,
             progress=100,
             message="Video başarıyla üretildi!",
-            result_url=f"/outputs/{relative.split('/outputs/')[-1]}",
+            result_url=result_url,
         )
         logger.info("[%s] Pipeline fully completed – %s", job_id, final_path)
 
