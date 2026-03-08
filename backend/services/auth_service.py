@@ -52,13 +52,21 @@ async def login_user(email: str, password: str) -> dict:
         res = await asyncio.to_thread(
             lambda: c.auth.sign_in_with_password({"email": email, "password": password})
         )
+        if not res.user or not res.session:
+            raise HTTPException(status_code=401, detail="E-posta veya şifre hatalı.")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Login hatası: {e}")
 
     uid = str(res.user.id)
-    profile_res = await asyncio.to_thread(
-        lambda: c.table("profiles").select("*").eq("id", uid).maybe_single().execute()
-    )
+    try:
+        profile_res = await asyncio.to_thread(
+            lambda: c.table("profiles").select("*").eq("id", uid).maybe_single().execute()
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Profil sorgu hatası: {e}")
+
     profile = profile_res.data
     if not profile:
         raise HTTPException(status_code=401, detail="Kullanıcı profili bulunamadı.")
