@@ -375,12 +375,28 @@ async function _fetchAndRenderLibrary(category, grid) {
             grid.innerHTML = `<div class="lib-picker-empty">Bu kategoride henüz öğe yok.<br><a href="/library" target="_blank">Kütüphaneye git →</a></div>`;
             return;
         }
-        grid.innerHTML = items.map(item => `
-            <div class="lib-picker-item" data-id="${item.id}" data-url="${item.image_url}" data-cat="${item.category}" onclick="selectLibraryItem(${JSON.stringify(JSON.stringify(item))})">
-                <img src="${item.image_url}" alt="${item.name}" loading="lazy">
-                <div class="lib-picker-item-name">${item.name}</div>
-            </div>
-        `).join("");
+
+        // Build HTML without inline onclick (inline JSON breaks HTML attribute parsing)
+        grid.innerHTML = items.map(item => {
+            const extras = item.extra_urls || [];
+            const extrasBadge = extras.length > 0
+                ? `<div class="lib-picker-extras-badge">+${extras.length}</div>` : "";
+            return `
+                <div class="lib-picker-item" data-id="${item.id}">
+                    <img src="${item.image_url}" alt="${item.name}" loading="lazy">
+                    <div class="lib-picker-item-name">${item.name}</div>
+                    ${extrasBadge}
+                </div>`;
+        }).join("");
+
+        // Attach click handlers via event listeners (safe with any item data)
+        const itemMap = Object.fromEntries(items.map(it => [it.id, it]));
+        grid.querySelectorAll(".lib-picker-item").forEach(el => {
+            el.addEventListener("click", () => {
+                const item = itemMap[el.dataset.id];
+                if (item) selectLibraryItem(JSON.stringify(item));
+            });
+        });
     } catch (err) {
         grid.innerHTML = `<div class="lib-picker-empty">Yüklenemedi: ${err.message}</div>`;
     }
