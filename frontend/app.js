@@ -162,6 +162,10 @@ const CAM_MOVES = [
     { value: "static",    label: "Static",    animClass: "cam-anim-static" },
 ];
 
+const CAM_PAGE = 4;
+const CAM_MAX_OFFSET = CAM_MOVES.length - CAM_PAGE; // = 4
+const camOffsets = {}; // per-card offset state: { shotIdx: offset }
+
 function getTotalDuration() {
     return shots.reduce((sum, s) => sum + s.duration, 0);
 }
@@ -175,7 +179,10 @@ function renderShots() {
     const container = document.getElementById("shots-container");
     if (!container) return;
 
-    container.innerHTML = shots.map((shot, idx) => `
+    container.innerHTML = shots.map((shot, idx) => {
+        if (camOffsets[idx] === undefined) camOffsets[idx] = 0;
+        const offset = camOffsets[idx];
+        return `
         <div class="shot-card">
             <div class="shot-card-header">
                 <span class="shot-card-title">Sahne ${idx + 1} · <span class="shot-dur-label">${shot.duration}sn</span></span>
@@ -183,18 +190,29 @@ function renderShots() {
                     ? `<button class="shot-remove-btn" onclick="removeShot(${idx})">✕</button>`
                     : ""}
             </div>
-            <div class="cam-grid">
-                ${CAM_MOVES.map(cm => `
-                    <button class="cam-btn${shot.camera_move === cm.value ? " active" : ""}"
-                            onclick="selectCamMove(${idx}, '${cm.value}')"
-                            title="${cm.label}">
-                        <div class="cam-anim ${cm.animClass}"></div>
-                        <span>${cm.label}</span>
-                    </button>
-                `).join("")}
+            <div class="cam-carousel">
+                <button class="cam-nav-btn" id="cam-prev-${idx}"
+                        onclick="shiftCamPage(${idx},-1)"
+                        ${offset === 0 ? "disabled" : ""}>‹</button>
+                <div class="cam-track-wrapper">
+                    <div class="cam-track" id="cam-track-${idx}">
+                        ${CAM_MOVES.map((cm, i) => `
+                            <button class="cam-btn${shot.camera_move === cm.value ? " active" : ""}"
+                                    id="cam-btn-${idx}-${i}"
+                                    onclick="selectCamMove(${idx}, '${cm.value}', ${i})"
+                                    title="${cm.label}">
+                                <div class="cam-anim ${cm.animClass}"></div>
+                                <span>${cm.label}</span>
+                            </button>
+                        `).join("")}
+                    </div>
+                </div>
+                <button class="cam-nav-btn" id="cam-next-${idx}"
+                        onclick="shiftCamPage(${idx},1)"
+                        ${offset >= CAM_MAX_OFFSET ? "disabled" : ""}>›</button>
             </div>
-            <div style="margin-top:10px">
-                <div style="display:flex;justify-content:space-between;font-size:0.71rem;color:var(--text-secondary);margin-bottom:4px">
+            <div class="shot-dur-row">
+                <div class="shot-dur-labels">
                     <span>Süre</span>
                     <span class="shot-dur-label">${shot.duration}sn</span>
                 </div>
@@ -202,7 +220,7 @@ function renderShots() {
                        oninput="updateShotDuration(${idx}, this.value, this.closest('.shot-card'))">
             </div>
             <div class="shot-desc-row">
-                <textarea class="form-input shot-desc" rows="1"
+                <textarea class="form-input shot-desc"
                           id="shot-desc-${idx}"
                           placeholder="Kendi istediğinizi yazın (Türkçe olabilir) veya ✦ AI'ya bırakın"
                           oninput="updateShotDesc(${idx}, this.value)">${shot.description || ""}</textarea>
@@ -210,14 +228,41 @@ function renderShots() {
                         onclick="refineShotDescription(${idx})" title="AI ile sinematik prompt oluştur">✦</button>
             </div>
         </div>
-    `).join("");
+        `;
+    }).join("");
+
+    // Apply carousel translate for all cards after DOM is built
+    shots.forEach((_, idx) => _applyCamTranslate(idx));
 
     updateTotalDurationLabel();
 }
 
-function selectCamMove(idx, move) {
+function _applyCamTranslate(idx) {
+    const track = document.getElementById(`cam-track-${idx}`);
+    if (!track) return;
+    const wrapper = track.parentElement;
+    const btnW = (wrapper.offsetWidth + 6) / CAM_PAGE; // +6 accounts for gap
+    track.style.transform = `translateX(-${camOffsets[idx] * btnW}px)`;
+}
+
+function shiftCamPage(idx, dir) {
+    camOffsets[idx] = Math.max(0, Math.min(CAM_MAX_OFFSET, (camOffsets[idx] || 0) + CAM_PAGE * dir));
+    _applyCamTranslate(idx);
+    const prev = document.getElementById(`cam-prev-${idx}`);
+    const next = document.getElementById(`cam-next-${idx}`);
+    if (prev) prev.disabled = camOffsets[idx] === 0;
+    if (next) next.disabled = camOffsets[idx] >= CAM_MAX_OFFSET;
+}
+
+function selectCamMove(idx, move, btnIdx) {
     shots[idx].camera_move = move;
-    renderShots();
+    // Update active class without full re-render
+    CAM_MOVES.forEach((_, i) => {
+        document.getElementById(`cam-btn-${idx}-${i}`)?.classList.remove("active");
+    });
+    if (btnIdx !== undefined) {
+        document.getElementById(`cam-btn-${idx}-${btnIdx}`)?.classList.add("active");
+    }
 }
 
 function updateShotDuration(idx, val, card) {
@@ -1286,3 +1331,8 @@ async function loadRecentVideos() {
 }
 
 loadRecentVideos();
+
+// Re-apply carousel translate on resize
+window.addEventListener("resize", () => {
+    shots.forEach((_, idx) => _applyCamTranslate(idx));
+});

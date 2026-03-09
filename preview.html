@@ -3,702 +3,333 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Antigravity — Tasarım Önizleme</title>
+<title>Shot Card Preview</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #f0f0f0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 40px 20px;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
 
   :root {
-    --bg: #080808;
-    --card: #0f0f0f;
-    --card-hover: #141414;
-    --border: #1e1e1e;
-    --border-hover: #2a2a2a;
-    --text: #f0f0f0;
-    --text-secondary: #888;
-    --text-muted: #444;
-    --accent: #e8e0d4;
-    --accent-dim: rgba(232, 224, 212, 0.08);
+    --bg-secondary: #f5f5f5;
+    --bg-card: #ffffff;
+    --border-subtle: #e8e8e8;
+    --text-primary: #0a0a0a;
+    --text-secondary: #555;
+    --text-muted: #999;
+    --accent: #0a0a0a;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --transition-fast: 0.15s ease;
   }
 
-  body {
-    font-family: 'Inter', -apple-system, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    overflow-x: hidden;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  /* ── Orb Animasyonları ── */
-  .orbs {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 0;
-    overflow: hidden;
-  }
-
-  .orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(120px);
-    opacity: 0.12;
-    animation: floatOrb linear infinite;
-  }
-
-  .orb-1 {
-    width: 600px; height: 600px;
-    background: radial-gradient(circle, #7c5cbf, transparent 70%);
-    top: -200px; left: -100px;
-    animation-duration: 25s;
-    animation-delay: 0s;
-  }
-
-  .orb-2 {
-    width: 500px; height: 500px;
-    background: radial-gradient(circle, #f5f0e8, transparent 70%);
-    top: 30%; right: -150px;
-    opacity: 0.07;
-    animation-duration: 32s;
-    animation-delay: -8s;
-  }
-
-  .orb-3 {
-    width: 400px; height: 400px;
-    background: radial-gradient(circle, #4a3870, transparent 70%);
-    bottom: -100px; left: 40%;
-    opacity: 0.10;
-    animation-duration: 20s;
-    animation-delay: -14s;
-  }
-
-  @keyframes floatOrb {
-    0%   { transform: translate(0px, 0px) scale(1); }
-    25%  { transform: translate(40px, -30px) scale(1.05); }
-    50%  { transform: translate(20px, 50px) scale(0.97); }
-    75%  { transform: translate(-30px, 20px) scale(1.03); }
-    100% { transform: translate(0px, 0px) scale(1); }
-  }
-
-  /* ── Layout ── */
-  .layout {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    height: 100vh;
-  }
-
-  /* ── Sidebar ── */
-  .sidebar {
-    width: 220px;
-    flex-shrink: 0;
-    border-right: 1px solid var(--border);
-    padding: 32px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .logo {
-    padding: 0 24px 28px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 12px;
-  }
-
-  .logo-name {
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--accent);
-  }
-
-  .logo-sub {
-    font-size: 10px;
-    color: var(--text-muted);
-    letter-spacing: 0.1em;
-    margin-top: 2px;
-  }
-
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 24px;
-    font-size: 13px;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: all 0.15s;
-    border-radius: 0;
-  }
-
-  .nav-item:hover {
-    color: var(--text);
-    background: var(--accent-dim);
-  }
-
-  .nav-item.active {
-    color: var(--text);
-    background: var(--accent-dim);
-    border-right: 2px solid var(--accent);
-  }
-
-  .nav-icon {
-    width: 16px;
-    height: 16px;
-    opacity: 0.6;
-  }
-
-  .nav-item.active .nav-icon { opacity: 1; }
-
-  .sidebar-bottom {
-    margin-top: auto;
+  .preview-box {
+    background: #fff;
+    border-radius: 16px;
     padding: 24px;
-    border-top: 1px solid var(--border);
+    width: 520px;
+    box-shadow: 0 2px 24px rgba(0,0,0,0.08);
+  }
+  .preview-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #999;
+    text-transform: uppercase;
+    margin-bottom: 14px;
   }
 
-  .user-chip {
+  /* ─── Shot Card ─── */
+  .shot-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+  .shot-card-header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    font-size: 12px;
-    color: var(--text-secondary);
+    justify-content: space-between;
+    margin-bottom: 10px;
   }
-
-  .user-avatar {
-    width: 28px; height: 28px;
+  .shot-card-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+  .shot-remove-btn {
+    width: 22px; height: 22px;
+    background: none;
+    border: 1px solid var(--border-subtle);
     border-radius: 50%;
-    background: var(--accent-dim);
-    border: 1px solid var(--border-hover);
+    cursor: pointer;
+    font-size: 0.6rem;
+    color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .shot-remove-btn:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+
+  /* ─── Carousel ─── */
+  .cam-carousel {
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    color: var(--accent);
+    gap: 6px;
+  }
+  .cam-nav-btn {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+    user-select: none;
+  }
+  .cam-nav-btn:hover:not(:disabled) { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .cam-nav-btn:disabled { opacity: 0.25; cursor: default; }
+
+  .cam-track-wrapper { flex: 1; overflow: hidden; }
+  .cam-track {
+    display: flex;
+    gap: 6px;
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* ── Main ── */
-  .main {
-    flex: 1;
+  /* ─── Cam Button ─── */
+  .cam-btn {
+    flex: 0 0 calc(25% - 5px);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-  }
-
-  .topbar {
-    height: 56px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 32px;
-    flex-shrink: 0;
-  }
-
-  .page-title {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-secondary);
-  }
-
-  .topbar-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 16px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 500;
+    gap: 5px;
+    padding: 8px 4px;
+    background: var(--bg-secondary);
+    border: 1.5px solid transparent;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all 0.15s;
-    border: none;
-  }
-
-  .btn-ghost {
-    background: transparent;
+    font-size: 0.62rem;
+    font-weight: 500;
     color: var(--text-secondary);
-    border: 1px solid var(--border);
+    transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+    white-space: nowrap;
   }
+  .cam-btn:hover { border-color: #d1d5db; color: var(--text-primary); }
+  .cam-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
 
-  .btn-ghost:hover {
-    border-color: var(--border-hover);
-    color: var(--text);
-    background: var(--accent-dim);
+  /* ─── Cam Anim Icons ─── */
+  .cam-anim { width: 28px; height: 20px; display: flex; align-items: center; justify-content: center; position: relative; }
+  .cam-anim-inner { width: 16px; height: 11px; border: 1.5px solid currentColor; border-radius: 2px; opacity: 0.8; }
+
+  .dolly-in-inner  { animation: dollyIn  1.4s ease-in-out infinite; }
+  .dolly-out-inner { animation: dollyOut 1.4s ease-in-out infinite; }
+  @keyframes dollyIn  { 0%,100%{transform:scale(1)}   50%{transform:scale(0.58)} }
+  @keyframes dollyOut { 0%,100%{transform:scale(0.58)} 50%{transform:scale(1)} }
+
+  .orbit-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: currentColor;
+    position: absolute; left: 50%; top: 50%;
+    animation: orbitAnim 1.6s linear infinite;
+    transform-origin: 0 0;
   }
+  @keyframes orbitAnim { from{transform:rotate(0deg) translateX(9px)} to{transform:rotate(360deg) translateX(9px)} }
 
-  .btn-primary {
-    background: var(--accent);
-    color: #080808;
-    font-weight: 600;
-  }
+  .pan-line { width: 14px; height: 2px; background: currentColor; border-radius: 1px; opacity: 0.8; animation: panAnim 1.4s ease-in-out infinite; }
+  @keyframes panAnim { 0%,100%{transform:translateX(-4px)} 50%{transform:translateX(4px)} }
 
-  .btn-primary:hover {
-    background: #f5ede0;
-  }
+  .tilt-line { width: 2px; height: 14px; background: currentColor; border-radius: 1px; opacity: 0.8; animation: tiltAnim 1.4s ease-in-out infinite; }
+  @keyframes tiltAnim { 0%,100%{transform:translateY(3px)} 50%{transform:translateY(-3px)} }
 
-  /* ── Content ── */
-  .content {
+  .tracking-rect { width: 11px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; opacity: 0.8; animation: trackingAnim 1.4s ease-in-out infinite; }
+  @keyframes trackingAnim { 0%,100%{transform:translateX(-4px)} 50%{transform:translateX(4px)} }
+
+  .crane-rect { width: 11px; height: 9px; border: 1.5px solid currentColor; border-radius: 2px; opacity: 0.8; animation: craneAnim 1.4s ease-in-out infinite; }
+  @keyframes craneAnim { 0%,100%{transform:translateY(3px)} 50%{transform:translateY(-3px)} }
+
+  .static-rect { width: 14px; height: 10px; border: 1.5px solid currentColor; border-radius: 2px; opacity: 0.8; }
+
+  /* ─── Duration ─── */
+  .shot-dur-row { margin-top: 12px; }
+  .shot-dur-labels { display: flex; justify-content: space-between; font-size: 0.71rem; color: var(--text-secondary); margin-bottom: 5px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+
+  /* ─── Desc Row ─── */
+  .shot-desc-row { display: flex; gap: 6px; align-items: flex-start; margin-top: 10px; }
+  .shot-desc {
     flex: 1;
-    overflow-y: auto;
-    padding: 40px 32px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
+    font-family: inherit;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    resize: vertical;
+    min-height: 76px;
+    outline: none;
+    transition: border-color var(--transition-fast);
   }
-
-  .section-header {
-    margin-bottom: 24px;
-  }
-
-  .section-title {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--text);
-    letter-spacing: -0.02em;
-  }
-
-  .section-sub {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin-top: 4px;
-  }
-
-  /* ── Cards ── */
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 32px;
-  }
-
-  .card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .card:hover {
-    border-color: var(--border-hover);
-    background: var(--card-hover);
-    transform: translateY(-1px);
-  }
-
-  .card-icon {
+  .shot-desc:focus { border-color: var(--accent); }
+  .shot-desc::placeholder { color: var(--text-muted); }
+  .shot-ai-btn {
+    flex-shrink: 0;
     width: 32px; height: 32px;
-    border-radius: 8px;
-    background: var(--accent-dim);
-    border: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 14px;
-    font-size: 14px;
-  }
-
-  .card-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text);
-    margin-bottom: 4px;
-  }
-
-  .card-desc {
-    font-size: 12px;
-    color: var(--text-secondary);
-    line-height: 1.5;
-  }
-
-  /* ── Wizard Modal ── */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(8px);
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.2s ease;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  .modal {
-    width: 540px;
-    background: var(--card);
-    border: 1px solid var(--border-hover);
-    border-radius: 14px;
-    overflow: hidden;
-    animation: slideUp 0.25s ease;
-  }
-
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .modal-header {
-    padding: 24px 28px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .modal-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .modal-step {
-    font-size: 11px;
-    color: var(--text-muted);
-    background: var(--accent-dim);
-    padding: 3px 10px;
-    border-radius: 20px;
-    border: 1px solid var(--border);
-  }
-
-  .modal-body {
-    padding: 28px;
-  }
-
-  .step-label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin-bottom: 16px;
-  }
-
-  .upload-zone {
-    border: 1px dashed var(--border-hover);
-    border-radius: 10px;
-    padding: 40px 20px;
-    text-align: center;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--accent);
+    font-size: 0.85rem;
     cursor: pointer;
-    transition: all 0.2s;
-    margin-bottom: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
   }
+  .shot-ai-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-  .upload-zone:hover {
-    border-color: var(--accent);
-    background: var(--accent-dim);
+  /* ─── Dark Mode ─── */
+  .dark-box {
+    --bg-secondary: #1e1e1e;
+    --bg-card: #161616;
+    --border-subtle: #2e2e2e;
+    --text-primary: #f0f0f0;
+    --text-secondary: #888;
+    --text-muted: #555;
+    --accent: #f0f0f0;
+    background: #111;
+    color: #f0f0f0;
   }
-
-  .upload-icon { font-size: 24px; margin-bottom: 8px; }
-
-  .upload-text {
-    font-size: 13px;
-    color: var(--text-secondary);
-  }
-
-  .upload-sub {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 4px;
-  }
-
-  .modal-footer {
-    padding: 20px 28px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .step-dots {
-    display: flex;
-    gap: 6px;
-  }
-
-  .dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: var(--border-hover);
-  }
-
-  .dot.active {
-    background: var(--accent);
-    width: 18px;
-    border-radius: 3px;
-  }
-
-  /* ── Gallery Preview ── */
-  .gallery-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-top: 8px;
-  }
-
-  .gallery-item {
-    aspect-ratio: 9/16;
-    border-radius: 8px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    overflow: hidden;
-    position: relative;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-
-  .gallery-item:hover {
-    border-color: var(--border-hover);
-    transform: translateY(-2px);
-  }
-
-  .gallery-thumb {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-muted);
-    font-size: 11px;
-  }
-
-  .gallery-thumb:nth-child(1) { background: linear-gradient(160deg, #1a1228 0%, #2d1b4e 100%); }
-
-  .gallery-overlay {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    background: linear-gradient(transparent, rgba(0,0,0,0.8));
-    padding: 12px 10px 10px;
-    font-size: 10px;
-    color: var(--text-secondary);
-  }
-
-  .tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: var(--accent-dim);
-    border: 1px solid var(--border);
-    font-size: 10px;
-    color: var(--text-secondary);
-  }
+  .dark-box .cam-btn.active { background: #f0f0f0; color: #111; border-color: #f0f0f0; }
+  .dark-box .shot-ai-btn:hover { background: #f0f0f0; color: #111; border-color: #f0f0f0; }
 </style>
 </head>
 <body>
 
-<!-- Orbs -->
-<div class="orbs">
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
+<!-- ── Light Mode ── -->
+<div class="preview-box">
+  <div class="preview-label">Light Mode</div>
+  <div id="shot-0" class="shot-card"></div>
+  <div id="shot-1" class="shot-card"></div>
 </div>
 
-<!-- Layout -->
-<div class="layout">
-
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <div class="logo">
-      <div class="logo-name">Antigravity</div>
-      <div class="logo-sub">Video Studio</div>
-    </div>
-
-    <div class="nav-item active">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/>
-        <rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/>
-      </svg>
-      Dashboard
-    </div>
-
-    <div class="nav-item" onclick="openModal()">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <circle cx="8" cy="8" r="6"/><line x1="8" y1="5" x2="8" y2="11"/><line x1="5" y1="8" x2="11" y2="8"/>
-      </svg>
-      Yeni Video
-    </div>
-
-    <div class="nav-item">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path d="M2 4h12M2 8h8M2 12h5"/>
-      </svg>
-      Defile Modu
-    </div>
-
-    <div class="nav-item">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <rect x="2" y="3" width="12" height="9" rx="1.5"/>
-        <path d="M5 13h6"/>
-      </svg>
-      Galeri
-    </div>
-
-    <div class="nav-item">
-      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-        <circle cx="8" cy="6" r="2.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5"/>
-      </svg>
-      Marka Ayarları
-    </div>
-
-    <div class="sidebar-bottom">
-      <div class="user-chip">
-        <div class="user-avatar">YS</div>
-        <div>
-          <div style="font-size:11px;color:var(--text)">Yusuf S.</div>
-          <div style="font-size:10px;color:var(--text-muted)">Pro Plan</div>
-        </div>
-      </div>
-    </div>
-  </aside>
-
-  <!-- Main -->
-  <main class="main">
-    <div class="topbar">
-      <span class="page-title">Dashboard</span>
-      <div class="topbar-actions">
-        <button class="btn btn-ghost">Galeri</button>
-        <button class="btn btn-primary" onclick="openModal()">+ Yeni Video</button>
-      </div>
-    </div>
-
-    <div class="content">
-
-      <!-- Hızlı Erişim -->
-      <div class="section-header">
-        <div class="section-title">Ne üretmek istiyorsunuz?</div>
-        <div class="section-sub">Bir mod seçin ve başlayın</div>
-      </div>
-
-      <div class="cards">
-        <div class="card" onclick="openModal()">
-          <div class="card-icon">✦</div>
-          <div class="card-title">Tek Video</div>
-          <div class="card-desc">Bir elbise yükle, sahne seç, video üret.</div>
-        </div>
-        <div class="card">
-          <div class="card-icon">◈</div>
-          <div class="card-title">Defile Modu</div>
-          <div class="card-desc">Birden fazla elbiseyi sırayla birleştir.</div>
-        </div>
-        <div class="card">
-          <div class="card-icon">⊞</div>
-          <div class="card-title">Toplu İşlem</div>
-          <div class="card-desc">Birden fazla elbise kuyruğa al.</div>
-        </div>
-      </div>
-
-      <!-- Son Videolar -->
-      <div class="section-header" style="margin-top:8px">
-        <div class="section-title">Son Videolar</div>
-        <div class="section-sub">En son üretilen 4 video</div>
-      </div>
-
-      <div class="gallery-grid">
-        <div class="gallery-item">
-          <div class="gallery-thumb" style="background:linear-gradient(160deg,#1a1228,#2d1b4e)">
-            <span>▶</span>
-          </div>
-          <div class="gallery-overlay">
-            <div style="margin-bottom:4px">Evening Gown</div>
-            <span class="tag">Studio</span>
-          </div>
-        </div>
-        <div class="gallery-item">
-          <div class="gallery-thumb" style="background:linear-gradient(160deg,#0a1628,#1a3a5c)">
-            <span>▶</span>
-          </div>
-          <div class="gallery-overlay">
-            <div style="margin-bottom:4px">Summer Dress</div>
-            <span class="tag">Beach</span>
-          </div>
-        </div>
-        <div class="gallery-item">
-          <div class="gallery-thumb" style="background:linear-gradient(160deg,#141a0a,#2a3a14)">
-            <span>▶</span>
-          </div>
-          <div class="gallery-overlay">
-            <div style="margin-bottom:4px">Blazer Set</div>
-            <span class="tag">Rooftop</span>
-          </div>
-        </div>
-        <div class="gallery-item">
-          <div class="gallery-thumb" style="background:linear-gradient(160deg,#1a1010,#3a1a1a)">
-            <span>▶</span>
-          </div>
-          <div class="gallery-overlay">
-            <div style="margin-bottom:4px">Couture Gown</div>
-            <span class="tag">Runway</span>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </main>
-</div>
-
-<!-- Wizard Modal -->
-<div class="modal-overlay" id="modal" style="display:none" onclick="closeModalOutside(event)">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Yeni Video Üret</div>
-      <span class="modal-step">Adım 1 / 4</span>
-    </div>
-    <div class="modal-body">
-      <div class="step-label">Elbise Fotoğrafı</div>
-      <div class="upload-zone">
-        <div class="upload-icon">↑</div>
-        <div class="upload-text">Ön fotoğrafı sürükle veya tıkla</div>
-        <div class="upload-sub">JPG, PNG, WEBP · Maks 10MB</div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <div class="upload-zone" style="flex:1;padding:16px">
-          <div style="font-size:11px;color:var(--text-muted)">+ Arka</div>
-        </div>
-        <div class="upload-zone" style="flex:1;padding:16px">
-          <div style="font-size:11px;color:var(--text-muted)">+ Yan</div>
-        </div>
-        <div class="upload-zone" style="flex:1;padding:16px">
-          <div style="font-size:11px;color:var(--text-muted)">+ Referans</div>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <div class="step-dots">
-        <div class="dot active"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
-        <div class="dot"></div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost" onclick="closeModal()">İptal</button>
-        <button class="btn btn-primary">Devam →</button>
-      </div>
-    </div>
-  </div>
+<!-- ── Dark Mode ── -->
+<div class="preview-box dark-box">
+  <div class="preview-label" style="color:#444">Dark Mode</div>
+  <div id="shot-2" class="shot-card"></div>
+  <div id="shot-3" class="shot-card"></div>
 </div>
 
 <script>
-  function openModal() {
-    document.getElementById('modal').style.display = 'flex';
-  }
-  function closeModal() {
-    document.getElementById('modal').style.display = 'none';
-  }
-  function closeModalOutside(e) {
-    if (e.target === document.getElementById('modal')) closeModal();
-  }
-</script>
+const CAM_MOVES = [
+  { value: "dolly_in",  label: "Dolly In",  icon: '<div class="cam-anim-inner dolly-in-inner"></div>' },
+  { value: "dolly_out", label: "Dolly Out", icon: '<div class="cam-anim-inner dolly-out-inner"></div>' },
+  { value: "orbit",     label: "Orbit",     icon: '<div class="orbit-dot"></div>' },
+  { value: "pan",       label: "Pan",       icon: '<div class="pan-line"></div>' },
+  { value: "tilt_up",   label: "Tilt Up",   icon: '<div class="tilt-line"></div>' },
+  { value: "tracking",  label: "Tracking",  icon: '<div class="tracking-rect"></div>' },
+  { value: "crane",     label: "Crane",     icon: '<div class="crane-rect"></div>' },
+  { value: "static",    label: "Static",    icon: '<div class="static-rect"></div>' },
+];
 
+const PAGE = 4;
+const MAX_OFFSET = CAM_MOVES.length - PAGE; // = 4
+
+const state = {};
+
+function buildCard(containerId, shotIdx, activeMove, defaultDesc) {
+  const el = document.getElementById(containerId);
+  state[shotIdx] = { offset: 0, active: activeMove };
+
+  el.innerHTML = `
+    <div class="shot-card-header">
+      <span class="shot-card-title">Sahne ${shotIdx % 2 + 1} · <span id="dur-${shotIdx}">5</span>sn</span>
+      <button class="shot-remove-btn">✕</button>
+    </div>
+
+    <div class="cam-carousel">
+      <button class="cam-nav-btn" id="prev-${shotIdx}" onclick="shiftPage(${shotIdx},-1)">‹</button>
+      <div class="cam-track-wrapper">
+        <div class="cam-track" id="track-${shotIdx}">
+          ${CAM_MOVES.map((cm, i) => `
+            <button class="cam-btn${cm.value === activeMove ? ' active' : ''}"
+                    id="btn-${shotIdx}-${i}"
+                    onclick="pickCam(${shotIdx},${i})">
+              <div class="cam-anim">${cm.icon}</div>
+              <span>${cm.label}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+      <button class="cam-nav-btn" id="next-${shotIdx}" onclick="shiftPage(${shotIdx},1)">›</button>
+    </div>
+
+    <div class="shot-dur-row">
+      <div class="shot-dur-labels"><span>Süre</span><span><span id="dur2-${shotIdx}">5</span>sn</span></div>
+      <input type="range" min="3" max="10" value="5" oninput="updateDur(${shotIdx},this.value)">
+    </div>
+
+    <div class="shot-desc-row">
+      <textarea class="shot-desc" placeholder="Kendi istediğinizi yazın (Türkçe olabilir) veya ✦ AI'ya bırakın">${defaultDesc}</textarea>
+      <button class="shot-ai-btn" title="AI ile sinematik prompt üret">✦</button>
+    </div>
+  `;
+
+  updateNav(shotIdx);
+}
+
+function shiftPage(idx, dir) {
+  state[idx].offset = Math.max(0, Math.min(MAX_OFFSET, state[idx].offset + PAGE * dir));
+  applyTranslate(idx);
+  updateNav(idx);
+}
+
+function applyTranslate(idx) {
+  const track = document.getElementById(`track-${idx}`);
+  const wrapper = track.parentElement;
+  const btnW = (wrapper.offsetWidth + 6) / PAGE; // +6 gap
+  track.style.transform = `translateX(-${state[idx].offset * btnW}px)`;
+}
+
+function updateNav(idx) {
+  document.getElementById(`prev-${idx}`).disabled = state[idx].offset === 0;
+  document.getElementById(`next-${idx}`).disabled = state[idx].offset >= MAX_OFFSET;
+}
+
+function pickCam(idx, btnIdx) {
+  CAM_MOVES.forEach((_, i) => {
+    document.getElementById(`btn-${idx}-${i}`)?.classList.remove('active');
+  });
+  document.getElementById(`btn-${idx}-${btnIdx}`)?.classList.add('active');
+  state[idx].active = CAM_MOVES[btnIdx].value;
+}
+
+function updateDur(idx, val) {
+  document.getElementById(`dur-${idx}`).textContent = val;
+  document.getElementById(`dur2-${idx}`).textContent = val;
+}
+
+window.addEventListener('resize', () => {
+  Object.keys(state).forEach(idx => applyTranslate(Number(idx)));
+});
+
+// Build all cards
+buildCard('shot-0', 0, 'dolly_in',
+  'Dolly in on a woman descending the grand staircase in an opulent hall, her outfit flowing elegantly, under warm chandelier lighting.');
+buildCard('shot-1', 1, 'orbit', '');
+buildCard('shot-2', 2, 'dolly_in',
+  'Seamlessly continuing, model turns at base of grand staircase, orbit shot reveals full outfit, warm chandelier glow.');
+buildCard('shot-3', 3, 'tracking', '');
+</script>
 </body>
 </html>
