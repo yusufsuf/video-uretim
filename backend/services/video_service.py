@@ -92,7 +92,7 @@ async def generate_multishot_video(
         "duration": str(duration),
         "aspect_ratio": aspect_ratio,
         "mode": "pro",
-        "sound": generate_audio,
+        "sound": "on",  # kie.ai requires string "on" when multi_shots is true
     }
     if kling_elements:
         input_data["kling_elements"] = kling_elements
