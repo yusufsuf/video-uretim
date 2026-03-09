@@ -130,11 +130,12 @@ const TOTAL_STEPS = 3;
 let generationStarted = false;
 
 // Library URL state
-let libraryFrontUrl = null;
-let librarySideUrl  = null;
-let libraryBackUrl  = null;
-let libraryBgUrl    = null;
-let libraryStyleUrl = null;
+let libraryFrontUrl    = null;
+let librarySideUrl     = null;
+let libraryBackUrl     = null;
+let libraryBgUrl       = null;
+let libraryBgExtraUrls = [];   // extra background images for per-shot cycling
+let libraryStyleUrl    = null;
 
 // ─── Multishot State ────────────────────────────────────────────────
 let shots = [
@@ -446,6 +447,7 @@ function selectLibraryItem(itemJson) {
         }
     } else if (item.category === "background") {
         libraryBgUrl = item.image_url;
+        libraryBgExtraUrls = item.extra_urls || [];
         // Update refimg zone UI
         const zone = refimgZone;
         refimgFile = null;
@@ -493,8 +495,9 @@ function clearLibraryBack() {
 }
 
 function clearLibraryBg() {
-    libraryBgUrl = null;
-    libraryStyleUrl = null;
+    libraryBgUrl       = null;
+    libraryBgExtraUrls = [];
+    libraryStyleUrl    = null;
     removeFile("refimg");
 }
 
@@ -649,7 +652,8 @@ async function startGeneration() {
     if (libraryFrontUrl)    formData.append("library_front_url",      libraryFrontUrl);
     if (librarySideUrl)     formData.append("library_side_url",       librarySideUrl);
     if (libraryBackUrl)     formData.append("library_back_url",       libraryBackUrl);
-    if (libraryBgUrl)       formData.append("library_background_url", libraryBgUrl);
+    if (libraryBgUrl)       formData.append("library_background_url",        libraryBgUrl);
+    if (libraryBgExtraUrls.length > 0) formData.append("library_background_extra_urls", JSON.stringify(libraryBgExtraUrls));
     if (libraryStyleUrl)    formData.append("library_style_url",      libraryStyleUrl);
 
     // Shots — serialize to JSON
@@ -819,8 +823,9 @@ newBtn?.addEventListener("click", () => {
     libraryFrontUrl = null;
     librarySideUrl  = null;
     libraryBackUrl  = null;
-    libraryBgUrl    = null;
-    libraryStyleUrl = null;
+    libraryBgUrl       = null;
+    libraryBgExtraUrls = [];
+    libraryStyleUrl    = null;
     // Reset shots to default
     shots = [
         { camera_move: "dolly_in", duration: 5, description: "" },

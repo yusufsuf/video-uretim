@@ -170,6 +170,7 @@ async def generate_video_endpoint(
     library_side_url: Optional[str] = Form(None),
     library_back_url: Optional[str] = Form(None),
     library_background_url: Optional[str] = Form(None),
+    library_background_extra_urls: Optional[str] = Form(None),
     library_style_url: Optional[str] = Form(None),
     watermark_image: Optional[UploadFile] = File(None, description="Watermark/logo PNG"),
 ):
@@ -226,6 +227,14 @@ async def generate_video_endpoint(
         # Library background bypasses Nano Banana — use directly
         reference_image_url = library_background_url
 
+    # Parse extra background URLs (for per-shot cycling)
+    bg_extra_urls: list = []
+    if library_background_extra_urls:
+        try:
+            bg_extra_urls = json.loads(library_background_extra_urls)
+        except Exception:
+            bg_extra_urls = []
+
     # Create job
     job_id = uuid.uuid4().hex[:12]
     request = GenerationRequest(
@@ -261,6 +270,7 @@ async def generate_video_endpoint(
             aspect_ratio=aspect_ratio,
             generate_audio=generate_audio.lower() == "true",
             library_style_url=library_style_url or None,
+            background_extra_urls=bg_extra_urls or None,
             watermark_path=await _save_upload(watermark_image) if watermark_image else None,
         )
     )

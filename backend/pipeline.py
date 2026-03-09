@@ -38,9 +38,6 @@ import shutil
 
 logger = logging.getLogger(__name__)
 
-# Scenes per Kling API call — smaller chunks = higher consistency via last-frame chaining
-CHUNK_SIZE = 2
-
 # In-memory job store
 jobs: dict[str, JobResponse] = {}
 
@@ -107,6 +104,7 @@ async def run_pipeline(
     aspect_ratio: str = "9:16",
     generate_audio: bool = True,
     library_style_url: Optional[str] = None,
+    background_extra_urls: Optional[list] = None,
     watermark_path: Optional[str] = None,
 ):
     """Execute the full pipeline asynchronously."""
@@ -181,44 +179,51 @@ async def run_pipeline(
             for scene, shot in zip(scene_prompt.scenes, request.shots):
                 scene.duration = str(shot.duration)
 
-        # Split scenes into chunks for last-frame chaining
+        # Build background pool for per-shot cycling
+        # If multiple backgrounds provided: each shot gets its own background (no chaining)
+        # If single background: chain via last-frame extraction
+        bg_pool = [background_url] + (background_extra_urls or [])
+        multi_bg = len(bg_pool) > 1
+        logger.info("[%s] Background pool: %d image(s), mode=%s",
+                    job_id, len(bg_pool), "cycle" if multi_bg else "chain")
+
+        # ── Per-shot execution: one Kling call per scene ─────────
         all_scenes = scene_prompt.scenes
-        chunks = [all_scenes[i:i+CHUNK_SIZE] for i in range(0, len(all_scenes), CHUNK_SIZE)]
-        n_chunks = len(chunks)
-        logger.info("[%s] %d scenes → %d chunk(s) of max %d", job_id, len(all_scenes), n_chunks, CHUNK_SIZE)
+        n_shots = len(all_scenes)
+        logger.info("[%s] %d scene(s) → %d individual Kling call(s)", job_id, n_shots, n_shots)
 
         clip_paths = []
-        current_start_image = background_url
+        current_start_image = bg_pool[0]
 
-        for chunk_idx, chunk in enumerate(chunks):
-            chunk_duration = sum(int(s.duration) for s in chunk)
-            chunk_multi_prompt = [{"duration": s.duration, "prompt": s.prompt} for s in chunk]
-            chunk_progress = 55 + int((chunk_idx / n_chunks) * 28)
-            chunk_msg = (
-                f"Sahne grubu {chunk_idx + 1}/{n_chunks} üretiliyor..."
-                if n_chunks > 1 else "Video üretiliyor..."
-            )
+        for shot_idx, scene in enumerate(all_scenes):
+            shot_progress = 55 + int((shot_idx / n_shots) * 28)
+            shot_msg = f"Sahne {shot_idx + 1}/{n_shots} üretiliyor..."
             _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
-                        progress=chunk_progress, message=chunk_msg)
-            logger.info("[%s] Chunk %d/%d: %d shots, %ds, start=%s...",
-                        job_id, chunk_idx + 1, n_chunks, len(chunk),
-                        chunk_duration, current_start_image[:60])
+                        progress=shot_progress, message=shot_msg)
+
+            # Choose start image: cycle pool (multi-bg) or chain from previous clip
+            start_image = bg_pool[shot_idx % len(bg_pool)] if multi_bg else current_start_image
+            shot_duration = int(scene.duration)
+
+            bg_preview: str = str(start_image)[0:60]  # type: ignore[index]
+            logger.info("[%s] Shot %d/%d: %ds, bg=%s...",
+                        job_id, shot_idx + 1, n_shots, shot_duration, bg_preview)
 
             clip_url = await generate_multishot_video(
-                start_image_url=current_start_image,
-                multi_prompt=chunk_multi_prompt,
+                start_image_url=start_image,
+                multi_prompt=[{"duration": scene.duration, "prompt": scene.prompt}],
                 elements=elements,
-                duration=str(chunk_duration),
+                duration=str(shot_duration),
                 aspect_ratio=aspect_ratio,
                 generate_audio=generate_audio,
             )
 
             clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
             clip_paths.append(clip_path)
-            logger.info("[%s] Chunk %d downloaded: %s", job_id, chunk_idx + 1, clip_path)
+            logger.info("[%s] Shot %d downloaded: %s", job_id, shot_idx + 1, clip_path)
 
-            # Extract last frame for next chunk (not needed after the last chunk)
-            if chunk_idx < n_chunks - 1:
+            # Chain via last frame only in single-background mode
+            if not multi_bg and shot_idx < n_shots - 1:
                 logger.info("[%s] Extracting last frame for chaining...", job_id)
                 last_frame_path = extract_last_frame(clip_path, settings.TEMP_DIR)
                 current_start_image = await upload_to_fal(last_frame_path)
@@ -226,14 +231,14 @@ async def run_pipeline(
                     os.remove(last_frame_path)
                 except Exception:
                     pass
-                logger.info("[%s] Chain: next clip starts from %s", job_id, current_start_image[:80])
+                logger.info("[%s] Chain: next shot starts from %s", job_id, current_start_image[:80])
 
         # Merge clips or move single clip to OUTPUT_DIR
-        merge_msg = "Sahneler birleştiriliyor..." if n_chunks > 1 else "Video indiriliyor..."
+        merge_msg = "Sahneler birleştiriliyor..." if n_shots > 1 else "Video indiriliyor..."
         _update_job(job_id, progress=85, message=merge_msg)
 
         final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
-        if n_chunks > 1:
+        if n_shots > 1:
             concatenate_clips(clip_paths, final_path)
             for p in clip_paths:
                 try:
