@@ -108,6 +108,14 @@ class SuggestShotsRequest(BaseModel):
     shots: List["SuggestShotItem"]
 
 
+class RefineShotRequest(BaseModel):
+    camera_move: str
+    duration: int
+    user_description: str
+    location: str = "studio"
+    custom_location: Optional[str] = None
+
+
 class DefileOutfit(BaseModel):
     """Defile koleksiyonundaki tek bir kıyafet."""
     front_url: str

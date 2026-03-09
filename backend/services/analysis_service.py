@@ -10,7 +10,7 @@ from typing import Optional
 from openai import AsyncOpenAI
 
 from config import settings
-from models import DressAnalysisResult, MultiScenePrompt, GenerationRequest, PhotoType, SuggestShotsRequest
+from models import DressAnalysisResult, MultiScenePrompt, GenerationRequest, PhotoType, SuggestShotsRequest, RefineShotRequest
 
 logger = logging.getLogger(__name__)
 
@@ -379,6 +379,42 @@ Rules:
 
 Example output for 2 shots:
 ["fashion model stands tall, full body reveal, slow dolly in, soft studio lighting", "seamlessly continuing, model turns gracefully, orbit shot captures garment silhouette, warm light"]"""
+
+
+async def refine_shot_description(request: RefineShotRequest) -> str:
+    """Convert a user's casual description into a cinematic English shot prompt."""
+    location_str = (
+        request.custom_location
+        if request.location == "custom" and request.custom_location
+        else _LOCATION_MAP.get(request.location, request.location)
+    )
+    cam_term = _CAM_MOVE_MAP.get(request.camera_move, request.camera_move)
+
+    system = (
+        "You are a professional fashion film director. "
+        "The user describes what they want to happen in a shot in their own words (possibly in Turkish). "
+        "Convert it into a precise, cinematic English prompt (15-30 words) suitable for an AI video generator. "
+        "Include: the camera movement specified, the action described, garment reference as 'the outfit', and lighting. "
+        "Return ONLY the prompt string, no quotes, no extra text."
+    )
+    user_msg = (
+        f"Location: {location_str}\n"
+        f"Camera movement: {cam_term}\n"
+        f"Duration: {request.duration}s\n"
+        f"User description: {request.user_description}\n\n"
+        "Write the cinematic prompt:"
+    )
+
+    response = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user_msg},
+        ],
+        temperature=0.7,
+        max_tokens=120,
+    )
+    return (response.choices[0].message.content or "").strip().strip('"').strip("'")
 
 
 async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:

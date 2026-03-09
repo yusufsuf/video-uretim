@@ -21,9 +21,9 @@ import json
 
 from config import settings
 from dependencies import get_current_user
-from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, LocationPreset, ShotConfig, SuggestShotsRequest
+from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, LocationPreset, RefineShotRequest, ShotConfig, SuggestShotsRequest
 from pipeline import jobs, run_pipeline, run_defile_collection_pipeline, _load_history
-from services.analysis_service import suggest_shot_descriptions
+from services.analysis_service import refine_shot_description, suggest_shot_descriptions
 from routes.auth_router import router as auth_router
 from routes.admin_router import router as admin_router
 from routes.library_router import router as library_router
@@ -287,6 +287,16 @@ async def suggest_shots_endpoint(
     """Return AI-generated cinematic descriptions for each shot."""
     descriptions = await suggest_shot_descriptions(request)
     return {"descriptions": descriptions}
+
+
+@app.post("/api/refine-shot")
+async def refine_shot_endpoint(
+    request: RefineShotRequest,
+    _user: dict = Depends(get_current_user),
+):
+    """Convert a casual user description into a cinematic shot prompt."""
+    description = await refine_shot_description(request)
+    return {"description": description}
 
 
 @app.post("/api/defile/collection", response_model=JobResponse)

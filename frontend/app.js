@@ -201,9 +201,14 @@ function renderShots() {
                 <input type="range" class="shot-dur-slider" min="3" max="10" value="${shot.duration}"
                        oninput="updateShotDuration(${idx}, this.value, this.closest('.shot-card'))">
             </div>
-            <textarea class="form-input shot-desc" rows="1"
-                      placeholder="Bu sahne için ek açıklama... (opsiyonel)"
-                      oninput="updateShotDesc(${idx}, this.value)">${shot.description || ""}</textarea>
+            <div class="shot-desc-row">
+                <textarea class="form-input shot-desc" rows="1"
+                          id="shot-desc-${idx}"
+                          placeholder="Kendi istediğinizi yazın (Türkçe olabilir) veya ✦ AI'ya bırakın"
+                          oninput="updateShotDesc(${idx}, this.value)">${shot.description || ""}</textarea>
+                <button class="shot-ai-btn" id="shot-ai-btn-${idx}"
+                        onclick="refineShotDescription(${idx})" title="AI ile sinematik prompt oluştur">✦</button>
+            </div>
         </div>
     `).join("");
 
@@ -239,11 +244,47 @@ function removeShot(idx) {
     renderShots();
 }
 
+async function refineShotDescription(idx) {
+    const textarea = document.getElementById(`shot-desc-${idx}`);
+    const btn      = document.getElementById(`shot-ai-btn-${idx}`);
+    if (!textarea || !btn) return;
+
+    const userText = textarea.value.trim();
+    const shot = shots[idx];
+
+    btn.disabled = true;
+    btn.textContent = "…";
+
+    try {
+        const resp = await fetch("/api/refine-shot", {
+            method: "POST",
+            headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify({
+                camera_move: shot.camera_move,
+                duration: shot.duration,
+                user_description: userText || "fashion model walks and poses naturally",
+                location: "studio",
+            }),
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            textarea.value = data.description;
+            shots[idx].description = data.description;
+        }
+    } catch {
+        // Silent fail
+    }
+
+    btn.disabled = false;
+    btn.textContent = "✦";
+}
+
 // Expose to global scope for inline onclick handlers
 window.selectCamMove = selectCamMove;
 window.updateShotDuration = updateShotDuration;
 window.updateShotDesc = updateShotDesc;
 window.removeShot = removeShot;
+window.refineShotDescription = refineShotDescription;
 
 // ─── Aspect Ratio Cards ──────────────────────────────────────────────
 document.querySelectorAll(".ratio-card").forEach(card => {
@@ -838,50 +879,18 @@ wizardModal?.addEventListener("click", (e) => {
     if (e.target === wizardModal) closeWizard();
 });
 
-wizardNextBtn?.addEventListener("click", async () => {
+wizardNextBtn?.addEventListener("click", () => {
     if (videoMode === "defile") {
         startDefileCollection();
         return;
     }
-    if (currentWizardStep === 1) {
-        await _advanceToStep2WithSuggestions();
-    } else if (currentWizardStep < TOTAL_STEPS) {
+    if (currentWizardStep < TOTAL_STEPS) {
         currentWizardStep++;
         showWizardStep(currentWizardStep);
     } else {
         startGeneration();
     }
 });
-
-async function _advanceToStep2WithSuggestions() {
-    wizardNextBtn.disabled = true;
-    wizardNextBtn.textContent = "✦ AI hazırlıyor...";
-
-    try {
-        const payload = {
-            location: "studio",
-            shots: shots.map(s => ({ camera_move: s.camera_move, duration: s.duration })),
-        };
-        const resp = await fetch("/api/suggest-shots", {
-            method: "POST",
-            headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
-        if (resp.ok) {
-            const data = await resp.json();
-            (data.descriptions || []).forEach((desc, i) => {
-                if (desc && shots[i]) shots[i].description = desc;
-            });
-        }
-    } catch {
-        // Silently continue if suggestions fail
-    }
-
-    wizardNextBtn.disabled = false;
-    wizardNextBtn.textContent = "Devam →";
-    currentWizardStep = 2;
-    showWizardStep(2);
-}
 
 wizardBackBtn?.addEventListener("click", () => {
     if (currentWizardStep > 1 && !generationStarted) {
