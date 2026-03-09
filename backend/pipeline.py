@@ -396,21 +396,127 @@ async def run_pipeline(
 
 
 # ── Fixed runway prompts for defile collection mode ──────────────────────────
+# Rich library of Prada-style cinematography techniques.
+# Organised by category; cycles across all shots so every defile gets varied angles.
+
 DEFILE_PROMPTS = [
-    # 1 — Wide frontal establishing: model walks from far end of white runway toward camera, audience seated both sides, full body, smooth dolly-in
-    "wide shot fashion runway, model walks from far end toward camera, white catwalk, audience seated both sides, full body tracking, smooth cinematic dolly-in",
-    # 2 — Medium frontal: eye-level, model fills frame, white fence rails flank runway, confident stride
-    "medium full-body shot, fashion model walks toward camera on white runway, eye level, white barriers frame both sides, sharp focus, confident walk",
-    # 3 — Torso close-up: camera follows outfit details at chest/jacket level while model walks forward, natural motion blur
-    "close-up on jacket and upper outfit as fashion model walks, camera tracks at torso height, fabric texture visible, slight motion blur from movement",
-    # 4 — Low ground-level: extreme low angle, camera near floor, model's legs and shoes in motion, dynamic footstep rhythm
-    "extreme low angle shot, camera at ground level, fashion model's legs and shoes walking on white runway, pants hem and footwear in sharp focus, motion blur",
-    # 5 — Rear tracking: camera follows model from behind, full body from back, outfit back details, blurred audience on sides
-    "rear tracking shot, camera follows fashion model from behind down runway, full body back view, outfit back details visible, audience blurred on both sides",
-    # 6 — Side profile tracking: camera positioned at runway side, model walks parallel, full silhouette, shallow depth of field
-    "side profile tracking shot, fashion model walks parallel to camera along runway, full silhouette from side, audience in soft background blur, lateral tracking",
-    # 7 — Accessory close-up: extreme close-up on bag or shoes while model walks, luxury detail shot
-    "extreme close-up on fashion accessory while model walks, handbag swinging or shoes stepping, very tight frame, texture and craftsmanship detail, motion blur background",
+
+    # ── WIDE / ESTABLISHING ───────────────────────────────────────────────────
+    # Full runway in frame, architectural grandeur, audience rows visible both sides
+
+    "wide establishing shot, fashion model walks from far backstage end of runway toward camera, white catwalk stretches full length, audience seated both sides, smooth cinematic dolly-in, full body tracking",
+
+    "ultra-wide runway shot, model is a small silhouette at far end and walks closer, enormous luxury fashion show venue, high arched ceiling, dramatic stage lighting, architectural grandeur",
+
+    "overhead bird's-eye crane shot, fashion model walks white runway from above, geometric symmetry of catwalk, audience rows on both sides create framing, pure graphic composition",
+
+    "wide telephoto compressed shot, long lens flattens runway perspective, fashion model sharp in foreground walking toward camera, audience rows stacked abstractly behind, cinematic compression",
+
+    "wide shot from elevated balcony angle, fashion model walks runway below at diagonal, strong geometric composition, venue interior fills frame, grand architectural scale",
+
+    # ── MEDIUM FRONTAL ────────────────────────────────────────────────────────
+    # Model approaching camera, fills most of frame, confident stride
+
+    "medium full-body tracking shot, fashion model walks confidently toward camera on white runway, eye level, white barriers frame both sides, sharp focus, 24fps cinematic movement",
+
+    "medium shot with slight low angle, fashion model walks toward camera, angle accentuates height and posture, audience soft blur behind model, white floor reflects runway lights",
+
+    "medium-close shot, fashion model fills frame from knees to head, walks directly toward camera, runway perspective lines converge behind, confident purposeful stride",
+
+    "medium tracking shot, fashion model in three-quarter angle walks toward camera, face and front-side of outfit both visible, dynamic forward movement, shallow depth of field on background",
+
+    "medium shot, fashion model walks runway toward camera at golden-hour style dramatic lighting, garment silhouette crisp against bright venue backdrop, editorial fashion film look",
+
+    # ── CLOSE-UP DETAILS ─────────────────────────────────────────────────────
+    # Garment fabric, construction, drape — texture as subject
+
+    "close-up on jacket and upper outfit as fashion model walks, camera tracks at torso height, fabric weave texture visible, slight motion blur from forward movement, shallow depth of field",
+
+    "extreme close-up on garment fabric flowing with movement, textile drape and material texture in sharp detail, model's body rhythmic walking motion, kinetic fashion photography",
+
+    "close-up on collar and neckline as fashion model walks, craftsmanship and garment construction visible, runway lights create fabric highlights, bokeh background",
+
+    "close-up on hem and skirt movement as model walks, fabric swings with each step, polished white runway floor reflects garment, kinetic motion captured",
+
+    "tight shot on jacket lapels and chest detail, camera tracks model torso, fabric surface and stitching visible, cinematic depth of field, editorial fashion detail",
+
+    "close-up on garment back details as model walks away, fabric drape and construction from behind, audience blur peripheral, runway light catches material surface",
+
+    # ── ACCESSORY EXTREME CLOSE-UPS ──────────────────────────────────────────
+    # Bag, shoes, jewellery — luxury object as protagonist
+
+    "extreme close-up on handbag swinging as fashion model walks runway, leather texture and metal hardware in sharp detail, motion blur background, luxury accessory focus",
+
+    "extreme close-up on footwear as model steps on white runway floor, shoe sole and heel craftsmanship visible, ground-level perspective, each step sharp and deliberate",
+
+    "close-up on wrist and jewellery as model's arm swings walking, metal catches runway light, shallow depth of field, luxury accessory detail shot",
+
+    "tight close-up on belt and waist construction as model walks, garment materials and stitching visible, cinematic focus, editorial craftsmanship detail",
+
+    # ── LOW ANGLE ────────────────────────────────────────────────────────────
+    # Ground level, dramatic upward perspective, legs dominant
+
+    "extreme low angle shot, camera at floor level, fashion model's legs and feet walking toward camera on white runway, pants hem in motion, dynamic footstep rhythm",
+
+    "low angle shot looking up at fashion model, camera slightly below waist height, model towers against bright venue ceiling, powerful editorial perspective, confident silhouette",
+
+    "ground level rear low angle, model's feet and lower legs walking away, white runway floor stretches ahead, audience feet visible at both sides, rhythmic stepping captured",
+
+    # ── REAR / FOLLOWING ─────────────────────────────────────────────────────
+    # Behind the model, back of outfit, following movement
+
+    "rear tracking shot, camera directly behind fashion model walking down runway, full back view of outfit, audience rows blur on both sides, smooth following movement",
+
+    "over-shoulder rear tracking, camera slightly to side and behind model, three-quarter back view, runway perspective lines visible ahead, audience in soft periphery",
+
+    "low rear angle tracking shot, camera follows model from low behind, emphasises silhouette and posture, back of garment and collar against bright venue, editorial angle",
+
+    # ── LATERAL / SIDE PROFILE ───────────────────────────────────────────────
+    # Model walks parallel to camera, full silhouette visible
+
+    "side profile tracking shot, fashion model walks parallel to camera along runway, full outfit silhouette from side, arms swinging, audience soft blur, smooth lateral camera",
+
+    "three-quarter front-side tracking, camera at 45 degrees to model's path, face and front-side of outfit both visible, dynamic angle, smooth follow movement",
+
+    "side close-up tracking at torso level, camera follows model laterally, outfit side profile and construction visible from side, shallow depth of field, editorial",
+
+    "wide lateral shot, camera perpendicular to runway, fashion model walks through frame, audience visible on near side, full silhouette passes, wide cinematic composition",
+
+    # ── END OF RUNWAY TURN ───────────────────────────────────────────────────
+    # Pivot, pause, back-to-front reveal — classic runway moment
+
+    "fashion model reaches end of runway, dramatic pause then slow deliberate pivot, camera holds and circles slightly, full outfit front-to-back reveal, editorial runway moment",
+
+    "model at runway end, slow-motion pivot, camera frontal holds as model turns, face composition changes through the turn, fabric swings with the movement, confident expression",
+
+    "end of runway turn from side angle, model pivots away from far end and begins walk back, profile to three-quarter reveal, audience beyond in soft focus",
+
+    # ── SLOW MOTION ──────────────────────────────────────────────────────────
+    # Cinematic slow-mo, fabric kinetics, hair movement
+
+    "slow motion medium shot, fashion model walks runway in cinematic slow-mo, fabric ripples and flows with each step, hair movement visible, editorial fashion film quality",
+
+    "slow motion close-up, garment fabric and drape in slow motion, material waves and swings captured in fine detail, kinetic beauty of fashion in motion",
+
+    "slow motion low angle, model's legs and garment hem in slow motion, fabric swings dramatically, white runway floor in sharp foreground, editorial slow-mo moment",
+
+    # ── FACE / EXPRESSION ────────────────────────────────────────────────────
+    # Stoic editorial expression, eyes forward, Prada intensity
+
+    "close-up on fashion model's face while walking runway, stoic focused editorial expression, eyes straight ahead, venue lights sculpt face, garment collar visible below",
+
+    "medium-close shot centered on face and upper body, model walks toward camera, expression powerful and composed, garment neckline prominent, runway recedes behind in bokeh",
+
+    "tight face tracking shot, camera ahead of walking model, dramatic side lighting from runway lights, editorial intensity, background of audience out of focus",
+
+    # ── ARCHITECTURAL / ENVIRONMENTAL ────────────────────────────────────────
+    # Venue as character, model within grand space
+
+    "wide architectural shot, grand fashion show venue with model as small figure, dramatic columns or ceiling structure visible, model walks runway through monumental interior",
+
+    "medium shot emphasising venue geometry, white runway lines converge to vanishing point behind model, symmetrical composition, model centered walking toward camera",
+
+    "long-lens medium shot, fashion model isolated against abstract soft-focus audience, telephoto compression renders background as warm blurred mass, model crisp and sharp",
 ]
 
 
