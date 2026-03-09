@@ -11,16 +11,10 @@
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --card: rgba(8, 8, 16, 0.72);
-            --border: rgba(255, 255, 255, 0.07);
-            --border-accent: rgba(255, 255, 255, 0.12);
             --text: #f0f0f0;
-            --text-muted: #666666;
+            --text-muted: #888;
             --input-bg: rgba(255, 255, 255, 0.05);
             --input-border: rgba(255, 255, 255, 0.1);
-            --gradient-btn: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
-            --btn-text: #0a0a0a;
-            --error: #b85450;
             --font: 'Inter', sans-serif;
             --font-display: 'Outfit', sans-serif;
         }
@@ -34,6 +28,7 @@
             align-items: center;
             justify-content: center;
             -webkit-font-smoothing: antialiased;
+            overflow: hidden;
         }
 
         /* ── Mesh Gradient Background ── */
@@ -41,7 +36,6 @@
             position: fixed;
             inset: 0;
             z-index: 0;
-            pointer-events: none;
             background: #070710;
             overflow: hidden;
         }
@@ -53,31 +47,24 @@
             will-change: transform;
         }
 
-        /* Teal */
         .bg-blob-1 {
             width: 700px; height: 700px;
             background: radial-gradient(circle, #0d5e5e 0%, transparent 70%);
             top: -20%; left: -10%;
             animation: blob1 14s ease-in-out infinite alternate;
         }
-
-        /* Blue */
         .bg-blob-2 {
             width: 600px; height: 600px;
             background: radial-gradient(circle, #0d3080 0%, transparent 70%);
             top: 20%; right: -15%;
             animation: blob2 11s ease-in-out infinite alternate;
         }
-
-        /* Peach */
         .bg-blob-3 {
             width: 550px; height: 550px;
             background: radial-gradient(circle, #a03828 0%, transparent 70%);
             bottom: -15%; left: 25%;
             animation: blob3 16s ease-in-out infinite alternate;
         }
-
-        /* Cream / warm amber */
         .bg-blob-4 {
             width: 420px; height: 420px;
             background: radial-gradient(circle, #7a4e20 0%, transparent 70%);
@@ -85,37 +72,148 @@
             animation: blob4 9s ease-in-out infinite alternate;
         }
 
-        @keyframes blob1 {
-            from { transform: translate(0, 0) scale(1); }
-            to   { transform: translate(12%, 18%) scale(1.15); }
+        @keyframes blob1 { from{transform:translate(0,0) scale(1)} to{transform:translate(12%,18%) scale(1.15)} }
+        @keyframes blob2 { from{transform:translate(0,0) scale(1)} to{transform:translate(-10%,-14%) scale(0.88)} }
+        @keyframes blob3 { from{transform:translate(0,0) scale(1)} to{transform:translate(15%,-12%) scale(1.12)} }
+        @keyframes blob4 { from{transform:translate(0,0) scale(1)} to{transform:translate(8%,-20%) scale(1.2)} }
+
+        /* ── Blur Overlay ── */
+        #bg-blur {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+            background: rgba(0, 0, 0, 0);
+            transition: backdrop-filter 0.5s ease, background 0.5s ease;
         }
-        @keyframes blob2 {
-            from { transform: translate(0, 0) scale(1); }
-            to   { transform: translate(-10%, -14%) scale(0.88); }
+
+        body.form-open #bg-blur {
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            background: rgba(0, 0, 0, 0.3);
         }
-        @keyframes blob3 {
-            from { transform: translate(0, 0) scale(1); }
-            to   { transform: translate(15%, -12%) scale(1.12); }
+
+        /* ── z-index layer for content ── */
+        #landing-view,
+        .auth-card {
+            position: relative;
+            z-index: 2;
         }
-        @keyframes blob4 {
-            from { transform: translate(0, 0) scale(1); }
-            to   { transform: translate(8%, -20%) scale(1.2); }
+
+        /* ── Landing View ── */
+        #landing-view {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 28px;
+            text-align: center;
+            padding: 20px;
+            transition: opacity 0.3s ease, transform 0.3s ease;
         }
+
+        body.form-open #landing-view {
+            opacity: 0;
+            transform: translateY(-10px);
+            pointer-events: none;
+            position: absolute;
+        }
+
+        .landing-logo {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .landing-logo-mark {
+            width: 56px; height: 56px;
+            background: #fff;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: #0a0a0a;
+            box-shadow: 0 4px 24px rgba(255,255,255,0.15);
+        }
+
+        .landing-brand {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.6rem;
+            letter-spacing: -0.03em;
+            color: var(--text);
+        }
+
+        .landing-tagline {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            max-width: 280px;
+            line-height: 1.6;
+        }
+
+        .landing-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .landing-btn-primary {
+            padding: 11px 28px;
+            background: #fff;
+            color: #0a0a0a;
+            border: none;
+            border-radius: 8px;
+            font-family: var(--font);
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+        }
+        .landing-btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+
+        .landing-btn-secondary {
+            padding: 11px 24px;
+            background: rgba(255,255,255,0.08);
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            font-family: var(--font);
+            font-weight: 500;
+            font-size: 0.88rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex; align-items: center;
+            transition: background 0.15s ease, transform 0.15s ease;
+        }
+        .landing-btn-secondary:hover { background: rgba(255,255,255,0.13); transform: translateY(-1px); }
 
         /* ── Auth Card ── */
         .auth-card {
-            position: relative;
-            z-index: 1;
             width: 100%;
             max-width: 400px;
-            background: var(--card);
+            background: rgba(8, 8, 16, 0.72);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            border: 1px solid var(--border);
+            border: 1px solid rgba(255,255,255,0.07);
             border-radius: 18px;
             padding: 40px 36px;
             margin: 20px;
-            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255,255,255,0.05) inset;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05) inset;
+
+            /* Hidden by default — slides up on open */
+            opacity: 0;
+            transform: translateY(24px);
+            pointer-events: none;
+            display: none;
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        body.form-open .auth-card {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
         }
 
         .auth-logo {
@@ -126,18 +224,14 @@
         }
 
         .auth-logo-mark {
-            width: 34px;
-            height: 34px;
-            background: #ffffff;
+            width: 34px; height: 34px;
+            background: #fff;
             border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             font-family: var(--font-display);
             font-weight: 700;
             font-size: 1rem;
             color: #0a0a0a;
-            flex-shrink: 0;
         }
 
         .auth-logo-name {
@@ -192,20 +286,18 @@
         }
 
         .form-input:focus {
-            border-color: rgba(255, 255, 255, 0.25);
-            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.08);
         }
 
-        .form-input::placeholder {
-            color: rgba(255, 255, 255, 0.18);
-        }
+        .form-input::placeholder { color: rgba(255,255,255,0.18); }
 
         .submit-btn {
             width: 100%;
             padding: 11px;
             margin-top: 8px;
-            background: var(--gradient-btn);
-            color: var(--btn-text);
+            background: linear-gradient(135deg, #fff 0%, #e0e0e0 100%);
+            color: #0a0a0a;
             border: none;
             border-radius: 8px;
             font-family: var(--font);
@@ -213,18 +305,10 @@
             font-size: 0.85rem;
             cursor: pointer;
             transition: opacity 0.15s ease, transform 0.15s ease;
-            letter-spacing: 0.01em;
         }
 
-        .submit-btn:hover:not(:disabled) {
-            opacity: 0.9;
-            transform: translateY(-1px);
-        }
-
-        .submit-btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
+        .submit-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+        .submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .auth-footer {
             text-align: center;
@@ -233,36 +317,27 @@
             color: var(--text-muted);
         }
 
-        .auth-footer a {
-            color: var(--text);
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        .auth-footer a:hover {
-            text-decoration: underline;
-        }
+        .auth-footer a { color: var(--text); text-decoration: none; font-weight: 500; }
+        .auth-footer a:hover { text-decoration: underline; }
 
         .error-box {
             display: none;
             align-items: center;
             gap: 8px;
             padding: 10px 14px;
-            background: rgba(184, 84, 80, 0.1);
-            border: 1px solid rgba(184, 84, 80, 0.3);
+            background: rgba(184,84,80,0.1);
+            border: 1px solid rgba(184,84,80,0.3);
             border-radius: 8px;
             color: #d97370;
             font-size: 0.78rem;
             margin-bottom: 16px;
         }
-
-        .error-box.show {
-            display: flex;
-        }
+        .error-box.show { display: flex; }
     </style>
 </head>
 <body>
 
+<!-- Gradient background -->
 <div id="bg-shader">
     <div class="bg-blob bg-blob-1"></div>
     <div class="bg-blob bg-blob-2"></div>
@@ -270,6 +345,23 @@
     <div class="bg-blob bg-blob-4"></div>
 </div>
 
+<!-- Blur overlay — activates on form open -->
+<div id="bg-blur"></div>
+
+<!-- Landing view -->
+<div id="landing-view">
+    <div class="landing-logo">
+        <div class="landing-logo-mark">A</div>
+        <div class="landing-brand">Video Studio</div>
+    </div>
+    <p class="landing-tagline">Moda videolarınızı yapay zeka ile saniyeler içinde üretin.</p>
+    <div class="landing-actions">
+        <button class="landing-btn-primary" onclick="openLogin()">Giriş Yap</button>
+        <a class="landing-btn-secondary" href="/register">Kayıt Ol</a>
+    </div>
+</div>
+
+<!-- Auth card — hidden until openLogin() -->
 <div class="auth-card">
     <div class="auth-logo">
         <div class="auth-logo-mark">A</div>
@@ -305,6 +397,19 @@
     // Already logged in → redirect
     if (localStorage.getItem('auth_token')) {
         window.location.href = '/';
+    }
+
+    function openLogin() {
+        // Step 1: make card visible in DOM (display:none → block) so transition can fire
+        const card = document.querySelector('.auth-card');
+        card.style.display = 'block';
+        // Step 2: after two rAFs (browser paints once), add class to trigger transitions
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                document.body.classList.add('form-open');
+                document.getElementById('email')?.focus();
+            });
+        });
     }
 
     document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -348,7 +453,6 @@
         }
     });
 </script>
-
 
 </body>
 </html>
