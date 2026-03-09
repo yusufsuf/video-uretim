@@ -97,6 +97,17 @@ class LibraryItem(BaseModel):
     created_at: Optional[str] = None
 
 
+class SuggestShotItem(BaseModel):
+    camera_move: str
+    duration: int
+
+
+class SuggestShotsRequest(BaseModel):
+    location: str = "studio"
+    custom_location: Optional[str] = None
+    shots: List["SuggestShotItem"]
+
+
 class DefileOutfit(BaseModel):
     """Defile koleksiyonundaki tek bir kıyafet."""
     front_url: str

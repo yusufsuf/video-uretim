@@ -21,8 +21,9 @@ import json
 
 from config import settings
 from dependencies import get_current_user
-from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, LocationPreset, ShotConfig
+from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, LocationPreset, ShotConfig, SuggestShotsRequest
 from pipeline import jobs, run_pipeline, run_defile_collection_pipeline, _load_history
+from services.analysis_service import suggest_shot_descriptions
 from routes.auth_router import router as auth_router
 from routes.admin_router import router as admin_router
 from routes.library_router import router as library_router
@@ -276,6 +277,16 @@ async def generate_video_endpoint(
     )
 
     return jobs[job_id]
+
+
+@app.post("/api/suggest-shots")
+async def suggest_shots_endpoint(
+    request: SuggestShotsRequest,
+    _user: dict = Depends(get_current_user),
+):
+    """Return AI-generated cinematic descriptions for each shot."""
+    descriptions = await suggest_shot_descriptions(request)
+    return {"descriptions": descriptions}
 
 
 @app.post("/api/defile/collection", response_model=JobResponse)

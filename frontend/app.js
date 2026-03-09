@@ -838,18 +838,50 @@ wizardModal?.addEventListener("click", (e) => {
     if (e.target === wizardModal) closeWizard();
 });
 
-wizardNextBtn?.addEventListener("click", () => {
+wizardNextBtn?.addEventListener("click", async () => {
     if (videoMode === "defile") {
         startDefileCollection();
         return;
     }
-    if (currentWizardStep < TOTAL_STEPS) {
+    if (currentWizardStep === 1) {
+        await _advanceToStep2WithSuggestions();
+    } else if (currentWizardStep < TOTAL_STEPS) {
         currentWizardStep++;
         showWizardStep(currentWizardStep);
     } else {
         startGeneration();
     }
 });
+
+async function _advanceToStep2WithSuggestions() {
+    wizardNextBtn.disabled = true;
+    wizardNextBtn.textContent = "✦ AI hazırlıyor...";
+
+    try {
+        const payload = {
+            location: "studio",
+            shots: shots.map(s => ({ camera_move: s.camera_move, duration: s.duration })),
+        };
+        const resp = await fetch("/api/suggest-shots", {
+            method: "POST",
+            headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            (data.descriptions || []).forEach((desc, i) => {
+                if (desc && shots[i]) shots[i].description = desc;
+            });
+        }
+    } catch {
+        // Silently continue if suggestions fail
+    }
+
+    wizardNextBtn.disabled = false;
+    wizardNextBtn.textContent = "Devam →";
+    currentWizardStep = 2;
+    showWizardStep(2);
+}
 
 wizardBackBtn?.addEventListener("click", () => {
     if (currentWizardStep > 1 && !generationStarted) {

@@ -10,7 +10,7 @@ from typing import Optional
 from openai import AsyncOpenAI
 
 from config import settings
-from models import DressAnalysisResult, MultiScenePrompt, GenerationRequest, PhotoType
+from models import DressAnalysisResult, MultiScenePrompt, GenerationRequest, PhotoType, SuggestShotsRequest
 
 logger = logging.getLogger(__name__)
 
@@ -340,4 +340,84 @@ async def generate_multi_scene_prompt(
 
     data = json.loads(raw)
     return MultiScenePrompt(**data)
+
+
+# ─── Shot Description Suggestions ──────────────────────────────────
+_CAM_MOVE_MAP = {
+    "orbit":     "360° Orbit / Arc Shot",
+    "dolly_in":  "Dolly In (Push In)",
+    "dolly_out": "Dolly Out (Pull Out)",
+    "pan":       "Pan Left/Right",
+    "tilt_up":   "Tilt Up",
+    "tracking":  "Tracking Shot / Follow Shot",
+    "crane":     "Crane Shot (rising)",
+    "static":    "Handheld / Static",
+}
+
+_LOCATION_MAP = {
+    "studio":      "professional fashion photography studio with clean backdrop and softbox lighting",
+    "beach":       "pristine beach at golden hour with turquoise waves",
+    "city_street": "elegant urban street with architectural backdrop, well-lit",
+    "garden":      "lush garden with flowers and warm natural daylight",
+    "rooftop":     "modern rooftop terrace with city skyline, bright daytime",
+    "runway":      "high-end fashion runway with dramatic stage lighting",
+    "custom":      "custom location",
+}
+
+SUGGEST_SHOTS_SYSTEM = """You are a professional fashion film director. Given a list of camera shots and a location, write a short cinematic prompt for each shot.
+
+Rules:
+- Each description is 15-25 words
+- Focus on: camera movement, model pose/action, garment interaction, lighting
+- All descriptions in English
+- Reference the garment generically (e.g. "the garment", "the outfit")
+- Descriptions should be natural continuations of each other (chained shots)
+- First shot: full-body establishing shot
+- Vary angles and energy across shots
+- Do NOT add extra shots or skip any
+- Respond ONLY with a JSON array of strings, one per shot
+
+Example output for 2 shots:
+["fashion model stands tall, full body reveal, slow dolly in, soft studio lighting", "seamlessly continuing, model turns gracefully, orbit shot captures garment silhouette, warm light"]"""
+
+
+async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
+    """Generate cinematic shot descriptions for the multishot designer."""
+    location_str = (
+        request.custom_location
+        if request.location == "custom" and request.custom_location
+        else _LOCATION_MAP.get(request.location, request.location)
+    )
+
+    shots_text = "\n".join(
+        f"  Shot {i + 1}: {_CAM_MOVE_MAP.get(s.camera_move, s.camera_move)}, {s.duration}s"
+        for i, s in enumerate(request.shots)
+    )
+
+    user_msg = f"Location: {location_str}\n\nShots:\n{shots_text}\n\nWrite a cinematic description for each shot."
+
+    response = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": SUGGEST_SHOTS_SYSTEM},
+            {"role": "user",   "content": user_msg},
+        ],
+        temperature=0.8,
+        max_tokens=600,
+    )
+
+    raw = (response.choices[0].message.content or "").strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+
+    import re
+    match = re.search(r'\[.*\]', raw, re.DOTALL)
+    if match:
+        raw = match.group(0)
+
+    descriptions: list[str] = json.loads(raw)
+    # Ensure we return exactly one description per shot
+    while len(descriptions) < len(request.shots):
+        descriptions.append("")
+    return descriptions[: len(request.shots)]
 
