@@ -614,9 +614,9 @@ async def run_defile_collection_pipeline(
 
                 clip_url = await generate_multishot_video(
                     start_image_url=scene_frame_url,
-                    multi_prompt=[{"duration": "5", "prompt": prompt_text}],
+                    multi_prompt=[{"duration": "3", "prompt": prompt_text}],
                     elements=None,  # outfit already baked into start frame via NB2
-                    duration="5",
+                    duration="3",
                     aspect_ratio=request.aspect_ratio,
                     generate_audio=request.generate_audio,
                 )
