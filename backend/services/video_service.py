@@ -64,10 +64,10 @@ async def generate_multishot_video(
                 all_urls.append(ref)
         if all_urls:
             has_elements = True
-            # kie.ai requires minimum 2 images in element_input_urls
+            # kie.ai requires minimum 2 and maximum 4 images in element_input_urls
             if len(all_urls) == 1:
                 all_urls = all_urls * 2
-            capped_urls = [u for i, u in enumerate(all_urls) if i < 50]
+            capped_urls = [u for i, u in enumerate(all_urls) if i < 4]
             kling_elements.append({
                 "name": "garment",
                 "description": "fashion garment reference images",
@@ -92,7 +92,7 @@ async def generate_multishot_video(
         "duration": str(duration),
         "aspect_ratio": aspect_ratio,
         "mode": "pro",
-        "sound": "on",  # kie.ai requires string "on" when multi_shots is true
+        "sound": True,  # must be True (bool) when multi_shots is True — False is rejected
     }
     if kling_elements:
         input_data["kling_elements"] = kling_elements
