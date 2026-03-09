@@ -255,6 +255,17 @@ async function refineShotDescription(idx) {
     btn.disabled = true;
     btn.textContent = "…";
 
+    // Resolve location context: library bg URL > uploaded refimg (as data URL) > none
+    let locationImageUrl = libraryBgUrl || null;
+    if (!locationImageUrl && refimgFile) {
+        locationImageUrl = await new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(refimgFile);
+        });
+    }
+
     try {
         const resp = await fetch("/api/refine-shot", {
             method: "POST",
@@ -264,6 +275,7 @@ async function refineShotDescription(idx) {
                 duration: shot.duration,
                 user_description: userText || "fashion model walks and poses naturally",
                 location: "studio",
+                location_image_url: locationImageUrl,
             }),
         });
         if (resp.ok) {

@@ -383,11 +383,6 @@ Example output for 2 shots:
 
 async def refine_shot_description(request: RefineShotRequest) -> str:
     """Convert a user's casual description into a cinematic English shot prompt."""
-    location_str = (
-        request.custom_location
-        if request.location == "custom" and request.custom_location
-        else _LOCATION_MAP.get(request.location, request.location)
-    )
     cam_term = _CAM_MOVE_MAP.get(request.camera_move, request.camera_move)
 
     system = (
@@ -395,21 +390,50 @@ async def refine_shot_description(request: RefineShotRequest) -> str:
         "The user describes what they want to happen in a shot in their own words (possibly in Turkish). "
         "Convert it into a precise, cinematic English prompt (15-30 words) suitable for an AI video generator. "
         "Include: the camera movement specified, the action described, garment reference as 'the outfit', and lighting. "
+        "If a location image is provided, derive the setting from that image — do NOT default to studio. "
         "Return ONLY the prompt string, no quotes, no extra text."
     )
-    user_msg = (
-        f"Location: {location_str}\n"
-        f"Camera movement: {cam_term}\n"
-        f"Duration: {request.duration}s\n"
-        f"User description: {request.user_description}\n\n"
-        "Write the cinematic prompt:"
-    )
+
+    if request.location_image_url:
+        # Vision call: infer location from the reference image
+        user_content = [
+            {
+                "type": "text",
+                "text": (
+                    f"Camera movement: {cam_term}\n"
+                    f"Duration: {request.duration}s\n"
+                    f"User description: {request.user_description}\n\n"
+                    "The image below is the location/background reference. "
+                    "Use the setting shown in the image as the environment for this shot.\n"
+                    "Write the cinematic prompt:"
+                ),
+            },
+            {
+                "type": "image_url",
+                "image_url": {"url": request.location_image_url, "detail": "low"},
+            },
+        ]
+        model = "gpt-4o"
+    else:
+        location_str = (
+            request.custom_location
+            if request.location == "custom" and request.custom_location
+            else _LOCATION_MAP.get(request.location, request.location)
+        )
+        user_content = (
+            f"Location: {location_str}\n"
+            f"Camera movement: {cam_term}\n"
+            f"Duration: {request.duration}s\n"
+            f"User description: {request.user_description}\n\n"
+            "Write the cinematic prompt:"
+        )
+        model = "gpt-4o-mini"
 
     response = await client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model,
         messages=[
             {"role": "system", "content": system},
-            {"role": "user",   "content": user_msg},
+            {"role": "user",   "content": user_content},
         ],
         temperature=0.7,
         max_tokens=120,

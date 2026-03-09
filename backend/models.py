@@ -114,6 +114,7 @@ class RefineShotRequest(BaseModel):
     user_description: str
     location: str = "studio"
     custom_location: Optional[str] = None
+    location_image_url: Optional[str] = None  # library bg URL or base64 data URI
 
 
 class DefileOutfit(BaseModel):
