@@ -1,4 +1,4 @@
-"""Video Service – Kling 3.0 Pro Multishot on fal.ai.
+"""Video Service – Kling 3.0 Pro, Sora 2, and Veo 3.1 on fal.ai.
 
 Generates fashion videos with multishot prompts and garment elements.
 """
@@ -78,6 +78,78 @@ async def generate_multishot_video(
         raise RuntimeError("Kling 3.0 Pro returned no video URL")
 
     logger.info("Multishot video completed: %s", video_url[:100])
+    return video_url
+
+
+# ─── Sora 2 image-to-video ────────────────────────────────────────
+
+async def generate_sora2_shot(
+    image_url: str,
+    prompt: str,
+    duration: int = 5,
+    aspect_ratio: str = "9:16",
+) -> str:
+    """Generate a single shot using OpenAI Sora 2 image-to-video (Pro) on fal.ai."""
+    # Sora 2 only accepts: 4, 8, or 12 seconds
+    valid = [4, 8, 12]
+    mapped = min(valid, key=lambda x: abs(x - duration))
+    logger.info("Sora 2 shot – duration %ds→%ds, aspect=%s", duration, mapped, aspect_ratio)
+
+    result = await fal_client.run_async(
+        "fal-ai/sora-2/image-to-video/pro",
+        arguments={
+            "prompt": prompt,
+            "image_url": image_url,
+            "duration": mapped,
+            "aspect_ratio": aspect_ratio,
+            "resolution": "720p",
+        },
+    )
+
+    video_url = result.get("video", {}).get("url", "")
+    if not video_url:
+        logger.error("Sora 2 returned no video URL. Result: %s", result)
+        raise RuntimeError("Sora 2 returned no video URL")
+
+    logger.info("Sora 2 shot completed: %s", video_url[:100])
+    return video_url
+
+
+# ─── Veo 3.1 image-to-video ───────────────────────────────────────
+
+async def generate_veo3_shot(
+    image_url: str,
+    prompt: str,
+    duration: int = 5,
+    aspect_ratio: str = "9:16",
+    generate_audio: bool = True,
+) -> str:
+    """Generate a single shot using Google Veo 3.1 image-to-video on fal.ai."""
+    # Veo 3.1 only accepts: "4s", "6s", or "8s"
+    valid = [4, 6, 8]
+    mapped = min(valid, key=lambda x: abs(x - duration))
+    logger.info("Veo 3.1 shot – duration %ds→%ds, aspect=%s, audio=%s",
+                duration, mapped, aspect_ratio, generate_audio)
+
+    result = await fal_client.run_async(
+        "fal-ai/veo3.1/image-to-video",
+        arguments={
+            "prompt": prompt,
+            "image_url": image_url,
+            "duration": f"{mapped}s",
+            "aspect_ratio": aspect_ratio,
+            "resolution": "720p",
+            "generate_audio": generate_audio,
+            "auto_fix": True,
+        },
+    )
+
+    video_url = result.get("video", {}).get("url", "")
+    if not video_url:
+        logger.error("Veo 3.1 returned no video URL. Result: %s", result)
+        raise RuntimeError("Veo 3.1 returned no video URL")
+
+    logger.info("Veo 3.1 shot completed: %s", video_url[:100])
     return video_url
 
 

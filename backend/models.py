@@ -86,6 +86,7 @@ class GenerationRequest(BaseModel):
     mood: Optional[str] = None
     generate_audio: bool = True
     shots: Optional[List["ShotConfig"]] = None
+    video_model: str = Field(default="kling", description="Video generation model: kling | sora2 | veo3")
 
 
 class LibraryItem(BaseModel):

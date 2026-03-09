@@ -144,6 +144,16 @@ let defileShotsPerOutfit = 1;
 let defileBgUrl = null;
 let defileAspectRatio = "9:16";
 
+// ─── Video Model State ─────────────────────────────────────────────
+let selectedVideoModel = "kling";
+
+function selectVideoModel(model) {
+    selectedVideoModel = model;
+    document.querySelectorAll("#model-selector .model-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.model === model);
+    });
+}
+
 // ─── Location State ─────────────────────────────────────────────────
 let selectedLocation = "studio";
 
@@ -478,6 +488,7 @@ async function refineShotDescription(idx) {
 // Expose to global scope for inline onclick handlers
 window.toggleLocationPicker = toggleLocationPicker;
 window.selectLocation = selectLocation;
+window.selectVideoModel = selectVideoModel;
 window.selectCamMove = selectCamMove;
 window.updateShotDuration = updateShotDuration;
 window.updateShotDesc = updateShotDesc;
@@ -1227,6 +1238,7 @@ async function startGeneration() {
     formData.append("aspect_ratio",  selectedAspectRatio);
     formData.append("generate_audio", audioToggle ? audioToggle.checked : true);
     formData.append("location",      selectedLocation);
+    formData.append("video_model",   selectedVideoModel);
 
     if (watermarkFile) formData.append("watermark_image", watermarkFile);
     if (videoDescInput && videoDescInput.value.trim()) {

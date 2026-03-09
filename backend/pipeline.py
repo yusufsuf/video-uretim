@@ -32,6 +32,8 @@ from services.nano_banana_service import generate_background
 from services.video_service import (
     download_file,
     generate_multishot_video,
+    generate_sora2_shot,
+    generate_veo3_shot,
     extract_last_frame,
     upload_to_fal,
     concatenate_clips,
@@ -108,6 +110,7 @@ async def run_pipeline(
     library_style_url: Optional[str] = None,
     background_extra_urls: Optional[list] = None,
     watermark_path: Optional[str] = None,
+    video_model: str = "kling",
 ):
     """Execute the full pipeline asynchronously."""
     try:
@@ -211,14 +214,30 @@ async def run_pipeline(
             logger.info("[%s] Shot %d/%d: %ds, bg=%s...",
                         job_id, shot_idx + 1, n_shots, shot_duration, bg_preview)
 
-            clip_url = await generate_multishot_video(
-                start_image_url=start_image,
-                multi_prompt=[{"duration": scene.duration, "prompt": scene.prompt}],
-                elements=elements,
-                duration=str(shot_duration),
-                aspect_ratio=aspect_ratio,
-                generate_audio=generate_audio,
-            )
+            if video_model == "sora2":
+                clip_url = await generate_sora2_shot(
+                    image_url=start_image,
+                    prompt=scene.prompt,
+                    duration=shot_duration,
+                    aspect_ratio=aspect_ratio,
+                )
+            elif video_model == "veo3":
+                clip_url = await generate_veo3_shot(
+                    image_url=start_image,
+                    prompt=scene.prompt,
+                    duration=shot_duration,
+                    aspect_ratio=aspect_ratio,
+                    generate_audio=generate_audio,
+                )
+            else:  # kling (default)
+                clip_url = await generate_multishot_video(
+                    start_image_url=start_image,
+                    multi_prompt=[{"duration": scene.duration, "prompt": scene.prompt}],
+                    elements=elements,
+                    duration=str(shot_duration),
+                    aspect_ratio=aspect_ratio,
+                    generate_audio=generate_audio,
+                )
 
             clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
             clip_paths.append(clip_path)
