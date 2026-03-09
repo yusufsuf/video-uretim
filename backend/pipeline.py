@@ -44,6 +44,31 @@ logger = logging.getLogger(__name__)
 jobs: dict[str, JobResponse] = {}
 
 
+async def _to_fal_url(url: str) -> str:
+    """Ensure a URL is reachable from fal.ai by re-uploading to fal.ai CDN if needed.
+
+    NB2 Edit (and some other fal.ai models) cannot access Supabase storage or
+    local-server URLs. This helper downloads the file and re-uploads it so
+    fal.ai can fetch it reliably.
+    """
+    # Already on fal.ai CDN — skip
+    if any(s in url for s in ("fal.media", "fal.run", "v3.fal.media", "storage.googleapis.com/isolate")):
+        return url
+    clean_url = url.split("?")[0]  # strip trailing ?. artefacts from Supabase SDK
+    try:
+        local = await download_file(clean_url, settings.TEMP_DIR, extension=".jpg")
+        fal_url = await upload_to_fal(local)
+        try:
+            os.remove(local)
+        except Exception:
+            pass
+        logger.info("Re-uploaded to fal.ai CDN: %s → %s", clean_url[:60], fal_url[:60])
+        return fal_url
+    except Exception as e:
+        logger.warning("Could not re-upload %s to fal.ai CDN (%s) — using original", clean_url[:60], e)
+        return url
+
+
 @lru_cache(maxsize=1)
 def _get_supabase() -> Client:
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
@@ -190,7 +215,14 @@ async def run_pipeline(
                     job_id, len(bg_pool), "cycle" if multi_bg else "chain")
 
         # Garment reference URLs for NB2 scene composition
+        # NB2 Edit cannot access Supabase / local-server URLs — re-upload to fal.ai CDN
         garment_ref_urls = [front_url] + ([side_url] if side_url else []) + ([back_url] if back_url else [])
+
+        _update_job(job_id, progress=52, message="Görseller hazırlanıyor...")
+        fal_garment_refs: list = []
+        for gurl in garment_ref_urls:
+            fal_garment_refs.append(await _to_fal_url(gurl))
+        logger.info("[%s] Garment refs on fal.ai CDN: %d", job_id, len(fal_garment_refs))
 
         # ── Per-shot execution: NB2 compose + Kling animate ──────
         all_scenes = scene_prompt.scenes
@@ -228,7 +260,7 @@ async def run_pipeline(
             )
 
             scene_frame_url = await generate_scene_frame(
-                image_urls=[start_image] + garment_ref_urls,
+                image_urls=[start_image] + fal_garment_refs,
                 prompt=nb2_prompt,
                 aspect_ratio=aspect_ratio,
             )
