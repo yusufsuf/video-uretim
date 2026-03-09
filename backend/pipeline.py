@@ -192,6 +192,9 @@ async def run_pipeline(
         logger.info("[%s] Background pool: %d image(s), mode=%s",
                     job_id, len(bg_pool), "cycle" if multi_bg else "chain")
 
+        # Build reference URL list for Veo 3.1 reference-to-video
+        veo3_image_urls = [front_url] + ([side_url] if side_url else []) + ([back_url] if back_url else [])
+
         # ── Per-shot execution: one Kling call per scene ─────────
         all_scenes = scene_prompt.scenes
         n_shots = len(all_scenes)
@@ -223,9 +226,8 @@ async def run_pipeline(
                 )
             elif video_model == "veo3":
                 clip_url = await generate_veo3_shot(
-                    image_url=start_image,
+                    image_urls=veo3_image_urls,
                     prompt=scene.prompt,
-                    duration=shot_duration,
                     aspect_ratio=aspect_ratio,
                     generate_audio=generate_audio,
                 )

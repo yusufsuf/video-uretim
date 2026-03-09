@@ -115,28 +115,28 @@ async def generate_sora2_shot(
     return video_url
 
 
-# ─── Veo 3.1 image-to-video ───────────────────────────────────────
+# ─── Veo 3.1 reference-to-video ──────────────────────────────────
 
 async def generate_veo3_shot(
-    image_url: str,
+    image_urls: List[str],
     prompt: str,
-    duration: int = 5,
     aspect_ratio: str = "9:16",
     generate_audio: bool = True,
 ) -> str:
-    """Generate a single shot using Google Veo 3.1 image-to-video on fal.ai."""
-    # Veo 3.1 only accepts: "4s", "6s", or "8s"
-    valid = [4, 6, 8]
-    mapped = min(valid, key=lambda x: abs(x - duration))
-    logger.info("Veo 3.1 shot – duration %ds→%ds, aspect=%s, audio=%s",
-                duration, mapped, aspect_ratio, generate_audio)
+    """Generate a single shot using Google Veo 3.1 reference-to-video on fal.ai.
+
+    Uses multiple garment reference images (front/side/back) for consistent
+    subject appearance — analogous to Kling's elements system.
+    Duration is fixed at 8s by the API.
+    """
+    logger.info("Veo 3.1 reference shot – refs=%d, aspect=%s, audio=%s",
+                len(image_urls), aspect_ratio, generate_audio)
 
     result = await fal_client.run_async(
-        "fal-ai/veo3.1/image-to-video",
+        "fal-ai/veo3.1/reference-to-video",
         arguments={
             "prompt": prompt,
-            "image_url": image_url,
-            "duration": f"{mapped}s",
+            "image_urls": image_urls,
             "aspect_ratio": aspect_ratio,
             "resolution": "720p",
             "generate_audio": generate_audio,
