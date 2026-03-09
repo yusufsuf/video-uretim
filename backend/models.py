@@ -97,6 +97,23 @@ class LibraryItem(BaseModel):
     created_at: Optional[str] = None
 
 
+class DefileOutfit(BaseModel):
+    """Defile koleksiyonundaki tek bir kıyafet."""
+    front_url: str
+    side_url: Optional[str] = None
+    back_url: Optional[str] = None
+    name: Optional[str] = None
+
+
+class DefileCollectionRequest(BaseModel):
+    """Defile koleksiyon video üretim talebi."""
+    outfits: List[DefileOutfit]           # 2–12 kıyafet
+    runway_background_url: Optional[str] = None
+    shots_per_outfit: int = 1             # Her kıyafet için Kling çağrısı sayısı (1–3)
+    aspect_ratio: str = "9:16"
+    generate_audio: bool = True
+
+
 class JobStatus(str, Enum):
     PENDING = "pending"
     ANALYZING = "analyzing"

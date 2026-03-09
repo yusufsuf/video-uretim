@@ -19,6 +19,8 @@ from typing import Optional
 from supabase import create_client, Client
 from config import settings
 from models import (
+    DefileCollectionRequest,
+    DefileOutfit,
     DressAnalysisResult,
     GenerationRequest,
     JobResponse,
@@ -300,6 +302,148 @@ async def run_pipeline(
 
     except Exception as exc:
         logger.exception("[%s] Pipeline failed", job_id)
+        _update_job(
+            job_id,
+            status=JobStatus.FAILED,
+            message=f"Hata: {exc}",
+        )
+
+
+# ── Fixed runway prompts for defile collection mode ──────────────────────────
+DEFILE_PROMPTS = [
+    "fashion model walks confidently down runway toward camera, full body shot, smooth tracking shot",
+    "camera pans up from shoes to face as model walks forward, elegant slow motion, editorial fashion",
+    "model turns at end of runway, dramatic pause, side profile, architectural background",
+    "wide establishing shot of runway, model walks from far end toward camera, cinematic",
+    "close-up on outfit fabric and details as model walks, shallow depth of field, fashion editorial",
+]
+
+
+async def run_defile_collection_pipeline(
+    job_id: str,
+    request: DefileCollectionRequest,
+):
+    """Execute the defile collection pipeline — one Kling call per outfit shot, concatenated."""
+    try:
+        n_outfits = len(request.outfits)
+        shots_per = max(1, min(3, request.shots_per_outfit))
+        total_shots = n_outfits * shots_per
+
+        # ── Step 1: Generate/fetch runway background ──────────────────────
+        _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=5,
+                    message="Pist arka planı hazırlanıyor...")
+
+        if request.runway_background_url:
+            background_url = request.runway_background_url
+            logger.info("[%s] Defile: using provided background %s", job_id, background_url[:80])
+        else:
+            logger.info("[%s] Defile: generating runway background via Nano Banana", job_id)
+            background_url = await generate_background(
+                prompt="high-end fashion runway, empty catwalk, dramatic stage lighting, luxury fashion show venue, no people, architectural interior",
+                aspect_ratio=request.aspect_ratio,
+            )
+            logger.info("[%s] Defile: background generated %s", job_id, background_url[:80])
+
+        _update_job(job_id, progress=15, message="Arka plan hazır. Defile başlıyor...")
+
+        # ── Step 2: Per-outfit Kling calls ────────────────────────────────
+        clip_paths: list = []
+        current_start_image: str = background_url
+
+        for outfit_idx, outfit in enumerate(request.outfits):
+            outfit_name = outfit.name or f"Kıyafet {outfit_idx + 1}"
+
+            element: dict = {
+                "frontal_image_url": outfit.front_url,
+                "reference_image_urls": [],
+            }
+            if outfit.side_url:
+                element["reference_image_urls"].append(outfit.side_url)
+            if outfit.back_url:
+                element["reference_image_urls"].append(outfit.back_url)
+
+            for shot_idx in range(shots_per):
+                global_shot = outfit_idx * shots_per + shot_idx
+                shot_progress = 15 + int((global_shot / total_shots) * 70)
+                shot_msg = f"{outfit_name} — sahne {shot_idx + 1}/{shots_per} üretiliyor..."
+                _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
+                            progress=shot_progress, message=shot_msg)
+
+                prompt_text = DEFILE_PROMPTS[global_shot % len(DEFILE_PROMPTS)]
+                logger.info("[%s] Defile shot %d/%d: outfit=%s, prompt=%s",
+                            job_id, global_shot + 1, total_shots, outfit_name, prompt_text[:60])
+
+                clip_url = await generate_multishot_video(
+                    start_image_url=current_start_image,
+                    multi_prompt=[{"duration": "5", "prompt": prompt_text}],
+                    elements=[element],
+                    duration="5",
+                    aspect_ratio=request.aspect_ratio,
+                    generate_audio=request.generate_audio,
+                )
+
+                clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
+                clip_paths.append(clip_path)
+                logger.info("[%s] Defile shot %d downloaded: %s", job_id, global_shot + 1, clip_path)
+
+                # Chain from last frame for smooth transitions within same outfit
+                if shot_idx < shots_per - 1 or outfit_idx < n_outfits - 1:
+                    last_frame_path = extract_last_frame(clip_path, settings.TEMP_DIR)
+                    current_start_image = await upload_to_fal(last_frame_path)
+                    try:
+                        os.remove(last_frame_path)
+                    except Exception:
+                        pass
+
+            # Reset start image to background for each new outfit (fresh entrance)
+            current_start_image = background_url
+
+        # ── Step 3: Concatenate all clips ─────────────────────────────────
+        _update_job(job_id, progress=87, message=f"{total_shots} sahne birleştiriliyor...")
+
+        final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
+        if len(clip_paths) > 1:
+            concatenate_clips(clip_paths, final_path)
+            for p in clip_paths:
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+        else:
+            shutil.move(clip_paths[0], final_path)
+
+        logger.info("[%s] Defile final video: %s", job_id, final_path)
+
+        # ── Step 4: Upload to Supabase ────────────────────────────────────
+        result_url = None
+        try:
+            _update_job(job_id, progress=96, message="Video yükleniyor...")
+            db = _get_supabase()
+            filename = os.path.basename(final_path)
+            with open(final_path, "rb") as f:
+                db.storage.from_("videos").upload(
+                    path=filename,
+                    file=f.read(),
+                    file_options={"content-type": "video/mp4"},
+                )
+            result_url = db.storage.from_("videos").get_public_url(filename)
+            logger.info("[%s] Defile uploaded: %s", job_id, result_url)
+        except Exception as upload_err:
+            logger.warning("[%s] Supabase upload failed: %s", job_id, upload_err)
+            relative = final_path.replace("\\", "/")
+            result_url = f"/outputs/{relative.split('/outputs/')[-1]}"
+
+        _update_job(
+            job_id,
+            status=JobStatus.COMPLETED,
+            progress=100,
+            message=f"Defile videosu hazır! {n_outfits} kıyafet, {total_shots} sahne.",
+            result_url=result_url,
+        )
+        logger.info("[%s] Defile pipeline completed", job_id)
+
+    except Exception as exc:
+        logger.exception("[%s] Defile pipeline failed", job_id)
         _update_job(
             job_id,
             status=JobStatus.FAILED,

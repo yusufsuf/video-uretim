@@ -137,6 +137,13 @@ let libraryBgUrl       = null;
 let libraryBgExtraUrls = [];   // extra background images for per-shot cycling
 let libraryStyleUrl    = null;
 
+// ─── Defile State ────────────────────────────────────────────────
+let videoMode = "video";          // "video" | "defile"
+let defileOutfits = [];           // [{front_url, side_url, back_url, name}]
+let defileShotsPerOutfit = 1;
+let defileBgUrl = null;
+let defileAspectRatio = "9:16";
+
 // ─── Multishot State ────────────────────────────────────────────────
 let shots = [
     { camera_move: "dolly_in", duration: 5, description: "" },
@@ -251,6 +258,13 @@ document.getElementById("add-shot-btn")?.addEventListener("click", addShot);
 
 // ─── Wizard Management ──────────────────────────────────────────────
 function openWizard() {
+    videoMode = "video";
+    const titleEl = document.getElementById("wizard-title");
+    if (titleEl) titleEl.textContent = "Yeni Video Üret";
+    // Hide defile step if it was showing
+    const defileStep = document.getElementById("step-defile");
+    if (defileStep) defileStep.style.display = "none";
+
     if (!generationStarted) {
         currentWizardStep = 1;
         showWizardStep(1);
@@ -270,6 +284,7 @@ function closeWizard() {
         pollInterval = null;
         generationStarted = false;
     }
+    videoMode = "video";
     wizardModal.style.display = "none";
     document.body.style.overflow = "";
 }
@@ -407,6 +422,18 @@ function selectLibraryItem(itemJson) {
     const item = JSON.parse(itemJson);
     const target = _libPickerTarget;
 
+    if (target === "defile-bg") {
+        defileBgUrl = item.image_url;
+        const preview = document.getElementById("defile-bg-preview");
+        const img = document.getElementById("defile-bg-img");
+        const name = document.getElementById("defile-bg-name");
+        if (preview) preview.style.display = "block";
+        if (img) img.src = item.image_url;
+        if (name) name.textContent = item.name;
+        closeLibraryPicker();
+        return;
+    }
+
     if (target === "front") {
         // Clear any uploaded file and use library URL
         libraryFrontUrl = item.image_url;
@@ -509,17 +536,313 @@ window.clearLibrarySide  = clearLibrarySide;
 window.clearLibraryBack  = clearLibraryBack;
 window.clearLibraryBg    = clearLibraryBg;
 
+// ─── Defile Mode ─────────────────────────────────────────────────
+function openDefile() {
+    videoMode = "defile";
+    defileOutfits = [];
+    defileShotsPerOutfit = 1;
+    defileBgUrl = null;
+    defileAspectRatio = "9:16";
+
+    const titleEl = document.getElementById("wizard-title");
+    if (titleEl) titleEl.textContent = "Defile Modu";
+
+    const stepLabel = document.getElementById("wizard-step-label");
+    if (stepLabel) stepLabel.textContent = "";
+
+    // Hide normal steps, show defile step
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
+        const el = document.getElementById(`step-${i}`);
+        if (el) el.style.display = "none";
+    }
+    document.getElementById("step-defile").style.display = "block";
+
+    // Update footer
+    const footer = document.getElementById("wizard-footer");
+    const backBtn = document.getElementById("wizard-back-btn");
+    const nextBtn = document.getElementById("wizard-next-btn");
+    if (backBtn) backBtn.style.display = "none";
+    if (nextBtn) {
+        nextBtn.textContent = "Defile Üret";
+        nextBtn.disabled = true;
+    }
+    if (footer) footer.style.display = "flex";
+
+    // Reset dot indicators
+    document.querySelectorAll("#step-dots .dot").forEach((d, i) => {
+        d.classList.toggle("active", i === 0);
+    });
+
+    // Render initial defile grid
+    renderDefileGrid();
+
+    wizardModal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+}
+
+function renderDefileGrid() {
+    const grid = document.getElementById("defile-collection-grid");
+    const emptyMsg = document.getElementById("defile-empty-msg");
+    const countEl = document.getElementById("defile-outfit-count");
+    if (!grid) return;
+
+    if (countEl) countEl.textContent = `${defileOutfits.length} kıyafet seçildi`;
+
+    if (defileOutfits.length === 0) {
+        if (!emptyMsg) {
+            grid.innerHTML = `<div class="defile-collection-empty" id="defile-empty-msg">Henüz kıyafet eklenmedi. Kütüphaneden seçin.</div>`;
+        }
+        document.getElementById("wizard-next-btn").disabled = true;
+        return;
+    }
+
+    grid.innerHTML = defileOutfits.map((outfit, idx) => `
+        <div class="defile-outfit-card">
+            <img src="${outfit.front_url}" alt="${outfit.name || `Kıyafet ${idx + 1}`}">
+            <div class="defile-outfit-card-overlay">
+                <span>${outfit.name || `Kıyafet ${idx + 1}`}</span>
+                <button class="defile-outfit-remove" onclick="removeDefileOutfit(${idx})">✕</button>
+            </div>
+        </div>
+    `).join("");
+
+    document.getElementById("wizard-next-btn").disabled = defileOutfits.length < 1;
+}
+
+function removeDefileOutfit(idx) {
+    defileOutfits.splice(idx, 1);
+    renderDefileGrid();
+}
+
+function updateDefileShots(val) {
+    defileShotsPerOutfit = parseInt(val);
+    const label = document.getElementById("defile-shots-label");
+    if (label) label.textContent = `${val} sahne`;
+}
+
+function clearDefileBg() {
+    defileBgUrl = null;
+    const preview = document.getElementById("defile-bg-preview");
+    if (preview) preview.style.display = "none";
+}
+
+// Defile library picker — multi-select outfit
+let _defilePickerMode = false;
+
+function openDefileOutfitPicker() {
+    _defilePickerMode = true;
+    _libPickerTarget = "defile-outfit";
+    _libPickerActiveTab = "character";
+
+    const modal   = document.getElementById("lib-picker-modal");
+    const title   = document.getElementById("lib-picker-title");
+    const tabs    = document.getElementById("lib-picker-tabs");
+    const grid    = document.getElementById("lib-picker-grid");
+    const closeBtn = document.getElementById("lib-picker-close");
+
+    title.textContent = "Kıyafet Seç";
+    tabs.innerHTML = `<button class="lib-picker-tab active" data-cat="character">Elbiseler</button>`;
+    tabs.querySelectorAll(".lib-picker-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+            tabs.querySelectorAll(".lib-picker-tab").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            _libPickerActiveTab = btn.dataset.cat;
+            _fetchAndRenderLibrary(_libPickerActiveTab, grid);
+        });
+    });
+
+    modal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+    closeBtn.onclick = () => {
+        _defilePickerMode = false;
+        closeLibraryPicker();
+    };
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            _defilePickerMode = false;
+            closeLibraryPicker();
+        }
+    };
+
+    _fetchAndRenderDefileOutfitLibrary(grid);
+}
+
+async function _fetchAndRenderDefileOutfitLibrary(grid) {
+    grid.innerHTML = `<div class="lib-picker-loading">Yükleniyor...</div>`;
+    try {
+        const resp = await fetch("/library/items?category=character", { headers: getAuthHeaders() });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const items = await resp.json();
+        if (!items.length) {
+            grid.innerHTML = `<div class="lib-picker-empty">Kütüphanede elbise yok.<br><a href="/library" target="_blank">Kütüphaneye git →</a></div>`;
+            return;
+        }
+
+        grid.innerHTML = items.map(item => {
+            const alreadyAdded = defileOutfits.some(o => o.front_url === item.image_url);
+            const extras = item.extra_urls || [];
+            const badge = extras.length > 0 ? `<div class="lib-picker-extras-badge">+${extras.length}</div>` : "";
+            const selectedClass = alreadyAdded ? " defile-picker-selected" : "";
+            return `
+                <div class="lib-picker-item${selectedClass}" data-id="${item.id}">
+                    <img src="${item.image_url}" alt="${item.name}" loading="lazy">
+                    <div class="lib-picker-item-name">${item.name}</div>
+                    ${badge}
+                    ${alreadyAdded ? `<div class="defile-picker-check">✓</div>` : ""}
+                </div>`;
+        }).join("");
+
+        const itemMap = Object.fromEntries(items.map(it => [it.id, it]));
+        grid.querySelectorAll(".lib-picker-item").forEach(el => {
+            el.addEventListener("click", () => {
+                const item = itemMap[el.dataset.id];
+                if (!item) return;
+                const already = defileOutfits.findIndex(o => o.front_url === item.image_url);
+                if (already >= 0) {
+                    // Deselect
+                    defileOutfits.splice(already, 1);
+                    el.classList.remove("defile-picker-selected");
+                    el.querySelector(".defile-picker-check")?.remove();
+                } else {
+                    // Add
+                    const extras = item.extra_urls || [];
+                    defileOutfits.push({
+                        front_url: item.image_url,
+                        side_url: extras[0] || null,
+                        back_url: extras[1] || null,
+                        name: item.name,
+                    });
+                    el.classList.add("defile-picker-selected");
+                    const check = document.createElement("div");
+                    check.className = "defile-picker-check";
+                    check.textContent = "✓";
+                    el.appendChild(check);
+                }
+                const countEl = document.getElementById("defile-outfit-count");
+                if (countEl) countEl.textContent = `${defileOutfits.length} kıyafet seçildi`;
+            });
+        });
+
+        // "Done" footer button
+        const footer = grid.closest(".lib-picker")?.querySelector(".lib-picker-footer");
+        if (footer) {
+            footer.innerHTML = `
+                <a href="/library" target="_blank" style="font-size:0.72rem;color:var(--text-secondary)">Kütüphaneyi Yönet →</a>
+                <button class="wizard-btn-primary" style="font-size:0.78rem;padding:7px 18px" onclick="confirmDefileOutfits()">Tamam (${defileOutfits.length})</button>
+            `;
+        }
+    } catch (err) {
+        grid.innerHTML = `<div class="lib-picker-empty">Yüklenemedi: ${err.message}</div>`;
+    }
+}
+
+function confirmDefileOutfits() {
+    _defilePickerMode = false;
+    closeLibraryPicker();
+    renderDefileGrid();
+    // Restore footer
+    const footer = document.getElementById("lib-picker-modal")?.querySelector(".lib-picker-footer");
+    if (footer) {
+        footer.innerHTML = `<a href="/library" target="_blank" style="font-size:0.72rem;color:var(--text-secondary)">Kütüphaneyi Yönet →</a>`;
+    }
+}
+
+function openDefileBgPicker() {
+    _libPickerTarget = "defile-bg";
+    _libPickerActiveTab = "background";
+
+    const modal   = document.getElementById("lib-picker-modal");
+    const title   = document.getElementById("lib-picker-title");
+    const tabs    = document.getElementById("lib-picker-tabs");
+    const grid    = document.getElementById("lib-picker-grid");
+    const closeBtn = document.getElementById("lib-picker-close");
+
+    title.textContent = "Pist Arka Planı Seç";
+    tabs.innerHTML = `<button class="lib-picker-tab active" data-cat="background">Arka Planlar</button>`;
+
+    modal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+    closeBtn.onclick = () => closeLibraryPicker();
+    modal.onclick = (e) => { if (e.target === modal) closeLibraryPicker(); };
+
+    _fetchAndRenderLibrary("background", grid);
+}
+
+// Defile ratio cards
+document.querySelectorAll("#defile-ratio-cards .ratio-card").forEach(card => {
+    card.addEventListener("click", () => {
+        document.querySelectorAll("#defile-ratio-cards .ratio-card").forEach(c => c.classList.remove("active"));
+        card.classList.add("active");
+        defileAspectRatio = card.dataset.ratio;
+    });
+});
+
+async function startDefileCollection() {
+    hideError();
+    resultSec.classList.remove("active");
+    progressSec.classList.add("active");
+    generationStarted = true;
+    wizardFooter.style.display = "none";
+    step4Title.textContent = "Defile Üretiliyor...";
+    step4Sub.textContent = `${defileOutfits.length} kıyafet, sahne başına ${defileShotsPerOutfit} çekim. Lütfen bekleyin.`;
+    resetSteps();
+    updateProgress(0, "Defile başlatılıyor...");
+
+    // Show step-3 (progress/result step)
+    document.getElementById("step-defile").style.display = "none";
+    document.getElementById("step-3").style.display = "block";
+
+    const payload = {
+        outfits: defileOutfits,
+        runway_background_url: defileBgUrl || null,
+        shots_per_outfit: defileShotsPerOutfit,
+        aspect_ratio: defileAspectRatio,
+        generate_audio: document.getElementById("defile-audio-toggle")?.checked ?? true,
+    };
+
+    try {
+        const resp = await fetch(`${API_BASE}/api/defile/collection`, {
+            method: "POST",
+            headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const job = await resp.json();
+        currentJobId = job.job_id;
+        startPolling();
+    } catch (err) {
+        showError(`Bağlantı hatası: ${err.message}`);
+        generationStarted = false;
+        wizardFooter.style.display = "flex";
+        document.getElementById("wizard-next-btn").textContent = "Tekrar Dene";
+        document.getElementById("wizard-next-btn").disabled = false;
+    }
+}
+
+window.removeDefileOutfit = removeDefileOutfit;
+window.updateDefileShots  = updateDefileShots;
+window.clearDefileBg      = clearDefileBg;
+window.confirmDefileOutfits = confirmDefileOutfits;
+
 // ─── Wizard Events ──────────────────────────────────────────────────
 document.getElementById("open-wizard-btn")?.addEventListener("click", openWizard);
 document.getElementById("nav-new-video")?.addEventListener("click", openWizard);
 document.getElementById("card-single-video")?.addEventListener("click", openWizard);
+document.getElementById("nav-defile")?.addEventListener("click", openDefile);
+document.getElementById("card-defile")?.addEventListener("click", openDefile);
 document.getElementById("wizard-close")?.addEventListener("click", closeWizard);
+document.getElementById("defile-add-outfit-btn")?.addEventListener("click", openDefileOutfitPicker);
+document.getElementById("defile-bg-btn")?.addEventListener("click", openDefileBgPicker);
 
 wizardModal?.addEventListener("click", (e) => {
     if (e.target === wizardModal) closeWizard();
 });
 
 wizardNextBtn?.addEventListener("click", () => {
+    if (videoMode === "defile") {
+        startDefileCollection();
+        return;
+    }
     if (currentWizardStep < TOTAL_STEPS) {
         currentWizardStep++;
         showWizardStep(currentWizardStep);
@@ -831,6 +1154,11 @@ newBtn?.addEventListener("click", () => {
         { camera_move: "dolly_in", duration: 5, description: "" },
         { camera_move: "orbit",    duration: 5, description: "" },
     ];
+    // Reset defile state
+    videoMode = "video";
+    defileOutfits = [];
+    defileShotsPerOutfit = 1;
+    defileBgUrl = null;
     step4Title.textContent = "Video Üretmeye Hazır";
     step4Sub.textContent = "Ayarlarınız kaydedildi. Üretimi başlatın.";
     currentWizardStep = 1;

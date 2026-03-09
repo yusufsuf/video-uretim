@@ -21,8 +21,8 @@ import json
 
 from config import settings
 from dependencies import get_current_user
-from models import GenerationRequest, JobResponse, JobStatus, LocationPreset, ShotConfig
-from pipeline import jobs, run_pipeline, _load_history
+from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, LocationPreset, ShotConfig
+from pipeline import jobs, run_pipeline, run_defile_collection_pipeline, _load_history
 from routes.auth_router import router as auth_router
 from routes.admin_router import router as admin_router
 from routes.library_router import router as library_router
@@ -278,6 +278,27 @@ async def generate_video_endpoint(
     return jobs[job_id]
 
 
+@app.post("/api/defile/collection", response_model=JobResponse)
+async def defile_collection_endpoint(
+    request: DefileCollectionRequest,
+    _user: dict = Depends(get_current_user),
+):
+    """Start a defile collection video generation job."""
+    if not request.outfits:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="En az bir kıyafet gereklidir.")
+
+    job_id = uuid.uuid4().hex[:12]
+    jobs[job_id] = JobResponse(
+        job_id=job_id,
+        status=JobStatus.PENDING,
+        message="Defile kuyruğa alındı.",
+    )
+
+    asyncio.create_task(run_defile_collection_pipeline(job_id=job_id, request=request))
+    return jobs[job_id]
+
+
 @app.get("/api/status/{job_id}", response_model=JobResponse)
 async def get_job_status(job_id: str, _user: dict = Depends(get_current_user)):
     """Poll the status of a generation job."""
@@ -305,6 +326,11 @@ async def gallery_page():
 @app.get("/library")
 async def library_page():
     return FileResponse(os.path.join(_get_frontend_dir(), "library.html"), media_type="text/html")
+
+
+@app.get("/defile")
+async def defile_page():
+    return FileResponse(os.path.join(_get_frontend_dir(), "index.html"), media_type="text/html")
 
 
 @app.get("/login")
