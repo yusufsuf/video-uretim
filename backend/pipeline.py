@@ -251,19 +251,25 @@ async def run_pipeline(
             fal_garment_refs.append(await _to_fal_url(gurl))
         logger.info("[%s] Garment refs on fal.ai CDN: %d", job_id, len(fal_garment_refs))
 
+        # Background URLs also need fal.ai CDN upload — NB2 Edit cannot access Supabase URLs
+        fal_bg_pool: list = []
+        for bg_url in bg_pool:
+            fal_bg_pool.append(await _to_fal_url(bg_url))
+        logger.info("[%s] Background pool on fal.ai CDN: %d", job_id, len(fal_bg_pool))
+
         # ── Per-shot execution: NB2 compose + Kling animate ──────
         all_scenes = scene_prompt.scenes
         n_shots = len(all_scenes)
         logger.info("[%s] %d scene(s) — NB2 compose + Kling per shot", job_id, n_shots)
 
         clip_paths = []
-        current_start_image = bg_pool[0]
+        current_start_image = fal_bg_pool[0]
 
         for shot_idx, scene in enumerate(all_scenes):
             base_progress = 55 + int((shot_idx / n_shots) * 28)
 
             # Choose start image: cycle pool (multi-bg) or chain from previous clip
-            start_image = bg_pool[shot_idx % len(bg_pool)] if multi_bg else current_start_image
+            start_image = fal_bg_pool[shot_idx % len(fal_bg_pool)] if multi_bg else current_start_image
             shot_duration = int(scene.duration)
 
             logger.info("[%s] Shot %d/%d: %ds", job_id, shot_idx + 1, n_shots, shot_duration)
