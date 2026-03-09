@@ -146,8 +146,8 @@ let defileAspectRatio = "9:16";
 
 // ─── Multishot State ────────────────────────────────────────────────
 let shots = [
-    { camera_move: "dolly_in", duration: 5, description: "" },
-    { camera_move: "orbit",    duration: 5, description: "" },
+    { camera_move: "dolly_in", duration: 5, description: "", camera_angle: "eye_level", shot_size: "wide" },
+    { camera_move: "orbit",    duration: 5, description: "", camera_angle: "eye_level", shot_size: "medium" },
 ];
 let selectedAspectRatio = "9:16";
 
@@ -160,6 +160,23 @@ const CAM_MOVES = [
     { value: "tracking",  label: "Tracking",  animClass: "cam-anim-tracking" },
     { value: "crane",     label: "Crane",     animClass: "cam-anim-crane" },
     { value: "static",    label: "Static",    animClass: "cam-anim-static" },
+];
+
+const CAMERA_ANGLES = [
+    { value: "eye_level",  label: "Eye Level" },
+    { value: "low_angle",  label: "Low Angle" },
+    { value: "high_angle", label: "High Angle" },
+    { value: "profile",    label: "Profile" },
+    { value: "rear",       label: "Rear Shot" },
+    { value: "dutch",      label: "Dutch Angle" },
+];
+
+const SHOT_SIZES = [
+    { value: "wide",             label: "Wide" },
+    { value: "medium_wide",      label: "Med. Wide" },
+    { value: "medium",           label: "Medium" },
+    { value: "close_up",         label: "Close-Up" },
+    { value: "extreme_close_up", label: "Extreme CU" },
 ];
 
 const CAM_PAGE = 4;
@@ -210,6 +227,20 @@ function renderShots() {
                 <button class="cam-nav-btn" id="cam-next-${idx}"
                         onclick="shiftCamPage(${idx},1)"
                         ${offset >= CAM_MAX_OFFSET ? "disabled" : ""}>›</button>
+            </div>
+            <div class="shot-params-row">
+                <div class="shot-param">
+                    <span class="shot-param-label">Açı</span>
+                    <select class="shot-select" onchange="updateShotAngle(${idx}, this.value)">
+                        ${CAMERA_ANGLES.map(a => `<option value="${a.value}"${shot.camera_angle === a.value ? " selected" : ""}>${a.label}</option>`).join("")}
+                    </select>
+                </div>
+                <div class="shot-param">
+                    <span class="shot-param-label">Çekim Boyu</span>
+                    <select class="shot-select" onchange="updateShotSize(${idx}, this.value)">
+                        ${SHOT_SIZES.map(s => `<option value="${s.value}"${shot.shot_size === s.value ? " selected" : ""}>${s.label}</option>`).join("")}
+                    </select>
+                </div>
             </div>
             <div class="shot-dur-row">
                 <div class="shot-dur-labels">
@@ -277,9 +308,17 @@ function updateShotDesc(idx, val) {
     shots[idx].description = val;
 }
 
+function updateShotAngle(idx, val) {
+    shots[idx].camera_angle = val;
+}
+
+function updateShotSize(idx, val) {
+    shots[idx].shot_size = val;
+}
+
 function addShot() {
     const defaults = ["dolly_in", "dolly_out", "orbit", "pan", "tilt_up", "tracking", "crane", "static"];
-    shots.push({ camera_move: defaults[shots.length % defaults.length], duration: 5, description: "" });
+    shots.push({ camera_move: defaults[shots.length % defaults.length], duration: 5, description: "", camera_angle: "eye_level", shot_size: "wide" });
     renderShots();
 }
 
@@ -317,6 +356,8 @@ async function refineShotDescription(idx) {
             headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
             body: JSON.stringify({
                 camera_move: shot.camera_move,
+                camera_angle: shot.camera_angle || "eye_level",
+                shot_size: shot.shot_size || "wide",
                 duration: shot.duration,
                 user_description: userText || "fashion model walks and poses naturally",
                 location: "studio",
@@ -340,6 +381,8 @@ async function refineShotDescription(idx) {
 window.selectCamMove = selectCamMove;
 window.updateShotDuration = updateShotDuration;
 window.updateShotDesc = updateShotDesc;
+window.updateShotAngle = updateShotAngle;
+window.updateShotSize = updateShotSize;
 window.removeShot = removeShot;
 window.refineShotDescription = refineShotDescription;
 

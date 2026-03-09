@@ -268,16 +268,39 @@ async def generate_multi_scene_prompt(
         f"The garment photos are referenced as @Element1 in prompts.\n"
     )
 
+    _angle_map = {
+        "eye_level":  "Eye Level",
+        "low_angle":  "Low Angle (upward, powerful)",
+        "high_angle": "High Angle (downward, editorial)",
+        "profile":    "Profile Shot (90° side)",
+        "rear":       "Rear Shot (from behind)",
+        "dutch":      "Dutch Angle (tilted, dramatic)",
+    }
+    _size_map = {
+        "wide":             "Wide Shot (full body + environment)",
+        "medium_wide":      "Medium Wide Shot (knees to head)",
+        "medium":           "Medium Shot (waist to head)",
+        "close_up":         "Close-Up (face or garment detail)",
+        "extreme_close_up": "Extreme Close-Up (fabric/texture/accessory)",
+    }
+
     if request.shots:
         user_text += "\n[CRITICAL] Per-shot configuration — you MUST follow this EXACTLY:\n"
         for i, shot in enumerate(request.shots):
-            cam_term = _cam_move_map.get(shot.camera_move, shot.camera_move)
-            user_text += f"  Shot {i + 1}: camera_movement=\"{cam_term}\", duration={shot.duration}s"
+            cam_term   = _cam_move_map.get(shot.camera_move, shot.camera_move)
+            angle_term = _angle_map.get(shot.camera_angle, shot.camera_angle)
+            size_term  = _size_map.get(shot.shot_size, shot.shot_size)
+            user_text += (
+                f"  Shot {i + 1}: camera_movement=\"{cam_term}\", "
+                f"camera_angle=\"{angle_term}\", "
+                f"shot_size=\"{size_term}\", "
+                f"duration={shot.duration}s"
+            )
             if shot.description:
                 user_text += f", additional_instruction=\"{shot.description}\""
             user_text += "\n"
         user_text += (
-            "Each scene's 'camera_movement' field MUST match the specified movement above. "
+            "Each scene's 'camera_movement', 'camera_angle', and 'shot_size' fields MUST match the specifications above. "
             "Each scene's 'duration' field MUST match the specified seconds above exactly.\n"
         )
 
@@ -354,6 +377,23 @@ _CAM_MOVE_MAP = {
     "static":    "Handheld / Static",
 }
 
+_CAMERA_ANGLE_MAP = {
+    "eye_level":  "Eye Level",
+    "low_angle":  "Low Angle (shooting upward — powerful, elongating)",
+    "high_angle": "High Angle (shooting downward — editorial, elegant)",
+    "profile":    "Profile Shot (90° side view — silhouette focus)",
+    "rear":       "Rear Shot (from behind — back of garment, mystery)",
+    "dutch":      "Dutch Angle (tilted frame — dramatic, fashion-forward)",
+}
+
+_SHOT_SIZE_MAP = {
+    "wide":              "Wide Shot / Extreme Wide Shot (full body + environment)",
+    "medium_wide":       "Medium Wide Shot (knees to head — full outfit visible)",
+    "medium":            "Medium Shot (waist to head — upper garment focus)",
+    "close_up":          "Close-Up (face or garment panel detail)",
+    "extreme_close_up":  "Extreme Close-Up (fabric texture, embellishment, accessory detail)",
+}
+
 _LOCATION_MAP = {
     "studio":      "professional fashion photography studio with clean backdrop and softbox lighting",
     "beach":       "pristine beach at golden hour with turquoise waves",
@@ -383,24 +423,28 @@ Example output for 2 shots:
 
 async def refine_shot_description(request: RefineShotRequest) -> str:
     """Convert a user's casual description into a cinematic English shot prompt."""
-    cam_term = _CAM_MOVE_MAP.get(request.camera_move, request.camera_move)
+    cam_term    = _CAM_MOVE_MAP.get(request.camera_move, request.camera_move)
+    angle_term  = _CAMERA_ANGLE_MAP.get(request.camera_angle, request.camera_angle)
+    size_term   = _SHOT_SIZE_MAP.get(request.shot_size, request.shot_size)
 
     system = (
         "You are a professional fashion film director. "
         "The user describes what they want to happen in a shot in their own words (possibly in Turkish). "
-        "Convert it into a precise, cinematic English prompt (15-30 words) suitable for an AI video generator. "
-        "Include: the camera movement specified, the action described, garment reference as 'the outfit', and lighting. "
+        "Convert it into a precise, cinematic English prompt (20-35 words) suitable for an AI video generator. "
+        "You MUST incorporate ALL THREE cinematography parameters: the exact camera movement, the exact camera angle, "
+        "and the exact shot size specified. Also include the action described, garment reference as 'the outfit', and lighting. "
         "If a location image is provided, derive the setting from that image — do NOT default to studio. "
         "Return ONLY the prompt string, no quotes, no extra text."
     )
 
     if request.location_image_url:
-        # Vision call: infer location from the reference image
         user_content = [
             {
                 "type": "text",
                 "text": (
                     f"Camera movement: {cam_term}\n"
+                    f"Camera angle: {angle_term}\n"
+                    f"Shot size: {size_term}\n"
                     f"Duration: {request.duration}s\n"
                     f"User description: {request.user_description}\n\n"
                     "The image below is the location/background reference. "
@@ -423,6 +467,8 @@ async def refine_shot_description(request: RefineShotRequest) -> str:
         user_content = (
             f"Location: {location_str}\n"
             f"Camera movement: {cam_term}\n"
+            f"Camera angle: {angle_term}\n"
+            f"Shot size: {size_term}\n"
             f"Duration: {request.duration}s\n"
             f"User description: {request.user_description}\n\n"
             "Write the cinematic prompt:"
