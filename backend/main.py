@@ -173,7 +173,6 @@ async def generate_video_endpoint(
     library_background_url: Optional[str] = Form(None),
     library_background_extra_urls: Optional[str] = Form(None),
     library_style_url: Optional[str] = Form(None),
-    video_model: str = Form("kling"),
     watermark_image: Optional[UploadFile] = File(None, description="Watermark/logo PNG"),
 ):
     """Start a new fashion video generation job."""
@@ -245,7 +244,6 @@ async def generate_video_endpoint(
         mood=mood,
         generate_audio=generate_audio.lower() == "true",
         shots=shots_list,
-        video_model=video_model,
     )
 
     jobs[job_id] = JobResponse(
@@ -275,7 +273,6 @@ async def generate_video_endpoint(
             library_style_url=library_style_url or None,
             background_extra_urls=bg_extra_urls or None,
             watermark_path=await _save_upload(watermark_image) if watermark_image else None,
-            video_model=video_model,
         )
     )
 
