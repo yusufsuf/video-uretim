@@ -144,6 +144,104 @@ let defileShotsPerOutfit = 1;
 let defileBgUrl = null;
 let defileAspectRatio = "9:16";
 
+// ─── Location State ─────────────────────────────────────────────────
+let selectedLocation = "studio";
+
+const LOCATIONS = [
+    {
+        value: "studio",
+        label: "Stüdyo",
+        labelTR: "Stüdyo",
+        desc: "Profesyonel fotoğraf stüdyosu",
+        gradient: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+        accent: "#4cc9f0",
+    },
+    {
+        value: "beach",
+        label: "Sahil",
+        labelTR: "Sahil",
+        desc: "Altın saat, kumsalda çekim",
+        gradient: "linear-gradient(135deg, #f4845f 0%, #f4a261 60%, #264653 100%)",
+        accent: "#f4a261",
+    },
+    {
+        value: "city_street",
+        label: "Şehir Sokağı",
+        labelTR: "Şehir",
+        desc: "Urban mimari, gece ışıkları",
+        gradient: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)",
+        accent: "#a78bfa",
+    },
+    {
+        value: "garden",
+        label: "Bahçe",
+        labelTR: "Bahçe",
+        desc: "Doğal ışık, yeşil ortam",
+        gradient: "linear-gradient(135deg, #1b4332 0%, #52b788 60%, #95d5b2 100%)",
+        accent: "#52b788",
+    },
+    {
+        value: "rooftop",
+        label: "Çatı Terası",
+        labelTR: "Çatı",
+        desc: "Şehir silueti, gün batımı",
+        gradient: "linear-gradient(135deg, #ff6b6b 0%, #ee9ca7 40%, #4361ee 100%)",
+        accent: "#ee9ca7",
+    },
+    {
+        value: "runway",
+        label: "Pist",
+        labelTR: "Pist",
+        desc: "Moda pistı, dramatik sahne",
+        gradient: "linear-gradient(135deg, #f72585 0%, #7209b7 60%, #3a0ca3 100%)",
+        accent: "#f72585",
+    },
+];
+
+function toggleLocationPicker() {
+    const panel  = document.getElementById("location-pick-panel");
+    const toggle = document.getElementById("location-pick-toggle");
+    const isOpen = panel.classList.contains("open");
+    if (!isOpen) {
+        renderLocationCards();
+        panel.classList.add("open");
+        toggle.classList.add("open");
+    } else {
+        panel.classList.remove("open");
+        toggle.classList.remove("open");
+    }
+}
+
+function renderLocationCards() {
+    const grid = document.getElementById("location-grid");
+    if (!grid) return;
+    grid.innerHTML = LOCATIONS.map(loc => `
+        <div class="location-card${selectedLocation === loc.value ? " active" : ""}"
+             onclick="selectLocation('${loc.value}', '${loc.labelTR}')">
+            <div class="location-card-bg" style="background:${loc.gradient}"></div>
+            <div class="location-card-overlay"></div>
+            <div class="location-card-info">
+                <div class="location-card-name">${loc.label}</div>
+                <div class="location-card-desc">${loc.desc}</div>
+            </div>
+            ${selectedLocation === loc.value
+                ? `<div class="location-card-check" style="background:${loc.accent}">✓</div>`
+                : ""}
+        </div>
+    `).join("");
+}
+
+function selectLocation(value, labelTR) {
+    selectedLocation = value;
+    const btn = document.getElementById("location-pick-label");
+    if (btn) btn.textContent = labelTR;
+    // Close panel
+    document.getElementById("location-pick-panel")?.classList.remove("open");
+    document.getElementById("location-pick-toggle")?.classList.remove("open");
+    // Re-render to update active state (panel is hidden but stays in DOM)
+    renderLocationCards();
+}
+
 // ─── Multishot State ────────────────────────────────────────────────
 let shots = [
     { camera_move: "dolly_in", duration: 5, description: "", camera_angle: "eye_level", shot_size: "wide" },
@@ -360,7 +458,7 @@ async function refineShotDescription(idx) {
                 shot_size: shot.shot_size || "wide",
                 duration: shot.duration,
                 user_description: userText || "fashion model walks and poses naturally",
-                location: "studio",
+                location: selectedLocation,
                 location_image_url: locationImageUrl,
             }),
         });
@@ -378,6 +476,8 @@ async function refineShotDescription(idx) {
 }
 
 // Expose to global scope for inline onclick handlers
+window.toggleLocationPicker = toggleLocationPicker;
+window.selectLocation = selectLocation;
 window.selectCamMove = selectCamMove;
 window.updateShotDuration = updateShotDuration;
 window.updateShotDesc = updateShotDesc;
@@ -1126,7 +1226,7 @@ async function startGeneration() {
     formData.append("scene_count",   String(shots.length));
     formData.append("aspect_ratio",  selectedAspectRatio);
     formData.append("generate_audio", audioToggle ? audioToggle.checked : true);
-    formData.append("location",      "studio");
+    formData.append("location",      selectedLocation);
 
     if (watermarkFile) formData.append("watermark_image", watermarkFile);
     if (videoDescInput && videoDescInput.value.trim()) {

@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <meta name="version" content="3.0.0">
-    <link rel="stylesheet" href="styles.css?v=13">
+    <link rel="stylesheet" href="styles.css?v=14">
 </head>
 
 <body>
@@ -209,13 +209,25 @@
 
                     <div class="wizard-section-divider">Opsiyonel Referanslar</div>
 
+                    <!-- Location preset picker -->
+                    <div class="location-pick-section">
+                        <button class="location-pick-toggle" id="location-pick-toggle" onclick="toggleLocationPicker()">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                            <span id="location-pick-label">Mekan Seç</span>
+                            <svg class="location-chevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                        </button>
+                        <div class="location-pick-panel" id="location-pick-panel">
+                            <div class="location-grid" id="location-grid"></div>
+                        </div>
+                    </div>
+
                     <div class="upload-grid" style="margin-top:8px">
                         <div class="upload-zone" id="refimg-zone">
                             <input type="file" id="refimg-input" accept="image/*">
                             <div class="upload-zone-inner">
                                 <div class="upload-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg></div>
                                 <div class="upload-label">Mekan / Referans</div>
-                                <div class="upload-hint">Mekan veya stil referansı</div>
+                                <div class="upload-hint">Fotoğraf yükle (opsiyonel)</div>
                             </div>
                             <span class="badge muted">Opsiyonel</span>
                         </div>
@@ -470,7 +482,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=17"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');
