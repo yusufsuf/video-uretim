@@ -106,14 +106,24 @@ async def generate_multishot_video(
     logger.info("  kie.ai payload: shots=%d, duration=%s, aspect=%s, audio=%s, elements=%d",
                 len(kie_multi_prompt), duration, aspect_ratio, generate_audio, len(kling_elements))
 
-    # ── Create task ───────────────────────────────────────────────────────
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(_KIE_CREATE_URL, json=payload, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
-
-    if data.get("code") != 200:
-        raise RuntimeError(f"kie.ai createTask failed: {data.get('msg')} (code={data.get('code')})")
+    # ── Create task (retry up to 3x on 5xx server errors) ────────────────
+    data = None
+    for _attempt in range(3):
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(_KIE_CREATE_URL, json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+        code = data.get("code")
+        if code == 200:
+            break
+        if isinstance(code, int) and code >= 500:
+            logger.warning("kie.ai createTask server error (code=%s), retrying in 10s…", code)
+            await asyncio.sleep(10)
+            continue
+        # 4xx or other non-retryable error
+        raise RuntimeError(f"kie.ai createTask failed: {data.get('msg')} (code={code})")
+    else:
+        raise RuntimeError(f"kie.ai createTask failed after 3 attempts: {data.get('msg') if data else 'no response'}")
 
     task_id = data["data"]["taskId"]
     logger.info("kie.ai task created: %s", task_id)

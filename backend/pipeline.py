@@ -547,21 +547,33 @@ async def run_defile_collection_pipeline(
 
         _update_job(job_id, progress=15, message="Arka plan hazır. Defile başlıyor...")
 
-        # ── Step 2: Per-outfit Kling calls ────────────────────────────────
+        # ── Step 2: Pre-upload all outfit images to fal.ai CDN ───────────────
+        # kie.ai cannot access Supabase storage URLs directly — re-upload first.
+        _update_job(job_id, progress=16, message="Kıyafet görselleri hazırlanıyor...")
+        fal_outfits: list = []
+        for outfit in request.outfits:
+            fal_front = await _to_fal_url(outfit.front_url)
+            fal_side = await _to_fal_url(outfit.side_url) if outfit.side_url else None
+            fal_back = await _to_fal_url(outfit.back_url) if outfit.back_url else None
+            fal_outfits.append((fal_front, fal_side, fal_back))
+        logger.info("[%s] Defile: %d outfits pre-uploaded to fal.ai CDN", job_id, len(fal_outfits))
+
+        # ── Step 3: Per-outfit Kling calls ────────────────────────────────
         clip_paths: list = []
         current_start_image: str = background_url
 
         for outfit_idx, outfit in enumerate(request.outfits):
             outfit_name = outfit.name or f"Kıyafet {outfit_idx + 1}"
+            fal_front, fal_side, fal_back = fal_outfits[outfit_idx]
 
             element: dict = {
-                "frontal_image_url": outfit.front_url,
+                "frontal_image_url": fal_front,
                 "reference_image_urls": [],
             }
-            if outfit.side_url:
-                element["reference_image_urls"].append(outfit.side_url)
-            if outfit.back_url:
-                element["reference_image_urls"].append(outfit.back_url)
+            if fal_side:
+                element["reference_image_urls"].append(fal_side)
+            if fal_back:
+                element["reference_image_urls"].append(fal_back)
 
             for shot_idx in range(shots_per):
                 global_shot = outfit_idx * shots_per + shot_idx
