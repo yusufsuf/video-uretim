@@ -11,14 +11,13 @@
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg: #080808;
-            --card: #0f0f0f;
-            --border: #1e1e1e;
-            --border-accent: #2a2a2a;
+            --card: rgba(8, 8, 16, 0.72);
+            --border: rgba(255, 255, 255, 0.07);
+            --border-accent: rgba(255, 255, 255, 0.12);
             --text: #f0f0f0;
             --text-muted: #666666;
-            --input-bg: #1a1a1a;
-            --input-border: #2e2e2e;
+            --input-bg: rgba(255, 255, 255, 0.05);
+            --input-border: rgba(255, 255, 255, 0.1);
             --gradient-btn: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
             --btn-text: #0a0a0a;
             --error: #b85450;
@@ -28,7 +27,7 @@
 
         body {
             font-family: var(--font);
-            background: var(--bg);
+            background: #070710;
             color: var(--text);
             min-height: 100vh;
             display: flex;
@@ -37,14 +36,28 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        /* ── Shader Background ── */
+        #bg-shader {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* ── Auth Card ── */
         .auth-card {
+            position: relative;
+            z-index: 1;
             width: 100%;
             max-width: 400px;
             background: var(--card);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 18px;
             padding: 40px 36px;
             margin: 20px;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255,255,255,0.05) inset;
         }
 
         .auth-logo {
@@ -117,15 +130,16 @@
             color: var(--text);
             font-family: var(--font);
             outline: none;
-            transition: border-color 0.15s ease;
+            transition: border-color 0.15s ease, background 0.15s ease;
         }
 
         .form-input:focus {
-            border-color: #555;
+            border-color: rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.08);
         }
 
         .form-input::placeholder {
-            color: #444;
+            color: rgba(255, 255, 255, 0.18);
         }
 
         .submit-btn {
@@ -190,6 +204,8 @@
     </style>
 </head>
 <body>
+
+<div id="bg-shader"></div>
 
 <div class="auth-card">
     <div class="auth-logo">
@@ -268,6 +284,31 @@
             btn.textContent = 'Giriş Yap';
         }
     });
+</script>
+
+<script type="module">
+    import {
+        ShaderMount,
+        meshGradientFragmentShader,
+        getShaderColorFromString,
+    } from "https://esm.sh/@paper-design/shaders@0.0.71";
+
+    const container = document.getElementById('bg-shader');
+
+    // Dark, moody palette — matches brand dark theme
+    const palette = ['#07070f', '#0c1228', '#0d0f28', '#130820'];
+
+    const uniforms = {
+        u_colors:      palette.map(getShaderColorFromString),
+        u_colorsCount: palette.length,
+        u_distortion:  0.55,
+        u_swirl:       0.35,
+        u_grainMixer:  0,
+        u_grainOverlay: 0,
+    };
+
+    // speed is the 5th constructor param (default 0 = paused, >0 = animating)
+    new ShaderMount(container, meshGradientFragmentShader, uniforms, undefined, 0.28);
 </script>
 
 </body>
