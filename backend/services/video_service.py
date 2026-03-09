@@ -1,9 +1,10 @@
-"""Video Service – Kling 3.0 Pro, Sora 2, and Veo 3.1 on fal.ai.
+"""Video Service – Kling 3.0 Pro via kie.ai API.
 
 Generates fashion videos with multishot prompts and garment elements.
 """
 
 import asyncio
+import json as _json
 import logging
 import os
 import subprocess
@@ -17,8 +18,11 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# Ensure FAL_KEY is set as environment variable for the fal-client SDK
+# Ensure FAL_KEY is set as environment variable for the fal-client SDK (used by NB2)
 os.environ["FAL_KEY"] = settings.FAL_KEY
+
+_KIE_CREATE_URL = "https://api.kie.ai/api/v1/jobs/createTask"
+_KIE_POLL_URL = "https://api.kie.ai/api/v1/jobs/recordInfo"
 
 
 async def generate_multishot_video(
@@ -30,55 +34,120 @@ async def generate_multishot_video(
     generate_audio: bool = True,
     negative_prompt: str = "blur, distort, and low quality, deformed hands, deformed face",
 ) -> str:
-    """Generate a fashion video using Kling 3.0 Pro multishot on fal.ai.
+    """Generate a fashion video using Kling 3.0 Pro multishot via kie.ai API.
 
     Args:
-        start_image_url: URL of the background/scene image (from Nano Banana).
-        multi_prompt: List of shot dicts, each with 'duration' (str) and 'prompt' (str).
+        start_image_url: URL of the start frame (NB2 scene composition output).
+        multi_prompt: List of shot dicts, each with 'duration' (str/int) and 'prompt' (str).
         elements: List of element dicts for garment consistency.
                   Each dict: { frontal_image_url: str, reference_image_urls: [str] }
         duration: Total video duration in seconds (str, "3"-"15").
         aspect_ratio: "16:9", "9:16", or "1:1".
         generate_audio: Whether to generate audio.
-        negative_prompt: Things to avoid in generation.
+        negative_prompt: Unused (kie.ai does not support this param — kept for API compat).
 
     Returns:
         URL of the generated video.
     """
-    logger.info("Starting Kling 3.0 Pro multishot – %d shots, %ss duration",
+    logger.info("Starting Kling 3.0 Pro multishot via kie.ai – %d shot(s), %ss",
                 len(multi_prompt), duration)
 
-    payload = {
-        "multi_prompt": multi_prompt,
-        "start_image_url": start_image_url,
-        "duration": duration,
-        "shot_type": "customize",
+    # ── Build kling_elements from fal.ai-style elements ──────────────────
+    kling_elements: list = []
+    has_elements = False
+    if elements:
+        all_urls: list = []
+        for elem in elements:
+            if elem.get("frontal_image_url"):
+                all_urls.append(elem["frontal_image_url"])
+            for ref in elem.get("reference_image_urls", []):
+                all_urls.append(ref)
+        if all_urls:
+            has_elements = True
+            # kie.ai requires minimum 2 images in element_input_urls
+            if len(all_urls) == 1:
+                all_urls = all_urls * 2
+            capped_urls = [u for i, u in enumerate(all_urls) if i < 50]
+            kling_elements.append({
+                "name": "garment",
+                "description": "fashion garment reference images",
+                "element_input_urls": capped_urls,
+            })
+
+    # ── Build multi_prompt — append @garment tag if elements present ──────
+    kie_multi_prompt = []
+    for shot in multi_prompt:
+        prompt_text = shot.get("prompt", "")
+        if has_elements:
+            prompt_text = f"{prompt_text} @garment"
+        kie_multi_prompt.append({
+            "prompt": prompt_text,
+            "duration": int(shot.get("duration", 5)),
+        })
+
+    input_data: dict = {
+        "image_urls": [start_image_url],
+        "multi_shots": True,
+        "multi_prompt": kie_multi_prompt,
+        "duration": str(duration),
         "aspect_ratio": aspect_ratio,
-        "generate_audio": generate_audio,
-        "negative_prompt": negative_prompt,
-        "cfg_scale": 0.5,
+        "mode": "pro",
+        "sound": generate_audio,
+    }
+    if kling_elements:
+        input_data["kling_elements"] = kling_elements
+
+    payload = {"model": "kling-3.0/video", "input": input_data}
+    headers = {
+        "Authorization": f"Bearer {settings.KIE_API_KEY}",
+        "Content-Type": "application/json",
     }
 
-    if elements:
-        payload["elements"] = elements
-        logger.info("  Elements: %d garment references", len(elements))
+    logger.info("  kie.ai payload: shots=%d, duration=%s, aspect=%s, audio=%s, elements=%d",
+                len(kie_multi_prompt), duration, aspect_ratio, generate_audio, len(kling_elements))
 
-    logger.info("  Payload keys: %s", list(payload.keys()))
-    logger.info("  Multi-prompt shots: %s",
-                [(s.get("duration"), s.get("prompt", "")[:60]) for s in multi_prompt])
+    # ── Create task ───────────────────────────────────────────────────────
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.post(_KIE_CREATE_URL, json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
 
-    result = await fal_client.run_async(
-        "fal-ai/kling-video/v3/pro/image-to-video",
-        arguments=payload,
-    )
+    if data.get("code") != 200:
+        raise RuntimeError(f"kie.ai createTask failed: {data.get('msg')} (code={data.get('code')})")
 
-    video_url = result.get("video", {}).get("url", "")
-    if not video_url:
-        logger.error("Kling returned no video URL. Full result: %s", result)
-        raise RuntimeError("Kling 3.0 Pro returned no video URL")
+    task_id = data["data"]["taskId"]
+    logger.info("kie.ai task created: %s", task_id)
 
-    logger.info("Multishot video completed: %s", video_url[:100])
-    return video_url
+    # ── Poll until complete (up to ~12 minutes) ───────────────────────────
+    for attempt in range(120):
+        await asyncio.sleep(6)
+        async with httpx.AsyncClient(timeout=30) as client:
+            poll_resp = await client.get(
+                _KIE_POLL_URL, params={"taskId": task_id}, headers=headers
+            )
+            poll_resp.raise_for_status()
+            poll_data = poll_resp.json()
+
+        task = poll_data.get("data", {})
+        state = task.get("state", "")
+        logger.info("kie.ai %s → %s (attempt %d)", task_id, state, attempt + 1)
+
+        if state == "success":
+            result_json = _json.loads(task.get("resultJson", "{}"))
+            result_urls = result_json.get("resultUrls", [])
+            if not result_urls:
+                raise RuntimeError(f"kie.ai task {task_id} succeeded but resultUrls is empty")
+            video_url = result_urls[0]
+            logger.info("Kling 3.0 video completed: %s", video_url[:100])
+            return video_url
+
+        if state == "fail":
+            fail_msg = task.get("failMsg", "unknown error")
+            raise RuntimeError(f"kie.ai task {task_id} failed: {fail_msg}")
+
+        # waiting / queuing / generating → keep polling
+
+    raise RuntimeError(f"kie.ai task {task_id} timed out after 120 polling attempts (~12 min)")
 
 
 # ─── Last-frame chaining helpers ─────────────────────────────────
@@ -134,5 +203,5 @@ async def download_file(url: str, output_dir: str, extension: str = ".mp4") -> s
         with open(filepath, "wb") as f:
             f.write(resp.content)
 
-    logger.info("Downloaded %s -> %s", url[:60], filepath)
+    logger.info("Downloaded %s -> %s", url, filepath)
     return filepath
