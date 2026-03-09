@@ -397,11 +397,20 @@ async def run_pipeline(
 
 # ── Fixed runway prompts for defile collection mode ──────────────────────────
 DEFILE_PROMPTS = [
-    "fashion model walks confidently down runway toward camera, full body shot, smooth tracking shot",
-    "camera pans up from shoes to face as model walks forward, elegant slow motion, editorial fashion",
-    "model turns at end of runway, dramatic pause, side profile, architectural background",
-    "wide establishing shot of runway, model walks from far end toward camera, cinematic",
-    "close-up on outfit fabric and details as model walks, shallow depth of field, fashion editorial",
+    # 1 — Wide frontal establishing: model walks from far end of white runway toward camera, audience seated both sides, full body, smooth dolly-in
+    "wide shot fashion runway, model walks from far end toward camera, white catwalk, audience seated both sides, full body tracking, smooth cinematic dolly-in",
+    # 2 — Medium frontal: eye-level, model fills frame, white fence rails flank runway, confident stride
+    "medium full-body shot, fashion model walks toward camera on white runway, eye level, white barriers frame both sides, sharp focus, confident walk",
+    # 3 — Torso close-up: camera follows outfit details at chest/jacket level while model walks forward, natural motion blur
+    "close-up on jacket and upper outfit as fashion model walks, camera tracks at torso height, fabric texture visible, slight motion blur from movement",
+    # 4 — Low ground-level: extreme low angle, camera near floor, model's legs and shoes in motion, dynamic footstep rhythm
+    "extreme low angle shot, camera at ground level, fashion model's legs and shoes walking on white runway, pants hem and footwear in sharp focus, motion blur",
+    # 5 — Rear tracking: camera follows model from behind, full body from back, outfit back details, blurred audience on sides
+    "rear tracking shot, camera follows fashion model from behind down runway, full body back view, outfit back details visible, audience blurred on both sides",
+    # 6 — Side profile tracking: camera positioned at runway side, model walks parallel, full silhouette, shallow depth of field
+    "side profile tracking shot, fashion model walks parallel to camera along runway, full silhouette from side, audience in soft background blur, lateral tracking",
+    # 7 — Accessory close-up: extreme close-up on bag or shoes while model walks, luxury detail shot
+    "extreme close-up on fashion accessory while model walks, handbag swinging or shoes stepping, very tight frame, texture and craftsmanship detail, motion blur background",
 ]
 
 
