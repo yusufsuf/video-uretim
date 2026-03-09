@@ -12,15 +12,18 @@ import os
 import uuid
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, Form, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 import json
 
 from config import settings
 from dependencies import get_current_user
+from limiter import limiter
 from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, LocationPreset, RefineShotRequest, ShotConfig, SuggestShotsRequest
 from pipeline import jobs, run_pipeline, run_defile_collection_pipeline, _load_history
 from services.analysis_service import refine_shot_description, suggest_shot_descriptions
@@ -41,6 +44,9 @@ app = FastAPI(
     description="Elbise fotoğraflarından profesyonel moda videoları üretin.",
     version="0.1.0",
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -151,7 +157,9 @@ def _file_to_url(path: str) -> str:
 
 # ─── Endpoints ─────────────────────────────────────────────────────
 @app.post("/api/generate", response_model=JobResponse)
+@limiter.limit("10/hour")
 async def generate_video_endpoint(
+    request: Request,
     _user: dict = Depends(get_current_user),
     front_image: Optional[UploadFile] = File(None, description="Elbise ön fotoğrafı"),
     side_image: Optional[UploadFile] = File(None, description="Elbise yan fotoğrafı (opsiyonel)"),
@@ -300,12 +308,14 @@ async def refine_shot_endpoint(
 
 
 @app.post("/api/defile/collection", response_model=JobResponse)
+@limiter.limit("10/hour")
 async def defile_collection_endpoint(
-    request: DefileCollectionRequest,
+    request: Request,
+    body: DefileCollectionRequest,
     _user: dict = Depends(get_current_user),
 ):
     """Start a defile collection video generation job."""
-    if not request.outfits:
+    if not body.outfits:
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="En az bir kıyafet gereklidir.")
 
@@ -316,7 +326,7 @@ async def defile_collection_endpoint(
         message="Defile kuyruğa alındı.",
     )
 
-    asyncio.create_task(run_defile_collection_pipeline(job_id=job_id, request=request))
+    asyncio.create_task(run_defile_collection_pipeline(job_id=job_id, request=body))
     return jobs[job_id]
 
 
@@ -333,7 +343,7 @@ async def get_job_status(job_id: str, _user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/gallery")
-async def get_gallery():
+async def get_gallery(_user: dict = Depends(get_current_user)):
     """Return job history for the gallery page."""
     history = _load_history()
     return {"items": history}

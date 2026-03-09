@@ -1,7 +1,10 @@
 """Authentication service — Supabase Auth + profiles table."""
 
 import asyncio
+import logging
 from functools import lru_cache
+
+logger = logging.getLogger(__name__)
 
 from fastapi import HTTPException
 from supabase import create_client, Client
@@ -24,7 +27,7 @@ def _fresh_auth_client() -> Client:
 
 async def register_user(email: str, password: str, full_name: str) -> dict:
     db = _admin_client()
-    print(f"[register] attempt: {email}")
+    logger.info("[register] attempt: %s", email)
     try:
         res = await asyncio.to_thread(
             lambda: db.auth.admin.create_user({
@@ -34,16 +37,16 @@ async def register_user(email: str, password: str, full_name: str) -> dict:
                 "user_metadata": {"full_name": full_name},
             })
         )
-        print(f"[register] create_user result: user={res.user}")
+        logger.info("[register] create_user success for %s", email)
     except Exception as e:
-        print(f"[register] create_user exception: {e}")
+        logger.warning("[register] create_user exception: %s", e)
         err = str(e).lower()
         if "already registered" in err or "already exists" in err or "duplicate" in err:
             raise HTTPException(status_code=400, detail="Bu e-posta adresi zaten kayıtlı.")
         raise HTTPException(status_code=400, detail=f"Kayıt hatası: {e}")
 
     if res.user is None:
-        print("[register] res.user is None")
+        logger.warning("[register] res.user is None for %s", email)
         raise HTTPException(status_code=400, detail="Kayıt başarısız.")
 
     uid = str(res.user.id)

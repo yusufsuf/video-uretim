@@ -8,13 +8,16 @@ New Flow (v2):
 5. (Optional) Watermark overlay
 """
 
+import ipaddress
 import logging
 import os
+import socket
 import subprocess
 import uuid
 from datetime import datetime
 from functools import lru_cache
 from typing import Optional
+from urllib.parse import urlparse
 
 from supabase import create_client, Client
 from config import settings
@@ -44,6 +47,28 @@ logger = logging.getLogger(__name__)
 jobs: dict[str, JobResponse] = {}
 
 
+_PRIVATE_NETS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+]
+
+
+def _is_ssrf_safe(url: str) -> bool:
+    """Return True only if the URL resolves to a public IP (not internal/loopback)."""
+    try:
+        parsed = urlparse(url)
+        host = parsed.hostname or ""
+        ip = ipaddress.ip_address(socket.gethostbyname(host))
+        return not any(ip in net for net in _PRIVATE_NETS)
+    except Exception:
+        return False
+
+
 async def _to_fal_url(url: str) -> str:
     """Ensure a URL is reachable from fal.ai by re-uploading to fal.ai CDN if needed.
 
@@ -54,7 +79,9 @@ async def _to_fal_url(url: str) -> str:
     # Already on fal.ai CDN — skip
     if any(s in url for s in ("fal.media", "fal.run", "v3.fal.media", "storage.googleapis.com/isolate")):
         return url
-    clean_url = url.split("?")[0]  # strip trailing ?. artefacts from Supabase SDK
+    clean_url: str = url.split("?")[0]  # strip trailing ?. artefacts from Supabase SDK
+    if not _is_ssrf_safe(clean_url):
+        raise ValueError(f"SSRF blocked: URL resolves to private/internal address: {clean_url}")
     try:
         local = await download_file(clean_url, settings.TEMP_DIR, extension=".jpg")
         fal_url = await upload_to_fal(local)
