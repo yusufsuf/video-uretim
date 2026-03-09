@@ -28,7 +28,7 @@ from models import (
     MultiScenePrompt,
 )
 from services.analysis_service import analyse_dress, generate_multi_scene_prompt
-from services.nano_banana_service import generate_background
+from services.nano_banana_service import generate_background, generate_scene_frame
 from services.video_service import (
     download_file,
     generate_multishot_video,
@@ -189,30 +189,57 @@ async def run_pipeline(
         logger.info("[%s] Background pool: %d image(s), mode=%s",
                     job_id, len(bg_pool), "cycle" if multi_bg else "chain")
 
-        # ── Per-shot execution: one Kling call per scene ─────────
+        # Garment reference URLs for NB2 scene composition
+        garment_ref_urls = [front_url] + ([side_url] if side_url else []) + ([back_url] if back_url else [])
+
+        # ── Per-shot execution: NB2 compose + Kling animate ──────
         all_scenes = scene_prompt.scenes
         n_shots = len(all_scenes)
-        logger.info("[%s] %d scene(s) → %d individual Kling call(s)", job_id, n_shots, n_shots)
+        logger.info("[%s] %d scene(s) — NB2 compose + Kling per shot", job_id, n_shots)
 
         clip_paths = []
         current_start_image = bg_pool[0]
 
         for shot_idx, scene in enumerate(all_scenes):
-            shot_progress = 55 + int((shot_idx / n_shots) * 28)
-            shot_msg = f"Sahne {shot_idx + 1}/{n_shots} üretiliyor..."
-            _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
-                        progress=shot_progress, message=shot_msg)
+            base_progress = 55 + int((shot_idx / n_shots) * 28)
 
             # Choose start image: cycle pool (multi-bg) or chain from previous clip
             start_image = bg_pool[shot_idx % len(bg_pool)] if multi_bg else current_start_image
             shot_duration = int(scene.duration)
 
-            bg_preview: str = str(start_image)[0:60]  # type: ignore[index]
-            logger.info("[%s] Shot %d/%d: %ds, bg=%s...",
-                        job_id, shot_idx + 1, n_shots, shot_duration, bg_preview)
+            logger.info("[%s] Shot %d/%d: %ds", job_id, shot_idx + 1, n_shots, shot_duration)
+
+            # ── 4a: Compose scene frame via Nano Banana 2 Edit ───
+            _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
+                        progress=base_progress,
+                        message=f"Sahne {shot_idx + 1}/{n_shots} kompoze ediliyor...")
+
+            angle = (scene.camera_angle or "eye_level").replace("_", " ")
+            size = (scene.shot_size or "full_body").replace("_", " ")
+            garment_hint = f"{analysis.color} {analysis.garment_type}"
+            nb2_prompt = (
+                f"Fashion editorial photo: the first image is the background scene — keep it exactly. "
+                f"Place a fashion model wearing the {garment_hint} from the garment reference images "
+                f"(images 2 onward) into this background. "
+                f"Preserve every garment detail: exact colors, pattern, texture, cut, length. "
+                f"Camera angle: {angle}. Shot framing: {size}. "
+                f"Context: {scene.prompt}. "
+                f"Professional fashion photography, sharp focus, natural elegant pose."
+            )
+
+            scene_frame_url = await generate_scene_frame(
+                image_urls=[start_image] + garment_ref_urls,
+                prompt=nb2_prompt,
+                aspect_ratio=aspect_ratio,
+            )
+            logger.info("[%s] Shot %d scene frame: %s", job_id, shot_idx + 1, scene_frame_url[:80])
+
+            # ── 4b: Animate scene frame via Kling ────────────────
+            _update_job(job_id, progress=base_progress + int(14 / n_shots),
+                        message=f"Sahne {shot_idx + 1}/{n_shots} animate ediliyor...")
 
             clip_url = await generate_multishot_video(
-                start_image_url=start_image,
+                start_image_url=scene_frame_url,
                 multi_prompt=[{"duration": scene.duration, "prompt": scene.prompt}],
                 elements=elements,
                 duration=str(shot_duration),
