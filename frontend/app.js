@@ -1286,9 +1286,10 @@ async function pollStatus() {
 
 // ─── Progress UI ─────────────────────────────────────────────────
 function updateProgress(percent, message) {
-    progressBar.style.width = `${percent}%`;
-    progressStat.textContent = message;
-    progressPct.textContent = `${percent}%`;
+    const pct = percent ?? 0;
+    progressBar.style.width = `${pct}%`;
+    progressStat.textContent = message || "";
+    progressPct.textContent = `${pct}%`;
 }
 
 const STEP_ORDER = ["analyzing", "generating_prompts", "generating_background", "generating_video"];
