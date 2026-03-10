@@ -668,6 +668,10 @@ async def run_defile_collection_pipeline(
                 "wearing the garment from the reference images (images 2 onward). "
                 "Full body visible, frontal medium-wide shot, confident runway stance. "
                 "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
+                "CRITICAL: the garment hem must touch and rest exactly on the runway floor — "
+                "the bottom of the garment grazes the floor surface. "
+                "Shoes and feet must NOT be visible under any circumstances — "
+                "the hem completely covers and conceals the feet. "
                 "Professional fashion show photography, sharp focus, editorial quality."
             )
 
