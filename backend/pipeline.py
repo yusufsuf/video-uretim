@@ -701,10 +701,17 @@ async def run_defile_collection_pipeline(
             _update_job(job_id, progress=base_progress + int(35 / n_outfits),
                         message=f"{outfit_name} — video üretiliyor ({outfit_idx + 1}/{n_outfits})...")
 
+            # Build elements: outfit images as garment reference for Kling consistency
+            outfit_element: dict = {"frontal_image_url": fal_front, "reference_image_urls": []}
+            if fal_side:
+                outfit_element["reference_image_urls"].append(fal_side)
+            if fal_back:
+                outfit_element["reference_image_urls"].append(fal_back)
+
             clip_url = await generate_multishot_video(
                 start_image_url=scene_frame_url,
                 multi_prompt=multi_prompt,
-                elements=None,  # outfit baked into start frame via NB2
+                elements=[outfit_element],
                 duration=str(total_duration),
                 aspect_ratio=request.aspect_ratio,
                 generate_audio=request.generate_audio,
