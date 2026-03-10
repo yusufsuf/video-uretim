@@ -193,6 +193,7 @@ let libraryStyleUrl    = null;
 
 // ─── Defile State ────────────────────────────────────────────────
 let videoMode = "video";          // "video" | "defile"
+let generationMode = "classic";   // "classic" | "multishot"
 let defileOutfits = [];           // [{front_url, side_url, back_url, name}]
 let defileShotConfigs = [{ duration: 5 }]; // global shot list [{duration}]
 let defileBgUrl = null;
@@ -606,6 +607,32 @@ document.querySelectorAll(".ratio-card").forEach(card => {
 });
 
 document.getElementById("add-shot-btn")?.addEventListener("click", addShot);
+
+// ─── Generation Mode Toggle ──────────────────────────────────────────
+function setGenerationMode(mode) {
+    generationMode = mode;
+    const btnClassic   = document.getElementById('mode-btn-classic');
+    const btnMultishot = document.getElementById('mode-btn-multishot');
+    const desc         = document.getElementById('mode-desc');
+    if (!btnClassic) return;
+    if (mode === 'classic') {
+        btnClassic.style.background   = '#fff';
+        btnClassic.style.color        = '#0a0a0a';
+        btnClassic.style.boxShadow    = '0 1px 4px rgba(0,0,0,0.15)';
+        btnMultishot.style.background = 'transparent';
+        btnMultishot.style.color      = 'var(--text-secondary)';
+        btnMultishot.style.boxShadow  = 'none';
+        if (desc) desc.textContent = 'Her sahne ayrı ayrı üretilip birleştirilir.';
+    } else {
+        btnMultishot.style.background = '#fff';
+        btnMultishot.style.color      = '#0a0a0a';
+        btnMultishot.style.boxShadow  = '0 1px 4px rgba(0,0,0,0.15)';
+        btnClassic.style.background   = 'transparent';
+        btnClassic.style.color        = 'var(--text-secondary)';
+        btnClassic.style.boxShadow    = 'none';
+        if (desc) desc.textContent = 'Tek NB2 + tek Kling çağrısıyla tüm sahneler üretilir.';
+    }
+}
 
 // ─── Wizard Management ──────────────────────────────────────────────
 function openWizard() {
@@ -1333,6 +1360,9 @@ async function startGeneration() {
     if (libraryBgUrl)       formData.append("library_background_url",        libraryBgUrl);
     if (libraryBgExtraUrls.length > 0) formData.append("library_background_extra_urls", JSON.stringify(libraryBgExtraUrls));
     if (libraryStyleUrl)    formData.append("library_style_url",      libraryStyleUrl);
+
+    // Generation mode
+    formData.append("generation_mode", generationMode);
 
     // Shots — serialize to JSON
     formData.append("shots",         JSON.stringify(shots));

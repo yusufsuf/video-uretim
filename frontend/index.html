@@ -324,6 +324,19 @@
                     <div class="wizard-step-title">Video Tasarımı</div>
                     <div class="wizard-step-sub">Her sahne için kamera hareketi ve süre belirleyin.</div>
 
+                    <!-- Üretim Modu -->
+                    <div style="display:flex;gap:6px;margin-top:14px;margin-bottom:2px;padding:4px;background:var(--bg-secondary);border-radius:10px;width:fit-content">
+                        <button id="mode-btn-classic" onclick="setGenerationMode('classic')"
+                            style="padding:6px 16px;border-radius:7px;border:none;font-family:inherit;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;background:#fff;color:#0a0a0a;box-shadow:0 1px 4px rgba(0,0,0,0.15)">
+                            Klasik
+                        </button>
+                        <button id="mode-btn-multishot" onclick="setGenerationMode('multishot')"
+                            style="padding:6px 16px;border-radius:7px;border:none;font-family:inherit;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;background:transparent;color:var(--text-secondary)">
+                            Multishot
+                        </button>
+                    </div>
+                    <div id="mode-desc" style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:6px;margin-top:4px">Her sahne ayrı ayrı üretilip birleştirilir.</div>
+
                     <!-- Format + Audio row -->
                     <div style="display:flex;gap:12px;margin-top:16px;align-items:flex-end;flex-wrap:wrap">
                         <div>

@@ -204,6 +204,7 @@ async def run_pipeline(
     library_style_url: Optional[str] = None,
     background_extra_urls: Optional[list] = None,
     watermark_path: Optional[str] = None,
+    generation_mode: str = "classic",
 ):
     """Execute the full pipeline asynchronously."""
     try:
@@ -301,92 +302,161 @@ async def run_pipeline(
             fal_bg_pool.append(await _to_fal_url(bg_url))
         logger.info("[%s] Background pool on fal.ai CDN: %d", job_id, len(fal_bg_pool))
 
-        # ── Per-shot execution: NB2 compose + Kling animate ──────
-        all_scenes = scene_prompt.scenes
-        n_shots = len(all_scenes)
-        logger.info("[%s] %d scene(s) — NB2 compose + Kling per shot", job_id, n_shots)
+        if generation_mode == "multishot":
+            # ── MULTISHOT MODE: single NB2 compose → GPT prompts → single Kling call ──
+            logger.info("[%s] Multishot mode: single NB2 + GPT multishot prompts + Kling", job_id)
 
-        clip_paths = []
-        current_start_image = fal_bg_pool[0]
-
-        for shot_idx, scene in enumerate(all_scenes):
-            base_progress = 55 + int((shot_idx / n_shots) * 28)
-
-            # Choose start image: cycle pool (multi-bg) or chain from previous clip
-            start_image = fal_bg_pool[shot_idx % len(fal_bg_pool)] if multi_bg else current_start_image
-            shot_duration = int(scene.duration)
-
-            logger.info("[%s] Shot %d/%d: %ds", job_id, shot_idx + 1, n_shots, shot_duration)
-
-            # ── 4a: Compose scene frame via Nano Banana 2 Edit ───
             _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
-                        progress=base_progress,
-                        message=f"Sahne {shot_idx + 1}/{n_shots} kompoze ediliyor...")
+                        progress=55, message="Sahne kompoze ediliyor (multishot)...")
 
-            angle = (scene.camera_angle or "eye_level").replace("_", " ")
-            size = (scene.shot_size or "full_body").replace("_", " ")
             garment_hint = f"{analysis.color} {analysis.garment_type}"
             nb2_prompt = (
                 f"Fashion editorial photo: the first image is the background scene — keep it exactly. "
                 f"Place a fashion model wearing the {garment_hint} from the garment reference images "
                 f"(images 2 onward) into this background. "
                 f"Preserve every garment detail: exact colors, pattern, texture, cut, length. "
-                f"Camera angle: {angle}. Shot framing: {size}. "
-                f"Context: {scene.prompt}. "
+                f"Camera angle: eye level. Shot framing: full body, medium-wide. "
                 f"Professional fashion photography, sharp focus, natural elegant pose."
             )
 
             scene_frame_url = await generate_scene_frame(
-                image_urls=[start_image] + fal_garment_refs,
+                image_urls=[fal_bg_pool[0]] + fal_garment_refs,
                 prompt=nb2_prompt,
                 aspect_ratio=aspect_ratio,
             )
-            logger.info("[%s] Shot %d scene frame: %s", job_id, shot_idx + 1, scene_frame_url[:80])
+            logger.info("[%s] Multishot scene frame: %s", job_id, scene_frame_url[:80])
 
-            # ── 4b: Animate scene frame via Kling ────────────────
-            _update_job(job_id, progress=base_progress + int(14 / n_shots),
-                        message=f"Sahne {shot_idx + 1}/{n_shots} animate ediliyor...")
+            _update_job(job_id, progress=65, message="Senaryo üretiliyor (multishot)...")
 
+            # Build shot configs: use user-specified shots or fall back to GPT scenes
+            if request.shots:
+                shot_configs_ms = request.shots
+            else:
+                from models import DefileShotConfig
+                shot_configs_ms = [DefileShotConfig(duration=int(s.duration)) for s in scene_prompt.scenes]
+
+            multi_prompt = await generate_defile_multishot_prompt(
+                scene_frame_url=scene_frame_url,
+                shot_configs=shot_configs_ms,
+                outfit_name="",
+            )
+            logger.info("[%s] Multishot: %d prompt(s) generated", job_id, len(multi_prompt))
+
+            _update_job(job_id, progress=72, message="Video üretiliyor (multishot)...")
+
+            # Compress garment images for Kling elements (10 MB limit)
+            elem_front = await _to_fal_url_compressed(front_url)
+            elem_side = await _to_fal_url_compressed(side_url) if side_url else None
+            elem_back = await _to_fal_url_compressed(back_url) if back_url else None
+            ms_element: dict = {"frontal_image_url": elem_front, "reference_image_urls": []}
+            if elem_side:
+                ms_element["reference_image_urls"].append(elem_side)
+            if elem_back:
+                ms_element["reference_image_urls"].append(elem_back)
+
+            total_ms_duration = sum(int(p["duration"]) for p in multi_prompt)
             clip_url = await generate_multishot_video(
                 start_image_url=scene_frame_url,
-                multi_prompt=[{"duration": scene.duration, "prompt": scene.prompt}],
-                elements=elements,
-                duration=str(shot_duration),
+                multi_prompt=multi_prompt,
+                elements=[ms_element],
+                duration=str(total_ms_duration),
                 aspect_ratio=aspect_ratio,
                 generate_audio=generate_audio,
             )
 
-            clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
-            clip_paths.append(clip_path)
-            logger.info("[%s] Shot %d downloaded: %s", job_id, shot_idx + 1, clip_path)
+            _update_job(job_id, progress=85, message="Video indiriliyor...")
+            final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
+            clip_path_ms = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
+            shutil.move(clip_path_ms, final_path)
+            logger.info("[%s] Multishot video ready: %s", job_id, final_path)
 
-            # Chain via last frame only in single-background mode
-            if not multi_bg and shot_idx < n_shots - 1:
-                logger.info("[%s] Extracting last frame for chaining...", job_id)
-                last_frame_path = extract_last_frame(clip_path, settings.TEMP_DIR)
-                current_start_image = await upload_to_fal(last_frame_path)
-                try:
-                    os.remove(last_frame_path)
-                except Exception:
-                    pass
-                logger.info("[%s] Chain: next shot starts from %s", job_id, current_start_image[:80])
-
-        # Merge clips or move single clip to OUTPUT_DIR
-        merge_msg = "Sahneler birleştiriliyor..." if n_shots > 1 else "Video indiriliyor..."
-        _update_job(job_id, progress=85, message=merge_msg)
-
-        final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
-        if n_shots > 1:
-            concatenate_clips(clip_paths, final_path)
-            for p in clip_paths:
-                try:
-                    os.remove(p)
-                except Exception:
-                    pass
         else:
-            shutil.move(clip_paths[0], final_path)
+            # ── CLASSIC MODE: per-shot NB2 compose + Kling animate ──────
+            all_scenes = scene_prompt.scenes
+            n_shots = len(all_scenes)
+            logger.info("[%s] %d scene(s) — NB2 compose + Kling per shot (classic)", job_id, n_shots)
 
-        logger.info("[%s] Final video: %s", job_id, final_path)
+            clip_paths = []
+            current_start_image = fal_bg_pool[0]
+
+            for shot_idx, scene in enumerate(all_scenes):
+                base_progress = 55 + int((shot_idx / n_shots) * 28)
+
+                # Choose start image: cycle pool (multi-bg) or chain from previous clip
+                start_image = fal_bg_pool[shot_idx % len(fal_bg_pool)] if multi_bg else current_start_image
+                shot_duration = int(scene.duration)
+
+                logger.info("[%s] Shot %d/%d: %ds", job_id, shot_idx + 1, n_shots, shot_duration)
+
+                # ── 4a: Compose scene frame via Nano Banana 2 Edit ───
+                _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
+                            progress=base_progress,
+                            message=f"Sahne {shot_idx + 1}/{n_shots} kompoze ediliyor...")
+
+                angle = (scene.camera_angle or "eye_level").replace("_", " ")
+                size = (scene.shot_size or "full_body").replace("_", " ")
+                garment_hint = f"{analysis.color} {analysis.garment_type}"
+                nb2_prompt = (
+                    f"Fashion editorial photo: the first image is the background scene — keep it exactly. "
+                    f"Place a fashion model wearing the {garment_hint} from the garment reference images "
+                    f"(images 2 onward) into this background. "
+                    f"Preserve every garment detail: exact colors, pattern, texture, cut, length. "
+                    f"Camera angle: {angle}. Shot framing: {size}. "
+                    f"Context: {scene.prompt}. "
+                    f"Professional fashion photography, sharp focus, natural elegant pose."
+                )
+
+                scene_frame_url = await generate_scene_frame(
+                    image_urls=[start_image] + fal_garment_refs,
+                    prompt=nb2_prompt,
+                    aspect_ratio=aspect_ratio,
+                )
+                logger.info("[%s] Shot %d scene frame: %s", job_id, shot_idx + 1, scene_frame_url[:80])
+
+                # ── 4b: Animate scene frame via Kling ────────────────
+                _update_job(job_id, progress=base_progress + int(14 / n_shots),
+                            message=f"Sahne {shot_idx + 1}/{n_shots} animate ediliyor...")
+
+                clip_url = await generate_multishot_video(
+                    start_image_url=scene_frame_url,
+                    multi_prompt=[{"duration": scene.duration, "prompt": scene.prompt}],
+                    elements=elements,
+                    duration=str(shot_duration),
+                    aspect_ratio=aspect_ratio,
+                    generate_audio=generate_audio,
+                )
+
+                clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
+                clip_paths.append(clip_path)
+                logger.info("[%s] Shot %d downloaded: %s", job_id, shot_idx + 1, clip_path)
+
+                # Chain via last frame only in single-background mode
+                if not multi_bg and shot_idx < n_shots - 1:
+                    logger.info("[%s] Extracting last frame for chaining...", job_id)
+                    last_frame_path = extract_last_frame(clip_path, settings.TEMP_DIR)
+                    current_start_image = await upload_to_fal(last_frame_path)
+                    try:
+                        os.remove(last_frame_path)
+                    except Exception:
+                        pass
+                    logger.info("[%s] Chain: next shot starts from %s", job_id, current_start_image[:80])
+
+            # Merge clips or move single clip to OUTPUT_DIR
+            merge_msg = "Sahneler birleştiriliyor..." if n_shots > 1 else "Video indiriliyor..."
+            _update_job(job_id, progress=85, message=merge_msg)
+
+            final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
+            if n_shots > 1:
+                concatenate_clips(clip_paths, final_path)
+                for p in clip_paths:
+                    try:
+                        os.remove(p)
+                    except Exception:
+                        pass
+            else:
+                shutil.move(clip_paths[0], final_path)
+
+            logger.info("[%s] Final video: %s", job_id, final_path)
 
         # ── Step 5 (optional): Watermark overlay ─────────────────
         if watermark_path and os.path.isfile(watermark_path):

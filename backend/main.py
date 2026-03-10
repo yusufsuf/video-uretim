@@ -182,6 +182,7 @@ async def generate_video_endpoint(
     library_background_extra_urls: Optional[str] = Form(None),
     library_style_url: Optional[str] = Form(None),
     watermark_image: Optional[UploadFile] = File(None, description="Watermark/logo PNG"),
+    generation_mode: str = Form("classic"),
 ):
     """Start a new fashion video generation job."""
 
@@ -281,6 +282,7 @@ async def generate_video_endpoint(
             library_style_url=library_style_url or None,
             background_extra_urls=bg_extra_urls or None,
             watermark_path=await _save_upload(watermark_image) if watermark_image else None,
+            generation_mode=generation_mode,
         )
     )
 
