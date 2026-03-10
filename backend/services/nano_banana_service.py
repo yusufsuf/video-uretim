@@ -1,5 +1,6 @@
 """Nano Banana 2 Service – generates background images and composes scene frames using fal.ai."""
 
+import asyncio
 import logging
 import os
 from typing import List
@@ -94,3 +95,42 @@ async def generate_scene_frame(
     image_url = images[0].get("url", "")
     logger.info("Scene frame composed: %s", image_url[:100])
     return image_url
+
+
+# 4 camera angle prompts for venue/location variant generation
+_VENUE_ANGLE_PROMPTS = [
+    "Wide establishing shot of this exact venue — preserve the same architectural style, materials, lighting atmosphere, and all decor elements. Full space visible from a wide cinematic angle, the runway or catwalk centered in the composition.",
+    "Medium frontal eye-level view of this exact venue — preserve architecture, materials, lighting and atmosphere exactly. Symmetrical central perspective, camera at eye level looking toward the main focal area of the space.",
+    "Side lateral view of this exact venue — preserve the same architectural style, materials, lighting and atmosphere. Camera positioned perpendicular to the main axis, full side profile of the space visible.",
+    "Elevated bird's-eye overhead view of this exact venue — preserve all architectural details, materials and atmosphere. Camera looking straight down from above, geometric top-down composition of the full space.",
+]
+
+
+async def generate_venue_variants(
+    venue_image_url: str,
+    count: int,
+    aspect_ratio: str = "9:16",
+) -> list:
+    """Generate N angle variants of a venue photo using NB2 Edit.
+
+    Args:
+        venue_image_url: fal.ai CDN URL of the source venue photo.
+        count: Number of variants to generate (1-4).
+        aspect_ratio: Output aspect ratio.
+
+    Returns:
+        List of generated image URLs (length = count).
+    """
+    count = max(1, min(4, count))
+    prompts = _VENUE_ANGLE_PROMPTS[:count]
+
+    async def _gen_one(prompt: str) -> str:
+        return await generate_scene_frame(
+            image_urls=[venue_image_url],
+            prompt=prompt,
+            aspect_ratio=aspect_ratio,
+        )
+
+    urls = await asyncio.gather(*[_gen_one(p) for p in prompts])
+    logger.info("Venue variants generated: %d", len(urls))
+    return list(urls)

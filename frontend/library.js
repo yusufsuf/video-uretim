@@ -294,5 +294,86 @@ document.querySelectorAll(".lib-tab").forEach(tab => {
     });
 });
 
+// ─── AI Venue Variants ───────────────────────────────────────────
+document.getElementById("open-ai-venue-btn")?.addEventListener("click", () => {
+    document.getElementById("ai-venue-name").value = "";
+    document.getElementById("ai-venue-file").value = "";
+    document.getElementById("ai-venue-file-label").textContent = "Fotoğraf seç...";
+    document.getElementById("ai-venue-count").value = "2";
+    document.getElementById("ai-venue-count-val").textContent = "2";
+    document.getElementById("confirm-ai-venue-btn").disabled = true;
+    document.getElementById("ai-venue-status").style.display = "none";
+    document.getElementById("ai-venue-modal").style.display = "flex";
+});
+
+document.getElementById("cancel-ai-venue-btn")?.addEventListener("click", () => {
+    document.getElementById("ai-venue-modal").style.display = "none";
+});
+
+document.getElementById("ai-venue-modal")?.addEventListener("click", e => {
+    if (e.target === document.getElementById("ai-venue-modal"))
+        document.getElementById("ai-venue-modal").style.display = "none";
+});
+
+document.getElementById("ai-venue-file")?.addEventListener("change", e => {
+    const file = e.target.files[0];
+    document.getElementById("ai-venue-file-label").textContent = file ? file.name : "Fotoğraf seç...";
+    document.getElementById("confirm-ai-venue-btn").disabled = !file;
+});
+
+document.getElementById("ai-venue-count")?.addEventListener("input", e => {
+    document.getElementById("ai-venue-count-val").textContent = e.target.value;
+});
+
+document.getElementById("confirm-ai-venue-btn")?.addEventListener("click", async () => {
+    const name = document.getElementById("ai-venue-name").value.trim();
+    const file = document.getElementById("ai-venue-file").files[0];
+    const count = document.getElementById("ai-venue-count").value;
+
+    if (!name) { alert("İsim girin."); return; }
+    if (!file) { alert("Fotoğraf seçin."); return; }
+
+    const btn = document.getElementById("confirm-ai-venue-btn");
+    const cancelBtn = document.getElementById("cancel-ai-venue-btn");
+    btn.disabled = true;
+    btn.textContent = "Üretiliyor...";
+    cancelBtn.disabled = true;
+    document.getElementById("ai-venue-status").style.display = "block";
+
+    try {
+        const fd = new FormData();
+        fd.append("name", name);
+        fd.append("count", count);
+        fd.append("file", file);
+
+        const resp = await fetch(`${API}/library/generate-venue-variants`, {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: fd,
+        });
+
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            alert(err.detail || "Üretim başarısız.");
+            return;
+        }
+
+        document.getElementById("ai-venue-modal").style.display = "none";
+
+        // Switch to background tab and refresh
+        document.querySelectorAll(".lib-tab").forEach(t => t.classList.remove("active"));
+        document.querySelector('[data-cat="background"]')?.classList.add("active");
+        loadItems("background");
+
+    } catch (err) {
+        alert("Bağlantı hatası: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Üret";
+        cancelBtn.disabled = false;
+        document.getElementById("ai-venue-status").style.display = "none";
+    }
+});
+
 // ─── Init ─────────────────────────────────────────────────────────
 loadItems("");

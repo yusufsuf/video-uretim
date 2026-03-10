@@ -313,7 +313,10 @@
                         <button class="lib-tab" data-cat="background">Arka Planlar</button>
                         <button class="lib-tab" data-cat="style">Stiller</button>
                     </div>
-                    <button class="btn-primary-sm" id="open-upload-btn">+ Görsel Ekle</button>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn-primary-sm" id="open-ai-venue-btn" style="background:var(--accent-muted,#2a2a3a);border:1px solid var(--border-accent)">✦ AI Mekan</button>
+                        <button class="btn-primary-sm" id="open-upload-btn">+ Görsel Ekle</button>
+                    </div>
                 </div>
 
                 <div class="lib-grid" id="lib-grid">
@@ -351,6 +354,48 @@
             <div style="display:flex;gap:8px;margin-top:4px">
                 <button class="wizard-btn-ghost" id="cancel-upload-btn" style="flex:1">İptal</button>
                 <button class="wizard-btn-primary" id="confirm-upload-btn" style="flex:1" disabled>Yükle</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Venue Variants Modal -->
+    <div class="upload-modal-overlay" id="ai-venue-modal" style="display:none">
+        <div class="upload-modal">
+            <div class="upload-modal-title">✦ AI Mekan Varyantı Üret</div>
+            <p style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.5">
+                Bir mekan fotoğrafı yükle — sistem farklı kamera açılarından varyantlar üretir ve tek kütüphane kaydı olarak kaydeder.
+            </p>
+
+            <div class="form-group" style="margin-bottom:12px">
+                <label class="form-label">İsim</label>
+                <input type="text" class="form-input" id="ai-venue-name" placeholder="Ör: Saray Salonu, Modern Showroom...">
+            </div>
+
+            <div class="form-group" style="margin-bottom:12px">
+                <label class="form-label">Mekan Fotoğrafı</label>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1.5px dashed var(--border-dashed);border-radius:var(--radius-md);background:var(--bg-secondary)">
+                    <span style="font-size:1.2rem">🖼</span>
+                    <span id="ai-venue-file-label" style="font-size:0.75rem;color:var(--text-secondary)">Fotoğraf seç...</span>
+                    <input type="file" id="ai-venue-file" accept="image/*" style="display:none">
+                </label>
+            </div>
+
+            <div class="form-group" style="margin-bottom:16px">
+                <label class="form-label">Kaç varyant üretilsin? — <strong id="ai-venue-count-val">2</strong></label>
+                <input type="range" id="ai-venue-count" min="1" max="4" value="2" step="1"
+                    style="width:100%;accent-color:var(--accent);margin-top:6px">
+                <div style="display:flex;justify-content:space-between;font-size:0.65rem;color:var(--text-muted);margin-top:3px">
+                    <span>1 — Wide</span><span>2 — +Frontal</span><span>3 — +Side</span><span>4 — +Overhead</span>
+                </div>
+            </div>
+
+            <div id="ai-venue-status" style="display:none;font-size:0.72rem;color:var(--accent);text-align:center;padding:8px 0">
+                Varyantlar üretiliyor, lütfen bekleyin...
+            </div>
+
+            <div style="display:flex;gap:8px;margin-top:4px">
+                <button class="wizard-btn-ghost" id="cancel-ai-venue-btn" style="flex:1">İptal</button>
+                <button class="wizard-btn-primary" id="confirm-ai-venue-btn" style="flex:1" disabled>Üret</button>
             </div>
         </div>
     </div>
