@@ -504,11 +504,11 @@ RULES:
 Camera vocabulary to use (vary across shots):
 Wide Shot, Medium Shot, Close-Up, Extreme Close-Up, Low Angle, High Angle, Bird's Eye, Tracking Shot, Dolly In, Dolly Out, Arc Shot, Tilt Up, Tilt Down, Follow Shot, Steadicam, Slow Motion
 
-Return ONLY a JSON array with exactly N objects:
-[
+Return a JSON object with a single key "shots" containing exactly N objects:
+{"shots": [
   {"duration": "5", "prompt": "..."},
   {"duration": "4", "prompt": "..."}
-]"""
+]}"""
 
 
 async def generate_defile_multishot_prompt(
@@ -561,13 +561,15 @@ async def generate_defile_multishot_prompt(
 
     raw = (response.choices[0].message.content or "").strip()
 
-    # Unwrap if GPT returned {"shots": [...]} or similar wrapper
+    # Parse {"shots": [...]} wrapper format
     try:
         parsed = json.loads(raw)
-        if isinstance(parsed, list):
+        if isinstance(parsed, dict) and "shots" in parsed:
+            shots = parsed["shots"]
+        elif isinstance(parsed, list):
             shots = parsed
         else:
-            # Find first list value in the dict
+            # Fallback: find first list value in the dict
             shots = next(v for v in parsed.values() if isinstance(v, list))
     except Exception:
         match = _re.search(r'\[.*\]', raw, _re.DOTALL)
