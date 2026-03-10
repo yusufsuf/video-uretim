@@ -117,7 +117,7 @@ async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> Dre
         ],
         response_format={"type": "json_object"},
         temperature=0.2,
-        max_tokens=1200,
+        max_completion_tokens=1200,
     )
 
     raw = response.choices[0].message.content.strip()
@@ -336,7 +336,7 @@ async def generate_multi_scene_prompt(
         ],
         response_format={"type": "json_object"},
         temperature=0.7,
-        max_tokens=3000,
+        max_completion_tokens=3000,
     )
 
     raw = response.choices[0].message.content
@@ -482,7 +482,7 @@ async def refine_shot_description(request: RefineShotRequest) -> str:
             {"role": "user",   "content": user_content},
         ],
         temperature=0.7,
-        max_tokens=120,
+        max_completion_tokens=120,
     )
     return (response.choices[0].message.content or "").strip().strip('"').strip("'")
 
@@ -556,7 +556,7 @@ async def generate_defile_multishot_prompt(
         ],
         response_format={"type": "json_object"},
         temperature=0.75,
-        max_tokens=1200,
+        max_completion_tokens=1200,
     )
 
     raw = (response.choices[0].message.content or "").strip()
@@ -608,7 +608,7 @@ async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
             {"role": "user",   "content": user_msg},
         ],
         temperature=0.8,
-        max_tokens=600,
+        max_completion_tokens=600,
     )
 
     raw = (response.choices[0].message.content or "").strip()
