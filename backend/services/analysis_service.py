@@ -491,18 +491,31 @@ _DEFILE_MULTISHOT_SYSTEM = """You are a luxury fashion film director. You receiv
 
 Your task: Write one cinematic English prompt per shot for Kling 3.0 Pro multishot video generation.
 
-RULES:
-- Shot 1: MUST be wide/establishing — full body visible, set the scene, model entering or standing at runway start
-- Each subsequent shot continues seamlessly from the previous (chained within one video generation)
-- NEVER repeat the same camera angle or movement twice
-- Each prompt references what you see in the image: garment color, silhouette, runway setting
-- Style: luxury fashion film, editorial Vogue aesthetic, smooth cinematic movement, shallow depth of field
-- Each prompt: 35-55 words, in English only
-- Model actions: walking toward camera, pivoting, pausing, turning, fabric swinging with movement
-- Keep lighting consistent across all shots (match what you see in the image)
+RUNWAY WALK STRUCTURE — MANDATORY:
+The sequence must depict ONE complete runway journey in this exact order:
+1. Model starts at the far end of the runway and walks TOWARD the camera (front view, approach)
+2. Middle shots: cinematic detail shots as model walks closer — vary angles (low angle, close-up fabric, medium tracking)
+3. SECOND-TO-LAST shot: model reaches the camera end of the runway, slows, executes a confident runway pivot/turn
+4. LAST shot: model walks AWAY from camera down the runway (back view, retreating) — the walk is finished, model does NOT turn back around
 
-Camera vocabulary to use (vary across shots):
-Wide Shot, Medium Shot, Close-Up, Extreme Close-Up, Low Angle, High Angle, Bird's Eye, Tracking Shot, Dolly In, Dolly Out, Arc Shot, Tilt Up, Tilt Down, Follow Shot, Steadicam, Slow Motion
+CRITICAL RULES:
+- The model NEVER turns back to face the camera after the final pivot — the sequence ends with the model walking away
+- Each shot continues seamlessly from the previous (chained within one video generation)
+- NEVER repeat the same camera angle or movement twice
+- Reference the garment color and silhouette visible in the image
+- Style: luxury fashion film, editorial Vogue aesthetic, smooth cinematic movement
+- Each prompt: 35-55 words, in English only
+- Keep lighting consistent across all shots
+
+SHOT COUNT GUIDANCE:
+- 1 shot: full runway walk from far end toward camera, model confident stride
+- 2 shots: (1) approach walk toward camera, (2) end pivot + walk away
+- 3 shots: (1) wide approach, (2) mid close-up detail, (3) pivot + walk away
+- 4 shots: (1) wide establishing approach, (2) medium tracking, (3) end pivot, (4) back view walk away
+- 5 shots: (1) wide approach, (2) low angle, (3) close-up fabric, (4) end pivot, (5) back view walk away
+
+Camera vocabulary (vary across shots):
+Wide Shot, Medium Shot, Close-Up, Extreme Close-Up, Low Angle, High Angle, Tracking Shot, Dolly In, Dolly Out, Arc Shot, Tilt Up, Follow Shot, Steadicam, Slow Motion
 
 Return a JSON object with a single key "shots" containing exactly N objects:
 {"shots": [
