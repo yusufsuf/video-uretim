@@ -374,6 +374,11 @@ async def register_page():
     return FileResponse(os.path.join(_get_frontend_dir(), "register.html"), media_type="text/html")
 
 
+@app.get("/order")
+async def order_page():
+    return FileResponse(os.path.join(_get_frontend_dir(), "order-preview.html"), media_type="text/html")
+
+
 @app.get("/admin-panel")
 async def admin_page():
     return FileResponse(os.path.join(_get_frontend_dir(), "admin.html"), media_type="text/html")
