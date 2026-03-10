@@ -715,10 +715,7 @@ async def run_defile_collection_pipeline(
             nb2_prompt = (
                 "Fashion runway show editorial photo: the first image is the runway scene — "
                 "preserve it exactly including architecture, lighting, floor, and audience. "
-                "Place a tall fashion model at the CENTER-BACK of the runway catwalk, "
-                "roughly two-thirds of the way down the runway from the camera — "
-                "a significant length of empty runway must be clearly visible between the model and the camera foreground. "
-                "wearing the garment from the reference images (images 2 onward). "
+                "Place a tall fashion model on the runway catwalk wearing the garment from the reference images (images 2 onward). "
                 "Full body visible, frontal medium-wide shot, confident runway stance. "
                 "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
                 "CRITICAL: the garment hem must touch and rest exactly on the runway floor — "
