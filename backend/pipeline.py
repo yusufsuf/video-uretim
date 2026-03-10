@@ -39,9 +39,53 @@ from services.video_service import (
     upload_to_fal,
     concatenate_clips,
 )
+import io
 import shutil
 
+from PIL import Image
+
 logger = logging.getLogger(__name__)
+
+_ELEMENTS_MAX_BYTES = 9 * 1024 * 1024  # 9 MB — safe margin under Kling's 10 MB limit
+_ELEMENTS_MAX_PX = 1536  # max dimension for element images
+
+
+async def _to_fal_url_compressed(url: str) -> str:
+    """Like _to_fal_url but also resizes/compresses the image to stay under Kling's
+    10 MB elements limit. Returns a fal.ai CDN URL pointing to the compressed image.
+    """
+    clean_url: str = url.split("?")[0]
+    if not _is_ssrf_safe(clean_url):
+        raise ValueError(f"SSRF blocked: {clean_url}")
+    try:
+        local = await download_file(clean_url, settings.TEMP_DIR, extension=".jpg")
+        # Compress with Pillow
+        with Image.open(local) as img:
+            img = img.convert("RGB")
+            w, h = img.size
+            # Resize if either dimension exceeds max
+            if w > _ELEMENTS_MAX_PX or h > _ELEMENTS_MAX_PX:
+                img.thumbnail((_ELEMENTS_MAX_PX, _ELEMENTS_MAX_PX), Image.LANCZOS)
+            # Save with progressive quality reduction until under limit
+            quality = 88
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=quality, optimize=True)
+            while buf.tell() > _ELEMENTS_MAX_BYTES and quality > 50:
+                quality -= 10
+                buf = io.BytesIO()
+                img.save(buf, format="JPEG", quality=quality, optimize=True)
+            with open(local, "wb") as f:
+                f.write(buf.getvalue())
+        fal_url = await upload_to_fal(local)
+        try:
+            os.remove(local)
+        except Exception:
+            pass
+        logger.info("Compressed + re-uploaded for elements: %s → %s (q=%d)", clean_url[:60], fal_url[:60], quality)
+        return fal_url
+    except Exception as e:
+        logger.warning("Could not compress %s (%s) — falling back to _to_fal_url", clean_url[:60], e)
+        return await _to_fal_url(url)
 
 # In-memory job store
 jobs: dict[str, JobResponse] = {}
@@ -634,13 +678,19 @@ async def run_defile_collection_pipeline(
             fal_bg_pool.append(await _to_fal_url(bg_url))
         logger.info("[%s] Defile: bg pool size=%d", job_id, len(fal_bg_pool))
 
-        fal_outfits: list = []
+        # Upload outfit images twice: full-res for NB2, compressed for Kling elements
+        fal_outfits: list = []        # (fal_front, fal_side, fal_back) — full-res for NB2
+        fal_outfits_elem: list = []   # (elem_front, elem_side, elem_back) — compressed for Kling elements
         for outfit in request.outfits:
             fal_front = await _to_fal_url(outfit.front_url)
             fal_side = await _to_fal_url(outfit.side_url) if outfit.side_url else None
             fal_back = await _to_fal_url(outfit.back_url) if outfit.back_url else None
             fal_outfits.append((fal_front, fal_side, fal_back))
-        logger.info("[%s] Defile: %d outfits on fal.ai CDN", job_id, len(fal_outfits))
+            elem_front = await _to_fal_url_compressed(outfit.front_url)
+            elem_side = await _to_fal_url_compressed(outfit.side_url) if outfit.side_url else None
+            elem_back = await _to_fal_url_compressed(outfit.back_url) if outfit.back_url else None
+            fal_outfits_elem.append((elem_front, elem_side, elem_back))
+        logger.info("[%s] Defile: %d outfits on fal.ai CDN (full + compressed)", job_id, len(fal_outfits))
 
         # ── Step 3: Per-outfit: NB2 compose → GPT prompts → Kling ────────
         clip_paths: list = []
@@ -648,6 +698,7 @@ async def run_defile_collection_pipeline(
         for outfit_idx, outfit in enumerate(request.outfits):
             outfit_name = outfit.name or f"Kıyafet {outfit_idx + 1}"
             fal_front, fal_side, fal_back = fal_outfits[outfit_idx]
+            elem_front, elem_side, elem_back = fal_outfits_elem[outfit_idx]
             base_progress = 20 + int((outfit_idx / n_outfits) * 65)
 
             # Background for this outfit (cycle pool)
@@ -701,12 +752,12 @@ async def run_defile_collection_pipeline(
             _update_job(job_id, progress=base_progress + int(35 / n_outfits),
                         message=f"{outfit_name} — video üretiliyor ({outfit_idx + 1}/{n_outfits})...")
 
-            # Build elements: outfit images as garment reference for Kling consistency
-            outfit_element: dict = {"frontal_image_url": fal_front, "reference_image_urls": []}
-            if fal_side:
-                outfit_element["reference_image_urls"].append(fal_side)
-            if fal_back:
-                outfit_element["reference_image_urls"].append(fal_back)
+            # Build elements: compressed outfit images as garment reference for Kling (10 MB limit)
+            outfit_element: dict = {"frontal_image_url": elem_front, "reference_image_urls": []}
+            if elem_side:
+                outfit_element["reference_image_urls"].append(elem_side)
+            if elem_back:
+                outfit_element["reference_image_urls"].append(elem_back)
 
             clip_url = await generate_multishot_video(
                 start_image_url=scene_frame_url,
