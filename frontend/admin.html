@@ -212,6 +212,32 @@
                     </table>
                 </div>
 
+                <!-- Sipariş Kodu Sorgula -->
+                <div class="card">
+                    <div class="section-heading">Sipariş Kodu Sorgula</div>
+                    <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">
+                        <input type="text" id="order-code-input" maxlength="6"
+                            placeholder="ABC123"
+                            oninput="this.value=this.value.toUpperCase()"
+                            style="font-family:monospace;font-size:1.1rem;letter-spacing:0.2em;text-transform:uppercase;
+                                   padding:8px 14px;background:var(--bg-secondary);border:1px solid var(--border-subtle);
+                                   border-radius:8px;color:var(--text-primary);width:130px;text-align:center">
+                        <button class="btn-approve" onclick="lookupOrder()" style="padding:7px 18px">Sorgula</button>
+                    </div>
+                    <div id="order-result" style="display:none">
+                        <pre id="order-json"
+                            style="background:var(--bg-secondary);border:1px solid var(--border-subtle);
+                                   border-radius:8px;padding:14px;font-size:0.72rem;line-height:1.7;
+                                   overflow-x:auto;white-space:pre-wrap;word-break:break-all;color:#7dd3fc"></pre>
+                        <button onclick="copyOrderJson()"
+                            style="margin-top:8px;padding:5px 14px;font-size:0.72rem;font-family:inherit;
+                                   background:var(--bg-secondary);border:1px solid var(--border-subtle);
+                                   border-radius:6px;color:var(--text-secondary);cursor:pointer">
+                            JSON Kopyala
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Onaylı Kullanıcılar -->
                 <div class="card">
                     <div class="section-heading">Onaylı Kullanıcılar</div>
@@ -343,6 +369,29 @@
         if (res.ok) { showToast('Kullanıcı silindi.'); loadUsers(); }
         else { showToast('Hata oluştu.'); btns.forEach(b => b.disabled = false); }
     }
+
+    // ── Order code lookup ────────────────────────────────────────
+    async function lookupOrder() {
+        const code = document.getElementById('order-code-input').value.trim().toUpperCase();
+        if (code.length !== 6) { showToast('6 haneli kod girin.'); return; }
+        const res = await fetch(`/api/orders/${code}`);
+        const resultDiv = document.getElementById('order-result');
+        if (res.status === 404) { showToast('Kod bulunamadı.'); resultDiv.style.display = 'none'; return; }
+        if (!res.ok) { showToast('Hata oluştu.'); return; }
+        const data = await res.json();
+        document.getElementById('order-json').textContent = JSON.stringify(data.shot_configs, null, 2);
+        resultDiv.style.display = 'block';
+    }
+
+    function copyOrderJson() {
+        navigator.clipboard.writeText(document.getElementById('order-json').textContent)
+            .then(() => showToast('JSON kopyalandı.'));
+    }
+
+    // Also allow Enter key on the code input
+    document.getElementById('order-code-input')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') lookupOrder();
+    });
 
     // ── Init ────────────────────────────────────────────────────
     (async () => {

@@ -275,6 +275,26 @@
                         <div id="defile-shot-rows" style="display:flex;flex-direction:column;gap:8px"></div>
                         <button id="defile-add-shot-btn" style="margin-top:8px;width:100%;padding:7px;background:var(--bg-secondary);border:1px dashed var(--border-subtle);border-radius:8px;color:var(--text-muted);font-size:0.75rem;cursor:pointer;font-family:inherit;transition:all 0.15s" onmouseover="this.style.borderColor='var(--border-default)';this.style.color='var(--text-secondary)'" onmouseout="this.style.borderColor='var(--border-subtle)';this.style.color='var(--text-muted)'">+ Sahne Ekle</button>
                         <div style="font-size:0.65rem;color:var(--text-muted);margin-top:5px">Her kıyafet tek bir Kling çağrısında tüm sahneleri içerir (max 15s)</div>
+                        <div style="margin-top:8px">
+                            <button id="defile-json-load-btn" onclick="toggleDefileJsonLoad(true)"
+                                style="font-size:0.72rem;color:var(--text-secondary);background:none;border:1px solid var(--border-subtle);
+                                       border-radius:6px;padding:3px 10px;cursor:pointer;font-family:inherit;transition:all 0.12s"
+                                onmouseover="this.style.color='var(--text-primary)';this.style.borderColor='var(--border-default)'"
+                                onmouseout="this.style.color='var(--text-secondary)';this.style.borderColor='var(--border-subtle)'">
+                                JSON Yükle
+                            </button>
+                        </div>
+                        <div id="defile-json-load-area" style="display:none;margin-top:6px">
+                            <textarea id="defile-json-paste-input" rows="4"
+                                placeholder='[{"type":"med_frontal","duration":5}, ...]'
+                                style="width:100%;font-family:monospace;font-size:0.71rem;padding:10px;
+                                       background:var(--bg-secondary);border:1px solid var(--border-subtle);
+                                       border-radius:8px;color:var(--text-primary);resize:vertical"></textarea>
+                            <div style="display:flex;gap:8px;margin-top:6px">
+                                <button class="wizard-btn-ghost" onclick="applyDefileJsonConfig()">Uygula</button>
+                                <button class="wizard-btn-ghost" onclick="toggleDefileJsonLoad(false)">İptal</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="wizard-section-divider" style="margin-top:16px">Opsiyonel Arka Plan</div>
@@ -336,6 +356,28 @@
                         </button>
                     </div>
                     <div id="mode-desc" style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:6px;margin-top:4px">Her sahne ayrı ayrı üretilip birleştirilir.</div>
+
+                    <!-- JSON Load -->
+                    <div style="margin-top:4px;margin-bottom:2px">
+                        <button id="json-load-btn" onclick="toggleJsonLoad(true)"
+                            style="font-size:0.72rem;color:var(--text-secondary);background:none;border:1px solid var(--border-subtle);
+                                   border-radius:6px;padding:3px 10px;cursor:pointer;font-family:inherit;transition:all 0.12s"
+                            onmouseover="this.style.color='var(--text-primary)';this.style.borderColor='var(--border-default)'"
+                            onmouseout="this.style.color='var(--text-secondary)';this.style.borderColor='var(--border-subtle)'">
+                            JSON Yükle
+                        </button>
+                    </div>
+                    <div id="json-load-area" style="display:none;margin-bottom:10px">
+                        <textarea id="json-paste-input" rows="4"
+                            placeholder='[{"type":"med_frontal","duration":5}, ...]'
+                            style="width:100%;font-family:monospace;font-size:0.71rem;padding:10px;
+                                   background:var(--bg-secondary);border:1px solid var(--border-subtle);
+                                   border-radius:8px;color:var(--text-primary);resize:vertical;margin-top:6px"></textarea>
+                        <div style="display:flex;gap:8px;margin-top:6px">
+                            <button class="wizard-btn-ghost" onclick="applyJsonConfig()">Uygula</button>
+                            <button class="wizard-btn-ghost" onclick="toggleJsonLoad(false)">İptal</button>
+                        </div>
+                    </div>
 
                     <!-- Format + Audio row -->
                     <div style="display:flex;gap:12px;margin-top:16px;align-items:flex-end;flex-wrap:wrap">

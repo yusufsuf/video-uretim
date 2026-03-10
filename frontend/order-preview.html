@@ -538,16 +538,16 @@
         .copy-btn.done { color: var(--green); border-color: var(--green); }
 
         .code-body {
-            padding: 14px;
+            padding: 20px 14px;
             font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-            font-size: 0.69rem;
-            line-height: 1.8;
-            color: var(--text-2);
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 0.25em;
+            text-align: center;
+            color: var(--text);
             white-space: pre-wrap;
             word-break: break-all;
         }
-        [data-theme="dark"]  .code-body { color: #7dd3fc; }
-        [data-theme="light"] .code-body { color: #1d4ed8; }
 
         /* ── Info note ── */
         .note {
@@ -826,14 +826,38 @@ function renderDur() {
 }
 
 // ── Generate code ─────────────────────────────────────────────────
-function generateCode() {
-    const payload = {
-        shot_configs: seq.map(x => ({ type: x.shot.id, duration: x.dur })),
-        total_duration: seq.reduce((a, x) => a + x.dur, 0),
-    };
-    document.getElementById('code-body').textContent = JSON.stringify(payload, null, 2);
-    document.getElementById('code-panel').style.display = 'block';
-    document.getElementById('code-panel').scrollIntoView({ behavior:'smooth', block:'nearest' });
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function _randomCode() {
+    let c = '';
+    for (let i = 0; i < 6; i++) c += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+    return c;
+}
+
+async function generateCode() {
+    const btn = document.getElementById('gen-btn');
+    btn.disabled = true;
+    btn.textContent = 'Kaydediliyor…';
+
+    const code = _randomCode();
+    const shot_configs = seq.map(x => ({ type: x.shot.id, duration: x.dur }));
+
+    try {
+        const res = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, shot_configs }),
+        });
+        if (!res.ok) throw new Error('Sunucu hatası: ' + res.status);
+
+        document.getElementById('code-body').textContent = code;
+        document.getElementById('code-panel').style.display = 'block';
+        document.getElementById('code-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (e) {
+        alert('Kod kaydedilemedi: ' + e.message);
+    } finally {
+        btn.disabled = seq.length === 0;
+        btn.textContent = 'Sipariş Kodu Oluştur';
+    }
 }
 
 function copyCode() {

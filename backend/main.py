@@ -12,7 +12,7 @@ import os
 import uuid
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, Form, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -27,9 +27,12 @@ from limiter import limiter
 from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, LocationPreset, RefineShotRequest, ShotConfig, SuggestShotsRequest
 from pipeline import jobs, run_pipeline, run_defile_collection_pipeline, _load_history
 from services.analysis_service import refine_shot_description, suggest_shot_descriptions
+from pydantic import BaseModel
+
 from routes.auth_router import router as auth_router
 from routes.admin_router import router as admin_router
 from routes.library_router import router as library_router
+from services.order_service import save_order, lookup_order
 
 # ─── Logging ───────────────────────────────────────────────────────
 logging.basicConfig(
@@ -379,6 +382,27 @@ async def register_page():
 @app.get("/order")
 async def order_page():
     return FileResponse(os.path.join(_get_frontend_dir(), "order-preview.html"), media_type="text/html")
+
+
+# ─── Order code endpoints ───────────────────────────────────────────
+
+class OrderCreate(BaseModel):
+    code: str
+    shot_configs: list
+
+
+@app.post("/api/orders")
+async def create_order(body: OrderCreate):
+    await save_order(body.code, body.shot_configs)
+    return {"ok": True}
+
+
+@app.get("/api/orders/{code}")
+async def get_order(code: str):
+    row = await lookup_order(code)
+    if not row:
+        raise HTTPException(status_code=404, detail="Kod bulunamadı.")
+    return {"shot_configs": row["shot_configs"]}
 
 
 @app.get("/admin-panel")

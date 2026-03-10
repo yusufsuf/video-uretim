@@ -609,6 +609,90 @@ document.querySelectorAll(".ratio-card").forEach(card => {
 document.getElementById("add-shot-btn")?.addEventListener("click", addShot);
 
 // ─── Generation Mode Toggle ──────────────────────────────────────────
+// ── Order JSON type → shot params mapping ─────────────────────────
+const ORDER_TYPE_MAP = {
+    wide_full:     { camera_move: 'dolly_out',  camera_angle: 'eye_level',  shot_size: 'wide' },
+    wide_ultra:    { camera_move: 'dolly_out',  camera_angle: 'eye_level',  shot_size: 'wide' },
+    wide_overhead: { camera_move: 'crane',      camera_angle: 'high_angle', shot_size: 'wide' },
+    wide_tele:     { camera_move: 'static',     camera_angle: 'eye_level',  shot_size: 'wide' },
+    med_frontal:   { camera_move: 'dolly_in',   camera_angle: 'eye_level',  shot_size: 'medium' },
+    med_low:       { camera_move: 'dolly_in',   camera_angle: 'low_angle',  shot_size: 'medium' },
+    med_3q:        { camera_move: 'orbit',      camera_angle: 'profile',    shot_size: 'medium' },
+    side_full:     { camera_move: 'tracking',   camera_angle: 'profile',    shot_size: 'medium_wide' },
+    side_3q:       { camera_move: 'orbit',      camera_angle: 'profile',    shot_size: 'medium' },
+    cu_jacket:     { camera_move: 'dolly_in',   camera_angle: 'eye_level',  shot_size: 'close_up' },
+    cu_fabric:     { camera_move: 'static',     camera_angle: 'eye_level',  shot_size: 'close_up' },
+    cu_collar:     { camera_move: 'dolly_in',   camera_angle: 'eye_level',  shot_size: 'close_up' },
+    cu_hem:        { camera_move: 'tilt_up',    camera_angle: 'low_angle',  shot_size: 'close_up' },
+    cu_belt:       { camera_move: 'static',     camera_angle: 'eye_level',  shot_size: 'close_up' },
+    rear_full:     { camera_move: 'tracking',   camera_angle: 'rear',       shot_size: 'medium_wide' },
+    rear_3q:       { camera_move: 'orbit',      camera_angle: 'rear',       shot_size: 'medium' },
+    rear_low:      { camera_move: 'dolly_in',   camera_angle: 'low_angle',  shot_size: 'medium' },
+    low_front:     { camera_move: 'dolly_in',   camera_angle: 'low_angle',  shot_size: 'medium' },
+    low_power:     { camera_move: 'dolly_in',   camera_angle: 'low_angle',  shot_size: 'wide' },
+    pivot_front:   { camera_move: 'orbit',      camera_angle: 'eye_level',  shot_size: 'medium' },
+    pivot_side:    { camera_move: 'orbit',      camera_angle: 'profile',    shot_size: 'medium' },
+    pivot_slow:    { camera_move: 'orbit',      camera_angle: 'eye_level',  shot_size: 'medium' },
+    face_close:    { camera_move: 'dolly_in',   camera_angle: 'eye_level',  shot_size: 'close_up' },
+    face_med:      { camera_move: 'static',     camera_angle: 'eye_level',  shot_size: 'medium' },
+};
+
+// ── JSON load helpers (regular video wizard) ───────────────────────
+function toggleJsonLoad(show) {
+    document.getElementById('json-load-area').style.display = show ? 'block' : 'none';
+    document.getElementById('json-load-btn').style.display  = show ? 'none'  : 'inline-block';
+    if (!show) document.getElementById('json-paste-input').value = '';
+}
+
+function applyJsonConfig() {
+    let raw = document.getElementById('json-paste-input').value.trim();
+    let configs;
+    try {
+        const parsed = JSON.parse(raw);
+        configs = Array.isArray(parsed) ? parsed : (parsed.shot_configs || null);
+        if (!Array.isArray(configs)) throw new Error('shot_configs dizisi bulunamadı');
+    } catch (e) {
+        alert('Geçersiz JSON: ' + e.message);
+        return;
+    }
+    shots = configs.map(c => {
+        const map = ORDER_TYPE_MAP[c.type] || {};
+        return {
+            camera_move:  map.camera_move  || 'dolly_in',
+            camera_angle: map.camera_angle || 'eye_level',
+            shot_size:    map.shot_size    || 'medium',
+            duration:     Number(c.duration) || 5,
+            description:  '',
+        };
+    });
+    renderShots();
+    updateTotalDurationLabel();
+    toggleJsonLoad(false);
+}
+
+// ── JSON load helpers (defile wizard) ─────────────────────────────
+function toggleDefileJsonLoad(show) {
+    document.getElementById('defile-json-load-area').style.display = show ? 'block' : 'none';
+    document.getElementById('defile-json-load-btn').style.display  = show ? 'none'  : 'inline-block';
+    if (!show) document.getElementById('defile-json-paste-input').value = '';
+}
+
+function applyDefileJsonConfig() {
+    let raw = document.getElementById('defile-json-paste-input').value.trim();
+    let configs;
+    try {
+        const parsed = JSON.parse(raw);
+        configs = Array.isArray(parsed) ? parsed : (parsed.shot_configs || null);
+        if (!Array.isArray(configs)) throw new Error('shot_configs dizisi bulunamadı');
+    } catch (e) {
+        alert('Geçersiz JSON: ' + e.message);
+        return;
+    }
+    defileShotConfigs = configs.map(c => ({ duration: Number(c.duration) || 5 }));
+    renderDefileShotDesigner();
+    toggleDefileJsonLoad(false);
+}
+
 function setGenerationMode(mode) {
     generationMode = mode;
     const btnClassic   = document.getElementById('mode-btn-classic');
