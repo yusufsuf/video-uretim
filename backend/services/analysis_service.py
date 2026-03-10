@@ -104,7 +104,7 @@ async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> Dre
         label += "."
 
     response = await client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-5.4",
         messages=[
             {"role": "system", "content": ANALYSIS_SYSTEM},
             {
@@ -329,7 +329,7 @@ async def generate_multi_scene_prompt(
         })
 
     response = await client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-5.4",
         messages=[
             {"role": "system", "content": MULTI_SCENE_SYSTEM},
             {"role": "user", "content": content_parts},
@@ -457,7 +457,7 @@ async def refine_shot_description(request: RefineShotRequest) -> str:
                 "image_url": {"url": request.location_image_url, "detail": "low"},
             },
         ]
-        model = "gpt-4o"
+        model = "gpt-5.4"
     else:
         location_str = (
             request.custom_location

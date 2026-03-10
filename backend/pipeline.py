@@ -405,124 +405,186 @@ async def run_pipeline(
 # Rich library of Prada-style cinematography techniques.
 # Organised by category; cycles across all shots so every defile gets varied angles.
 
-DEFILE_PROMPTS = [
+DEFILE_SHOT_CONFIGS = [
 
     # ── WIDE / ESTABLISHING ───────────────────────────────────────────────────
-    # Full runway in frame, architectural grandeur, audience rows visible both sides
+    {"prompt": "wide establishing shot, fashion model walks from far backstage end of runway toward camera, white catwalk stretches full length, audience seated both sides, smooth cinematic dolly-in, full body tracking",
+     "nb2_angle": "model as small full-body figure at the far end of the runway, centered, walking toward camera, wide establishing composition, full catwalk visible",
+     "view": "front"},
 
-    "wide establishing shot, fashion model walks from far backstage end of runway toward camera, white catwalk stretches full length, audience seated both sides, smooth cinematic dolly-in, full body tracking",
+    {"prompt": "ultra-wide runway shot, model is a small silhouette at far end and walks closer, enormous luxury fashion show venue, high arched ceiling, dramatic stage lighting, architectural grandeur",
+     "nb2_angle": "model as tiny silhouette at the very far end of the runway, ultra-wide composition, full venue architecture dominates, model centered at vanishing point",
+     "view": "front"},
 
-    "ultra-wide runway shot, model is a small silhouette at far end and walks closer, enormous luxury fashion show venue, high arched ceiling, dramatic stage lighting, architectural grandeur",
+    {"prompt": "overhead bird's-eye crane shot, fashion model walks white runway from above, geometric symmetry of catwalk, audience rows on both sides create framing, pure graphic composition",
+     "nb2_angle": "overhead bird's-eye view, model seen from directly above on the runway, geometric top-down composition, catwalk lines visible",
+     "view": "front"},
 
-    "overhead bird's-eye crane shot, fashion model walks white runway from above, geometric symmetry of catwalk, audience rows on both sides create framing, pure graphic composition",
+    {"prompt": "wide telephoto compressed shot, long lens flattens runway perspective, fashion model sharp in foreground walking toward camera, audience rows stacked abstractly behind, cinematic compression",
+     "nb2_angle": "frontal full body, telephoto compression, model sharp and centered, audience blurred and stacked behind, medium-wide framing",
+     "view": "front"},
 
-    "wide telephoto compressed shot, long lens flattens runway perspective, fashion model sharp in foreground walking toward camera, audience rows stacked abstractly behind, cinematic compression",
-
-    "wide shot from elevated balcony angle, fashion model walks runway below at diagonal, strong geometric composition, venue interior fills frame, grand architectural scale",
+    {"prompt": "wide shot from elevated balcony angle, fashion model walks runway below at diagonal, strong geometric composition, venue interior fills frame, grand architectural scale",
+     "nb2_angle": "model seen from elevated high angle at diagonal, three-quarter overhead view, full body visible from above-front, wide venue composition",
+     "view": "front"},
 
     # ── MEDIUM FRONTAL ────────────────────────────────────────────────────────
-    # Model approaching camera, fills most of frame, confident stride
+    {"prompt": "medium full-body tracking shot, fashion model walks confidently toward camera on white runway, eye level, white barriers frame both sides, sharp focus, 24fps cinematic movement",
+     "nb2_angle": "full body frontal, eye level, model centered walking directly toward camera, head to feet visible, confident stride",
+     "view": "front"},
 
-    "medium full-body tracking shot, fashion model walks confidently toward camera on white runway, eye level, white barriers frame both sides, sharp focus, 24fps cinematic movement",
+    {"prompt": "medium shot with slight low angle, fashion model walks toward camera, angle accentuates height and posture, audience soft blur behind model, white floor reflects runway lights",
+     "nb2_angle": "full body frontal, slight low angle accentuating height, model walking toward camera, upward perspective",
+     "view": "front"},
 
-    "medium shot with slight low angle, fashion model walks toward camera, angle accentuates height and posture, audience soft blur behind model, white floor reflects runway lights",
+    {"prompt": "medium-close shot, fashion model fills frame from knees to head, walks directly toward camera, runway perspective lines converge behind, confident purposeful stride",
+     "nb2_angle": "frontal from knees to head, model fills frame, walking directly toward camera, upper and mid body dominant",
+     "view": "front"},
 
-    "medium-close shot, fashion model fills frame from knees to head, walks directly toward camera, runway perspective lines converge behind, confident purposeful stride",
+    {"prompt": "medium tracking shot, fashion model in three-quarter angle walks toward camera, face and front-side of outfit both visible, dynamic forward movement, shallow depth of field on background",
+     "nb2_angle": "three-quarter front-left angle, face and front-left side of outfit visible, model angled to show depth, full body",
+     "view": "front"},
 
-    "medium tracking shot, fashion model in three-quarter angle walks toward camera, face and front-side of outfit both visible, dynamic forward movement, shallow depth of field on background",
-
-    "medium shot, fashion model walks runway toward camera at golden-hour style dramatic lighting, garment silhouette crisp against bright venue backdrop, editorial fashion film look",
+    {"prompt": "medium shot, fashion model walks runway toward camera at golden-hour style dramatic lighting, garment silhouette crisp against bright venue backdrop, editorial fashion film look",
+     "nb2_angle": "full body frontal centered, dramatic backlighting from venue, model silhouette crisp, walking toward camera",
+     "view": "front"},
 
     # ── CLOSE-UP DETAILS ─────────────────────────────────────────────────────
-    # Garment fabric, construction, drape — texture as subject
+    {"prompt": "close-up on jacket and upper outfit as fashion model walks, camera tracks at torso height, fabric weave texture visible, slight motion blur from forward movement, shallow depth of field",
+     "nb2_angle": "tight close-up on jacket and upper torso, frontal, garment fabric texture and lapels dominant, waist to shoulders",
+     "view": "front"},
 
-    "close-up on jacket and upper outfit as fashion model walks, camera tracks at torso height, fabric weave texture visible, slight motion blur from forward movement, shallow depth of field",
+    {"prompt": "extreme close-up on garment fabric flowing with movement, textile drape and material texture in sharp detail, model's body rhythmic walking motion, kinetic fashion photography",
+     "nb2_angle": "extreme close-up on garment fabric and drape at mid-torso, frontal, textile surface texture fills frame",
+     "view": "front"},
 
-    "extreme close-up on garment fabric flowing with movement, textile drape and material texture in sharp detail, model's body rhythmic walking motion, kinetic fashion photography",
+    {"prompt": "close-up on collar and neckline as fashion model walks, craftsmanship and garment construction visible, runway lights create fabric highlights, bokeh background",
+     "nb2_angle": "tight close-up on collar, neckline and upper chest, frontal, garment construction at neck, head partially visible above",
+     "view": "front"},
 
-    "close-up on collar and neckline as fashion model walks, craftsmanship and garment construction visible, runway lights create fabric highlights, bokeh background",
+    {"prompt": "close-up on hem and skirt movement as model walks, fabric swings with each step, polished white runway floor reflects garment, kinetic motion captured",
+     "nb2_angle": "tight close-up on lower body and hem, frontal, skirt or pants bottom and feet visible, fabric movement at hem",
+     "view": "front"},
 
-    "close-up on hem and skirt movement as model walks, fabric swings with each step, polished white runway floor reflects garment, kinetic motion captured",
+    {"prompt": "tight shot on jacket lapels and chest detail, camera tracks model torso, fabric surface and stitching visible, cinematic depth of field, editorial fashion detail",
+     "nb2_angle": "tight close-up on lapels and chest detail, frontal upper body, jacket construction and stitching visible",
+     "view": "front"},
 
-    "tight shot on jacket lapels and chest detail, camera tracks model torso, fabric surface and stitching visible, cinematic depth of field, editorial fashion detail",
-
-    "close-up on garment back details as model walks away, fabric drape and construction from behind, audience blur peripheral, runway light catches material surface",
+    {"prompt": "close-up on garment back details as model walks away, fabric drape and construction from behind, audience blur peripheral, runway light catches material surface",
+     "nb2_angle": "close-up on garment back, model facing away from camera walking down runway, back fabric and construction visible from behind",
+     "view": "back"},
 
     # ── ACCESSORY EXTREME CLOSE-UPS ──────────────────────────────────────────
-    # Bag, shoes, jewellery — luxury object as protagonist
+    {"prompt": "extreme close-up on handbag swinging as fashion model walks runway, leather texture and metal hardware in sharp detail, motion blur background, luxury accessory focus",
+     "nb2_angle": "tight close-up on model hand and handbag at side, frontal-side view of arm and bag, accessory detail",
+     "view": "front"},
 
-    "extreme close-up on handbag swinging as fashion model walks runway, leather texture and metal hardware in sharp detail, motion blur background, luxury accessory focus",
+    {"prompt": "extreme close-up on footwear as model steps on white runway floor, shoe sole and heel craftsmanship visible, ground-level perspective, each step sharp and deliberate",
+     "nb2_angle": "ground-level close-up on model feet and shoes on runway, frontal low angle, footwear fills frame",
+     "view": "front"},
 
-    "extreme close-up on footwear as model steps on white runway floor, shoe sole and heel craftsmanship visible, ground-level perspective, each step sharp and deliberate",
+    {"prompt": "close-up on wrist and jewellery as model's arm swings walking, metal catches runway light, shallow depth of field, luxury accessory detail shot",
+     "nb2_angle": "tight close-up on wrist and jewellery, model arm at side, frontal-side detail of wrist accessories",
+     "view": "front"},
 
-    "close-up on wrist and jewellery as model's arm swings walking, metal catches runway light, shallow depth of field, luxury accessory detail shot",
-
-    "tight close-up on belt and waist construction as model walks, garment materials and stitching visible, cinematic focus, editorial craftsmanship detail",
+    {"prompt": "tight close-up on belt and waist construction as model walks, garment materials and stitching visible, cinematic focus, editorial craftsmanship detail",
+     "nb2_angle": "tight close-up on waist and belt, frontal mid-section, belt hardware and garment construction at waist",
+     "view": "front"},
 
     # ── LOW ANGLE ────────────────────────────────────────────────────────────
-    # Ground level, dramatic upward perspective, legs dominant
+    {"prompt": "extreme low angle shot, camera at floor level, fashion model's legs and feet walking toward camera on white runway, pants hem in motion, dynamic footstep rhythm",
+     "nb2_angle": "extreme low angle from floor level, looking up at model legs and lower body walking toward camera, dramatic upward perspective",
+     "view": "front"},
 
-    "extreme low angle shot, camera at floor level, fashion model's legs and feet walking toward camera on white runway, pants hem in motion, dynamic footstep rhythm",
+    {"prompt": "low angle shot looking up at fashion model, camera slightly below waist height, model towers against bright venue ceiling, powerful editorial perspective, confident silhouette",
+     "nb2_angle": "low angle looking up at model, full body from below, model towers above with venue ceiling behind, powerful upward perspective",
+     "view": "front"},
 
-    "low angle shot looking up at fashion model, camera slightly below waist height, model towers against bright venue ceiling, powerful editorial perspective, confident silhouette",
-
-    "ground level rear low angle, model's feet and lower legs walking away, white runway floor stretches ahead, audience feet visible at both sides, rhythmic stepping captured",
+    {"prompt": "ground level rear low angle, model's feet and lower legs walking away, white runway floor stretches ahead, audience feet visible at both sides, rhythmic stepping captured",
+     "nb2_angle": "ground-level low angle from behind model, looking up at model walking away, lower legs and back of garment from behind",
+     "view": "back"},
 
     # ── REAR / FOLLOWING ─────────────────────────────────────────────────────
-    # Behind the model, back of outfit, following movement
+    {"prompt": "rear tracking shot, camera directly behind fashion model walking down runway, full back view of outfit, audience rows blur on both sides, smooth following movement",
+     "nb2_angle": "full back view, model facing directly away from camera, complete back of garment visible head to feet, rear tracking composition",
+     "view": "back"},
 
-    "rear tracking shot, camera directly behind fashion model walking down runway, full back view of outfit, audience rows blur on both sides, smooth following movement",
+    {"prompt": "over-shoulder rear tracking, camera slightly to side and behind model, three-quarter back view, runway perspective lines visible ahead, audience in soft periphery",
+     "nb2_angle": "three-quarter back-right view, model right shoulder and back-side of garment visible, over-shoulder perspective, runway visible ahead",
+     "view": "back"},
 
-    "over-shoulder rear tracking, camera slightly to side and behind model, three-quarter back view, runway perspective lines visible ahead, audience in soft periphery",
-
-    "low rear angle tracking shot, camera follows model from low behind, emphasises silhouette and posture, back of garment and collar against bright venue, editorial angle",
+    {"prompt": "low rear angle tracking shot, camera follows model from low behind, emphasises silhouette and posture, back of garment and collar against bright venue, editorial angle",
+     "nb2_angle": "low angle from behind model, looking up at back of garment, posture and silhouette from rear, collar and back detail visible",
+     "view": "back"},
 
     # ── LATERAL / SIDE PROFILE ───────────────────────────────────────────────
-    # Model walks parallel to camera, full silhouette visible
+    {"prompt": "side profile tracking shot, fashion model walks parallel to camera along runway, full outfit silhouette from side, arms swinging, audience soft blur, smooth lateral camera",
+     "nb2_angle": "full left side profile, model walking parallel to camera, complete outfit silhouette from the side head to feet, lateral composition",
+     "view": "side"},
 
-    "side profile tracking shot, fashion model walks parallel to camera along runway, full outfit silhouette from side, arms swinging, audience soft blur, smooth lateral camera",
+    {"prompt": "three-quarter front-side tracking, camera at 45 degrees to model's path, face and front-side of outfit both visible, dynamic angle, smooth follow movement",
+     "nb2_angle": "three-quarter front-right angle at 45 degrees, model face and front-right side of outfit visible, dynamic diagonal composition",
+     "view": "side"},
 
-    "three-quarter front-side tracking, camera at 45 degrees to model's path, face and front-side of outfit both visible, dynamic angle, smooth follow movement",
+    {"prompt": "side close-up tracking at torso level, camera follows model laterally, outfit side profile and construction visible from side, shallow depth of field, editorial",
+     "nb2_angle": "tight close-up from right side at torso level, outfit side construction and silhouette from the side, lateral editorial detail",
+     "view": "side"},
 
-    "side close-up tracking at torso level, camera follows model laterally, outfit side profile and construction visible from side, shallow depth of field, editorial",
-
-    "wide lateral shot, camera perpendicular to runway, fashion model walks through frame, audience visible on near side, full silhouette passes, wide cinematic composition",
+    {"prompt": "wide lateral shot, camera perpendicular to runway, fashion model walks through frame, audience visible on near side, full silhouette passes, wide cinematic composition",
+     "nb2_angle": "wide left side profile, model perpendicular to camera, full silhouette visible from side, wide lateral composition with runway extending",
+     "view": "side"},
 
     # ── END OF RUNWAY TURN ───────────────────────────────────────────────────
-    # Pivot, pause, back-to-front reveal — classic runway moment
+    {"prompt": "fashion model reaches end of runway, dramatic pause then slow deliberate pivot, camera holds and circles slightly, full outfit front-to-back reveal, editorial runway moment",
+     "nb2_angle": "model at end of runway in pivot pose, three-quarter angle showing both front and turning side, poised confident stance",
+     "view": "front"},
 
-    "fashion model reaches end of runway, dramatic pause then slow deliberate pivot, camera holds and circles slightly, full outfit front-to-back reveal, editorial runway moment",
+    {"prompt": "model at runway end, slow-motion pivot, camera frontal holds as model turns, face composition changes through the turn, fabric swings with the movement, confident expression",
+     "nb2_angle": "frontal medium at runway end, model in slight pivot, face toward camera, fabric in motion from turn",
+     "view": "front"},
 
-    "model at runway end, slow-motion pivot, camera frontal holds as model turns, face composition changes through the turn, fabric swings with the movement, confident expression",
-
-    "end of runway turn from side angle, model pivots away from far end and begins walk back, profile to three-quarter reveal, audience beyond in soft focus",
+    {"prompt": "end of runway turn from side angle, model pivots away from far end and begins walk back, profile to three-quarter reveal, audience beyond in soft focus",
+     "nb2_angle": "side profile at runway end, model mid-pivot showing full side silhouette, three-quarter angle during turn",
+     "view": "side"},
 
     # ── SLOW MOTION ──────────────────────────────────────────────────────────
-    # Cinematic slow-mo, fabric kinetics, hair movement
+    {"prompt": "slow motion medium shot, fashion model walks runway in cinematic slow-mo, fabric ripples and flows with each step, hair movement visible, editorial fashion film quality",
+     "nb2_angle": "full body frontal, model centered, fabric flowing, elegant slow motion pose, head to feet visible",
+     "view": "front"},
 
-    "slow motion medium shot, fashion model walks runway in cinematic slow-mo, fabric ripples and flows with each step, hair movement visible, editorial fashion film quality",
+    {"prompt": "slow motion close-up, garment fabric and drape in slow motion, material waves and swings captured in fine detail, kinetic beauty of fashion in motion",
+     "nb2_angle": "extreme close-up on fabric drape and movement at mid-torso, frontal, fabric flowing in motion",
+     "view": "front"},
 
-    "slow motion close-up, garment fabric and drape in slow motion, material waves and swings captured in fine detail, kinetic beauty of fashion in motion",
-
-    "slow motion low angle, model's legs and garment hem in slow motion, fabric swings dramatically, white runway floor in sharp foreground, editorial slow-mo moment",
+    {"prompt": "slow motion low angle, model's legs and garment hem in slow motion, fabric swings dramatically, white runway floor in sharp foreground, editorial slow-mo moment",
+     "nb2_angle": "low angle frontal, legs and hem dominant, fabric at hem flowing, runway floor in sharp foreground",
+     "view": "front"},
 
     # ── FACE / EXPRESSION ────────────────────────────────────────────────────
-    # Stoic editorial expression, eyes forward, Prada intensity
+    {"prompt": "close-up on fashion model's face while walking runway, stoic focused editorial expression, eyes straight ahead, venue lights sculpt face, garment collar visible below",
+     "nb2_angle": "close-up on face and upper chest, frontal, stoic editorial expression, garment collar and neckline visible below face",
+     "view": "front"},
 
-    "close-up on fashion model's face while walking runway, stoic focused editorial expression, eyes straight ahead, venue lights sculpt face, garment collar visible below",
+    {"prompt": "medium-close shot centered on face and upper body, model walks toward camera, expression powerful and composed, garment neckline prominent, runway recedes behind in bokeh",
+     "nb2_angle": "medium-close frontal, face and upper body, model looking directly at camera, garment neckline prominent",
+     "view": "front"},
 
-    "medium-close shot centered on face and upper body, model walks toward camera, expression powerful and composed, garment neckline prominent, runway recedes behind in bokeh",
-
-    "tight face tracking shot, camera ahead of walking model, dramatic side lighting from runway lights, editorial intensity, background of audience out of focus",
+    {"prompt": "tight face tracking shot, camera ahead of walking model, dramatic side lighting from runway lights, editorial intensity, background of audience out of focus",
+     "nb2_angle": "tight face close-up, frontal with dramatic directional lighting, model face fills upper frame, garment shoulder and collar visible",
+     "view": "front"},
 
     # ── ARCHITECTURAL / ENVIRONMENTAL ────────────────────────────────────────
-    # Venue as character, model within grand space
+    {"prompt": "wide architectural shot, grand fashion show venue with model as small figure, dramatic columns or ceiling structure visible, model walks runway through monumental interior",
+     "nb2_angle": "model as small full-body figure centered in grand architectural space, wide environmental composition, venue structure dominates",
+     "view": "front"},
 
-    "wide architectural shot, grand fashion show venue with model as small figure, dramatic columns or ceiling structure visible, model walks runway through monumental interior",
+    {"prompt": "medium shot emphasising venue geometry, white runway lines converge to vanishing point behind model, symmetrical composition, model centered walking toward camera",
+     "nb2_angle": "full body frontal centered, symmetrical runway perspective lines converge behind model, geometric environmental composition",
+     "view": "front"},
 
-    "medium shot emphasising venue geometry, white runway lines converge to vanishing point behind model, symmetrical composition, model centered walking toward camera",
-
-    "long-lens medium shot, fashion model isolated against abstract soft-focus audience, telephoto compression renders background as warm blurred mass, model crisp and sharp",
+    {"prompt": "long-lens medium shot, fashion model isolated against abstract soft-focus audience, telephoto compression renders background as warm blurred mass, model crisp and sharp",
+     "nb2_angle": "medium frontal, telephoto-style compression, model sharp against very blurred audience background, isolated editorial look",
+     "view": "front"},
 ]
 
 
@@ -573,14 +635,26 @@ async def run_defile_collection_pipeline(
             fal_front, fal_side, fal_back = fal_outfits[outfit_idx]
 
             # Garment reference list for NB2 (front always present, side/back optional)
-            garment_refs = [fal_front] + ([fal_side] if fal_side else []) + ([fal_back] if fal_back else [])
-
             # Each outfit starts fresh from the runway background
             current_start_image = fal_background_url
 
             for shot_idx in range(shots_per):
                 global_shot = outfit_idx * shots_per + shot_idx
                 base_progress = 20 + int((global_shot / total_shots) * 65)
+
+                # Select shot config (prompt + angle + view) cycling through library
+                shot_config = DEFILE_SHOT_CONFIGS[global_shot % len(DEFILE_SHOT_CONFIGS)]
+                prompt_text = shot_config["prompt"]
+                nb2_angle = shot_config["nb2_angle"]
+                view = shot_config["view"]
+
+                # Build garment refs based on view — use best available reference angle
+                if view == "back":
+                    view_refs = [fal_back] if fal_back else [fal_front]
+                elif view == "side":
+                    view_refs = [fal_side] if fal_side else [fal_front]
+                else:  # front (default)
+                    view_refs = [fal_front] + ([fal_side] if fal_side else [])
 
                 # ── 3a: NB2 scene composition ─────────────────────────────
                 _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
@@ -590,14 +664,14 @@ async def run_defile_collection_pipeline(
                 nb2_prompt = (
                     "Fashion runway show editorial photo: the first image is the runway scene — "
                     "preserve it exactly including architecture, lighting, floor, and audience. "
-                    "Place a tall fashion model wearing the garment from the reference images "
-                    "(images 2 onward) walking on the runway catwalk, centered, full body visible. "
+                    f"Place a tall fashion model on the runway catwalk wearing the garment from the reference images (images 2 onward). "
+                    f"Camera composition and angle: {nb2_angle}. "
                     "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
-                    "Professional fashion show photography, sharp focus, elegant confident pose."
+                    "Professional fashion show photography, sharp focus."
                 )
 
                 scene_frame_url = await generate_scene_frame(
-                    image_urls=[current_start_image] + garment_refs,
+                    image_urls=[current_start_image] + view_refs,
                     prompt=nb2_prompt,
                     aspect_ratio=request.aspect_ratio,
                 )
@@ -608,9 +682,8 @@ async def run_defile_collection_pipeline(
                 _update_job(job_id, progress=base_progress + max(1, int(32 / total_shots)),
                             message=f"{outfit_name} — sahne {shot_idx + 1}/{shots_per} animate ediliyor...")
 
-                prompt_text = DEFILE_PROMPTS[global_shot % len(DEFILE_PROMPTS)]
-                logger.info("[%s] Defile shot %d/%d: outfit=%s, prompt=%.60s",
-                            job_id, global_shot + 1, total_shots, outfit_name, prompt_text)
+                logger.info("[%s] Defile shot %d/%d: outfit=%s view=%s prompt=%.60s",
+                            job_id, global_shot + 1, total_shots, outfit_name, view, prompt_text)
 
                 clip_url = await generate_multishot_video(
                     start_image_url=scene_frame_url,
