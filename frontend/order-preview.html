@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Konfigürasyonu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* ── Theme tokens ── */
+        :root {
+            --font: 'Inter', sans-serif;
+            --font-display: 'Outfit', sans-serif;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+
+        [data-theme="dark"] {
+            --bg:          #0a0a0a;
+            --bg-raised:   #111111;
+            --surface:     #161616;
+            --surface-2:   #1c1c1c;
+            --border:      #2a2a2a;
+            --border-2:    #333333;
+            --text:        #f2f2f2;
+            --text-2:      #999999;
+            --text-3:      #555555;
+            --accent:      #f2f2f2;
+            --accent-inv:  #0a0a0a;
+            --accent-soft: rgba(242,242,242,0.08);
+            --accent-soft2:rgba(242,242,242,0.12);
+            --green:       #4ade80;
+            --green-bg:    rgba(74,222,128,0.1);
+            --amber:       #fbbf24;
+            --amber-bg:    rgba(251,191,36,0.1);
+            --red:         #f87171;
+            --red-bg:      rgba(248,113,113,0.1);
+            --shadow:      0 1px 3px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.3);
+        }
+
+        [data-theme="light"] {
+            --bg:          #f5f5f5;
+            --bg-raised:   #ffffff;
+            --surface:     #ffffff;
+            --surface-2:   #f0f0f0;
+            --border:      #e5e5e5;
+            --border-2:    #d4d4d4;
+            --text:        #0a0a0a;
+            --text-2:      #6b6b6b;
+            --text-3:      #b0b0b0;
+            --accent:      #0a0a0a;
+            --accent-inv:  #f2f2f2;
+            --accent-soft: rgba(0,0,0,0.06);
+            --accent-soft2:rgba(0,0,0,0.1);
+            --green:       #16a34a;
+            --green-bg:    rgba(22,163,74,0.08);
+            --amber:       #d97706;
+            --amber-bg:    rgba(217,119,6,0.08);
+            --red:         #dc2626;
+            --red-bg:      rgba(220,38,38,0.08);
+            --shadow:      0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            transition: background 0.2s ease, color 0.2s ease;
+        }
+
+        /* ── Top bar ── */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            padding: 0 32px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        [data-theme="dark"] .topbar {
+            background: rgba(10,10,10,0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        [data-theme="light"] .topbar {
+            background: rgba(245,245,245,0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .topbar-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 0.95rem;
+            letter-spacing: -0.02em;
+            color: var(--text);
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* ── Theme toggle ── */
+        .theme-toggle {
+            width: 36px; height: 36px;
+            background: var(--accent-soft);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem;
+            color: var(--text-2);
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .theme-toggle:hover { background: var(--accent-soft2); color: var(--text); border-color: var(--border-2); }
+
+        /* ── Page layout ── */
+        .page {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 36px 24px 80px;
+        }
+
+        .page-head {
+            margin-bottom: 28px;
+        }
+        .page-title {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 1.6rem;
+            letter-spacing: -0.03em;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+        .page-sub {
+            font-size: 0.82rem;
+            color: var(--text-2);
+        }
+
+        /* ── Duration bar ── */
+        .dur-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 28px;
+            box-shadow: var(--shadow);
+        }
+        .dur-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-3);
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            white-space: nowrap;
+        }
+        .dur-track {
+            flex: 1;
+            height: 5px;
+            background: var(--surface-2);
+            border-radius: 3px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .dur-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: var(--green);
+            transition: width 0.25s ease, background 0.25s ease;
+        }
+        .dur-fill.warn { background: var(--amber); }
+        .dur-fill.full  { background: var(--red); }
+        .dur-value {
+            font-size: 0.82rem;
+            font-weight: 700;
+            white-space: nowrap;
+            min-width: 56px;
+            text-align: right;
+            color: var(--text);
+        }
+        .dur-value em { color: var(--text-3); font-style: normal; font-weight: 400; }
+
+        /* ── Columns ── */
+        .columns {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 20px;
+            align-items: start;
+        }
+
+        /* ── Section label ── */
+        .sec-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            color: var(--text-3);
+            margin-bottom: 10px;
+        }
+
+        /* ── Library panel ── */
+        .library-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        .lib-top {
+            padding: 16px 18px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .lib-top-title {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-2);
+            margin-bottom: 12px;
+        }
+        .cat-row {
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding-bottom: 1px;
+        }
+        .cat-row::-webkit-scrollbar { display: none; }
+        .cat-btn {
+            flex-shrink: 0;
+            padding: 5px 13px;
+            border-radius: 20px;
+            font-size: 0.73rem;
+            font-weight: 500;
+            color: var(--text-2);
+            background: none;
+            border: 1px solid transparent;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.12s ease;
+            font-family: var(--font);
+        }
+        .cat-btn:hover { color: var(--text); background: var(--accent-soft); border-color: var(--border); }
+        .cat-btn.on { color: var(--text); background: var(--accent-soft2); border-color: var(--border-2); }
+
+        .lib-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            padding: 14px 14px 16px;
+        }
+
+        /* ── Shot card ── */
+        .shot-card {
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            border: 1.5px solid var(--border);
+            cursor: pointer;
+            transition: border-color 0.12s, transform 0.12s, box-shadow 0.12s;
+            background: var(--surface-2);
+            position: relative;
+        }
+        .shot-card:hover {
+            border-color: var(--border-2);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+        .shot-card.on {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+        }
+        .shot-video-wrap {
+            width: 100%;
+            aspect-ratio: 9/16;
+            background: var(--bg);
+            position: relative;
+            overflow: hidden;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .shot-video-wrap video {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .shot-placeholder {
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(160deg, var(--surface-2) 0%, var(--bg) 100%);
+        }
+        .shot-placeholder-icon {
+            font-size: 1rem;
+            opacity: 0.2;
+        }
+        .shot-check {
+            position: absolute;
+            top: 5px; right: 5px;
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: var(--accent-inv);
+            font-size: 0.6rem;
+            font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0;
+            transition: opacity 0.12s;
+        }
+        .shot-card:hover .shot-check { opacity: 0.5; }
+        .shot-card.on .shot-check { opacity: 1; }
+        .shot-info {
+            padding: 7px 8px 8px;
+        }
+        .shot-name {
+            font-size: 0.68rem;
+            font-weight: 600;
+            line-height: 1.3;
+            color: var(--text);
+        }
+        .shot-cat {
+            font-size: 0.6rem;
+            color: var(--text-3);
+            margin-top: 2px;
+        }
+
+        /* ── Right panel ── */
+        .right-col {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        .panel-head {
+            padding: 13px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .panel-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-2);
+        }
+        .panel-count {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-3);
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 2px 8px;
+        }
+        .panel-body {
+            padding: 12px;
+        }
+
+        /* ── Sequence empty ── */
+        .seq-empty {
+            text-align: center;
+            padding: 28px 12px;
+            color: var(--text-3);
+            font-size: 0.75rem;
+            line-height: 1.6;
+        }
+        .seq-empty-icon { font-size: 1.4rem; margin-bottom: 8px; opacity: 0.3; }
+
+        /* ── Sequence slot ── */
+        .slot {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            margin-bottom: 6px;
+            transition: border-color 0.1s;
+        }
+        .slot:last-child { margin-bottom: 0; }
+        .slot:hover { border-color: var(--border-2); }
+
+        .slot-num {
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            background: var(--accent-soft2);
+            border: 1px solid var(--border-2);
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--text-2);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+        .slot-thumb {
+            width: 26px; height: 46px;
+            border-radius: 4px;
+            background: var(--bg);
+            flex-shrink: 0;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .slot-thumb video, .slot-thumb img {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .slot-thumb-empty {
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.5rem;
+            color: var(--text-3);
+        }
+        .slot-body {
+            flex: 1;
+            min-width: 0;
+        }
+        .slot-name {
+            font-size: 0.71rem;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text);
+        }
+        .slot-dur {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 4px;
+        }
+        .dur-btn {
+            width: 18px; height: 18px;
+            border-radius: 4px;
+            background: var(--accent-soft);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 0.75rem;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.1s, border-color 0.1s;
+            font-family: var(--font);
+        }
+        .dur-btn:hover { background: var(--accent-soft2); border-color: var(--border-2); }
+        .dur-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .dur-num {
+            font-size: 0.72rem;
+            font-weight: 700;
+            min-width: 20px;
+            text-align: center;
+            color: var(--text);
+        }
+        .dur-unit {
+            font-size: 0.62rem;
+            color: var(--text-3);
+        }
+        .slot-del {
+            width: 20px; height: 20px;
+            border-radius: 4px;
+            background: none;
+            border: none;
+            color: var(--text-3);
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            transition: color 0.1s, background 0.1s;
+        }
+        .slot-del:hover { color: var(--red); background: var(--red-bg); }
+
+        /* ── Generate button ── */
+        .gen-btn {
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: var(--accent-inv);
+            border: none;
+            border-radius: var(--radius-md);
+            font-family: var(--font);
+            font-weight: 700;
+            font-size: 0.83rem;
+            cursor: pointer;
+            letter-spacing: 0.01em;
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .gen-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+        .gen-btn:disabled { opacity: 0.25; cursor: not-allowed; transform: none; }
+
+        /* ── Code output ── */
+        .code-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        .code-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+        .code-title {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-3);
+        }
+        .copy-btn {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-2);
+            background: var(--accent-soft);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 3px 10px;
+            cursor: pointer;
+            font-family: var(--font);
+            transition: all 0.1s;
+        }
+        .copy-btn:hover { color: var(--text); border-color: var(--border-2); background: var(--accent-soft2); }
+        .copy-btn.done { color: var(--green); border-color: var(--green); }
+
+        .code-body {
+            padding: 14px;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.69rem;
+            line-height: 1.8;
+            color: var(--text-2);
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        [data-theme="dark"]  .code-body { color: #7dd3fc; }
+        [data-theme="light"] .code-body { color: #1d4ed8; }
+
+        /* ── Info note ── */
+        .note {
+            display: flex;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-size: 0.72rem;
+            color: var(--text-3);
+            line-height: 1.5;
+        }
+        .note-icon { flex-shrink: 0; }
+
+        /* ── Responsive ── */
+        @media (max-width: 820px) {
+            .topbar { padding: 0 16px; }
+            .page { padding: 24px 14px 60px; }
+            .columns { grid-template-columns: 1fr; }
+            .right-col { order: -1; }
+            .lib-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 480px) {
+            .lib-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+    <div class="topbar-title">Video Konfigürasyonu</div>
+    <div class="topbar-right">
+        <button class="theme-toggle" id="theme-btn" onclick="toggleTheme()" title="Tema değiştir">
+            <span id="theme-icon">☀️</span>
+        </button>
+    </div>
+</div>
+
+<div class="page">
+
+    <div class="page-head">
+        <h1 class="page-title">Sahne Sıranızı Oluşturun</h1>
+        <p class="page-sub">Sahne tipine tıklayarak sıraya ekleyin. Her sahnenin süresini ayarlayın. Maks. 15 saniye.</p>
+    </div>
+
+    <!-- Duration bar -->
+    <div class="dur-bar">
+        <div class="dur-label">Toplam Süre</div>
+        <div class="dur-track">
+            <div class="dur-fill" id="dur-fill"></div>
+        </div>
+        <div class="dur-value" id="dur-value">0s <em>/ 15s</em></div>
+    </div>
+
+    <div class="columns">
+
+        <!-- Left: Library -->
+        <div>
+            <div class="sec-label">Sahne Kütüphanesi</div>
+            <div class="library-panel">
+                <div class="lib-top">
+                    <div class="lib-top-title">Bir sahne tipine tıklayarak sekansınıza ekleyin</div>
+                    <div class="cat-row" id="cat-row"></div>
+                </div>
+                <div class="lib-grid" id="lib-grid"></div>
+            </div>
+        </div>
+
+        <!-- Right: Sequence + actions -->
+        <div class="right-col">
+
+            <div>
+                <div class="sec-label">Seçilen Sekans</div>
+                <div class="panel">
+                    <div class="panel-head">
+                        <div class="panel-title">Sahne Sırası</div>
+                        <div class="panel-count" id="seq-count">0 sahne</div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="seq-empty" id="seq-empty">
+                            <div class="seq-empty-icon">🎬</div>
+                            Soldaki kartlara tıklayarak<br>sahne ekleyin.
+                        </div>
+                        <div id="seq-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="gen-btn" id="gen-btn" onclick="generateCode()" disabled>
+                Sipariş Kodu Oluştur
+            </button>
+
+            <div class="code-panel" id="code-panel" style="display:none">
+                <div class="code-head">
+                    <div class="code-title">Sipariş Kodu</div>
+                    <button class="copy-btn" id="copy-btn" onclick="copyCode()">Kopyala</button>
+                </div>
+                <div class="code-body" id="code-body"></div>
+            </div>
+
+            <div class="note">
+                <span class="note-icon">ℹ</span>
+                <span>Bu kodu admin paneline yapıştırdığınızda seçilen sahne sırası ve süreler otomatik uygulanır.</span>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Shot data ─────────────────────────────────────────────────────
+const SHOTS = [
+    { id:'wide_full',     cat:'wide',    name:'Tam Pist Genel',       sub:'Geniş / Genel',  video:null },
+    { id:'wide_ultra',    cat:'wide',    name:'Ultra Geniş Mekan',    sub:'Geniş / Genel',  video:null },
+    { id:'wide_overhead', cat:'wide',    name:'Kuş Bakışı',           sub:'Geniş / Genel',  video:null },
+    { id:'wide_tele',     cat:'wide',    name:'Telefoto Sıkışık',     sub:'Geniş / Genel',  video:null },
+    { id:'med_frontal',   cat:'medium',  name:'Orta Boy Önden',       sub:'Orta Boy',       video:null },
+    { id:'med_low',       cat:'medium',  name:'Hafif Alçak Önden',    sub:'Orta Boy',       video:null },
+    { id:'med_3q',        cat:'medium',  name:'Üç Çeyrek Açı',        sub:'Orta Boy',       video:null },
+    { id:'side_full',     cat:'medium',  name:'Yan Tam Profil',       sub:'Orta Boy',       video:null },
+    { id:'side_3q',       cat:'medium',  name:'Yan Üç Çeyrek',        sub:'Orta Boy',       video:null },
+    { id:'cu_jacket',     cat:'closeup', name:'Kıyafet Üst Detay',    sub:'Yakın Çekim',    video:null },
+    { id:'cu_fabric',     cat:'closeup', name:'Kumaş Doku',           sub:'Yakın Çekim',    video:null },
+    { id:'cu_collar',     cat:'closeup', name:'Yaka / Boyun',         sub:'Yakın Çekim',    video:null },
+    { id:'cu_hem',        cat:'closeup', name:'Etek Eteği Hareketi',  sub:'Yakın Çekim',    video:null },
+    { id:'cu_belt',       cat:'closeup', name:'Kemer / Bel Detayı',   sub:'Yakın Çekim',    video:null },
+    { id:'rear_full',     cat:'rear',    name:'Tam Arkadan Takip',    sub:'Arkadan',         video:null },
+    { id:'rear_3q',       cat:'rear',    name:'Üç Çeyrek Arka',       sub:'Arkadan',         video:null },
+    { id:'rear_low',      cat:'rear',    name:'Alçak Arkadan',        sub:'Arkadan',         video:null },
+    { id:'low_front',     cat:'low',     name:'Zemin Seviyesi Önden', sub:'Alçak Açı',      video:null },
+    { id:'low_power',     cat:'low',     name:'Güçlü Alçak Açı',     sub:'Alçak Açı',      video:null },
+    { id:'pivot_front',   cat:'pivot',   name:'Pivot — Önden Tutar',  sub:'Pivot / Dönüş',  video:null },
+    { id:'pivot_side',    cat:'pivot',   name:'Pivot — Yan Profil',   sub:'Pivot / Dönüş',  video:null },
+    { id:'pivot_slow',    cat:'pivot',   name:'Ağır Çekim Pivot',     sub:'Pivot / Dönüş',  video:null },
+    { id:'face_close',    cat:'face',    name:'Yüz Yakın',            sub:'Yüz',             video:null },
+    { id:'face_med',      cat:'face',    name:'Yüz + Üst Beden',      sub:'Yüz',             video:null },
+];
+
+const CATS = [
+    { id:'all',     label:'Tümü'         },
+    { id:'wide',    label:'Geniş'        },
+    { id:'medium',  label:'Orta Boy'     },
+    { id:'closeup', label:'Yakın Çekim'  },
+    { id:'rear',    label:'Arkadan'      },
+    { id:'low',     label:'Alçak Açı'   },
+    { id:'pivot',   label:'Pivot'        },
+    { id:'face',    label:'Yüz'          },
+];
+
+const MAX = 15, MIN = 3;
+let seq = [];      // [{shot, dur}]
+let activeCat = 'all';
+
+// ── Theme ─────────────────────────────────────────────────────────
+function toggleTheme() {
+    const html = document.documentElement;
+    const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+    html.dataset.theme = next;
+    document.getElementById('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+}
+
+// ── Category bar ──────────────────────────────────────────────────
+function buildCats() {
+    const row = document.getElementById('cat-row');
+    row.innerHTML = CATS.map(c => `
+        <button class="cat-btn ${c.id === activeCat ? 'on' : ''}"
+                onclick="setCat('${c.id}', this)">${c.label}</button>
+    `).join('');
+}
+
+function setCat(id, btn) {
+    activeCat = id;
+    document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    renderGrid();
+}
+
+// ── Library grid ──────────────────────────────────────────────────
+function renderGrid() {
+    const list = activeCat === 'all' ? SHOTS : SHOTS.filter(s => s.cat === activeCat);
+    const grid = document.getElementById('lib-grid');
+    grid.innerHTML = list.map(s => {
+        const on = seq.some(x => x.shot.id === s.id);
+        return `
+        <div class="shot-card ${on ? 'on' : ''}" onclick="toggleShot('${s.id}')">
+            <div class="shot-video-wrap">
+                ${s.video
+                    ? `<video src="${s.video}" autoplay loop muted playsinline></video>`
+                    : `<div class="shot-placeholder"><div class="shot-placeholder-icon">▶</div></div>`
+                }
+                <div class="shot-check">${on ? '✓' : '+'}</div>
+            </div>
+            <div class="shot-info">
+                <div class="shot-name">${s.name}</div>
+                <div class="shot-cat">${s.sub}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── Toggle shot ───────────────────────────────────────────────────
+function toggleShot(id) {
+    const shot = SHOTS.find(s => s.id === id);
+    const idx = seq.findIndex(x => x.shot.id === id);
+    if (idx >= 0) {
+        seq.splice(idx, 1);
+    } else {
+        const used = seq.reduce((a, x) => a + x.dur, 0);
+        const left = MAX - used;
+        if (left <= 0) { alert('Maksimum 15 saniyeye ulaştınız. Önce bir sahne kaldırın.'); return; }
+        seq.push({ shot, dur: Math.min(5, Math.max(MIN, left)) });
+    }
+    renderAll();
+}
+
+// ── Sequence list ─────────────────────────────────────────────────
+function renderSeq() {
+    const empty = document.getElementById('seq-empty');
+    const list  = document.getElementById('seq-list');
+    const count = document.getElementById('seq-count');
+    const total = seq.reduce((a, x) => a + x.dur, 0);
+
+    empty.style.display = seq.length ? 'none' : 'block';
+    count.textContent = seq.length + ' sahne';
+
+    list.innerHTML = seq.map((item, i) => {
+        const canMinus = item.dur > MIN;
+        const canPlus  = total < MAX;
+        return `
+        <div class="slot">
+            <div class="slot-num">${i + 1}</div>
+            <div class="slot-thumb">
+                ${item.shot.video
+                    ? `<video src="${item.shot.video}" autoplay loop muted playsinline></video>`
+                    : `<div class="slot-thumb-empty">▶</div>`
+                }
+            </div>
+            <div class="slot-body">
+                <div class="slot-name">${item.shot.name}</div>
+                <div class="slot-dur">
+                    <button class="dur-btn" onclick="changeDur(${i},-1)" ${canMinus ? '' : 'disabled'}>−</button>
+                    <span class="dur-num">${item.dur}</span>
+                    <span class="dur-unit">sn</span>
+                    <button class="dur-btn" onclick="changeDur(${i},1)"  ${canPlus  ? '' : 'disabled'}>+</button>
+                </div>
+            </div>
+            <button class="slot-del" onclick="removeSlot(${i})" title="Kaldır">✕</button>
+        </div>`;
+    }).join('');
+}
+
+function changeDur(idx, d) {
+    const total = seq.reduce((a, x, i) => i === idx ? a : a + x.dur, 0);
+    const nd = seq[idx].dur + d;
+    if (nd < MIN || total + nd > MAX) return;
+    seq[idx].dur = nd;
+    renderAll();
+}
+
+function removeSlot(idx) {
+    seq.splice(idx, 1);
+    renderAll();
+}
+
+// ── Duration bar ──────────────────────────────────────────────────
+function renderDur() {
+    const total = seq.reduce((a, x) => a + x.dur, 0);
+    const pct = (total / MAX) * 100;
+    const fill = document.getElementById('dur-fill');
+    fill.style.width = pct + '%';
+    fill.className = 'dur-fill' + (pct >= 100 ? ' full' : pct >= 80 ? ' warn' : '');
+    document.getElementById('dur-value').innerHTML = `${total}s <em>/ ${MAX}s</em>`;
+    document.getElementById('gen-btn').disabled = seq.length === 0;
+}
+
+// ── Generate code ─────────────────────────────────────────────────
+function generateCode() {
+    const payload = {
+        shot_configs: seq.map(x => ({ type: x.shot.id, duration: x.dur })),
+        total_duration: seq.reduce((a, x) => a + x.dur, 0),
+    };
+    document.getElementById('code-body').textContent = JSON.stringify(payload, null, 2);
+    document.getElementById('code-panel').style.display = 'block';
+    document.getElementById('code-panel').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function copyCode() {
+    navigator.clipboard.writeText(document.getElementById('code-body').textContent).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'Kopyalandı ✓';
+        btn.classList.add('done');
+        setTimeout(() => { btn.textContent = 'Kopyala'; btn.classList.remove('done'); }, 1600);
+    });
+}
+
+// ── Render all ────────────────────────────────────────────────────
+function renderAll() {
+    renderGrid();
+    renderSeq();
+    renderDur();
+    document.getElementById('code-panel').style.display = 'none';
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+buildCats();
+renderAll();
+</script>
+</body>
+</html>
