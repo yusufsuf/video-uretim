@@ -140,10 +140,65 @@ let libraryStyleUrl    = null;
 // ─── Defile State ────────────────────────────────────────────────
 let videoMode = "video";          // "video" | "defile"
 let defileOutfits = [];           // [{front_url, side_url, back_url, name}]
-let defileShotsPerOutfit = 1;
+let defileShotConfigs = [{ duration: 5 }]; // global shot list [{duration}]
 let defileBgUrl = null;
 let defileBgExtraUrls = [];
 let defileAspectRatio = "9:16";
+
+// ── Defile Shot Designer ─────────────────────────────────────────────
+const DEFILE_MAX_TOTAL = 15;
+const DEFILE_MIN_SHOT  = 3;
+const DEFILE_MAX_SHOT  = 10;
+const DEFILE_MAX_SHOTS = 5;
+
+function _defileTotalDuration() {
+    return defileShotConfigs.reduce((s, c) => s + c.duration, 0);
+}
+
+function renderDefileShotDesigner() {
+    const container = document.getElementById("defile-shot-rows");
+    const totalLabel = document.getElementById("defile-total-dur-label");
+    const addBtn = document.getElementById("defile-add-shot-btn");
+    if (!container) return;
+
+    const total = _defileTotalDuration();
+    if (totalLabel) {
+        totalLabel.textContent = `${total}s / ${DEFILE_MAX_TOTAL}s`;
+        totalLabel.style.color = total > DEFILE_MAX_TOTAL ? "var(--error)" : "var(--text-secondary)";
+    }
+    if (addBtn) addBtn.style.display = defileShotConfigs.length >= DEFILE_MAX_SHOTS ? "none" : "block";
+
+    container.innerHTML = defileShotConfigs.map((cfg, idx) => `
+        <div style="display:flex;align-items:center;gap:8px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px">
+            <span style="font-size:0.72rem;font-weight:600;color:var(--text-muted);min-width:52px">Sahne ${idx + 1}</span>
+            <input type="range" class="shot-dur-slider" style="flex:1" min="${DEFILE_MIN_SHOT}" max="${DEFILE_MAX_SHOT}" value="${cfg.duration}"
+                oninput="updateDefileShotDuration(${idx}, this.value)">
+            <span style="font-size:0.72rem;font-weight:600;color:var(--text-primary);min-width:24px;text-align:right">${cfg.duration}s</span>
+            ${defileShotConfigs.length > 1
+                ? `<button onclick="removeDefileShot(${idx})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.8rem;padding:2px 4px;line-height:1" title="Sahneyi kaldır">✕</button>`
+                : ""}
+        </div>
+    `).join("");
+}
+
+function updateDefileShotDuration(idx, val) {
+    defileShotConfigs[idx].duration = parseInt(val);
+    renderDefileShotDesigner();
+}
+
+function addDefileShot() {
+    if (defileShotConfigs.length >= DEFILE_MAX_SHOTS) return;
+    const remaining = DEFILE_MAX_TOTAL - _defileTotalDuration();
+    const dur = Math.max(DEFILE_MIN_SHOT, Math.min(DEFILE_MAX_SHOT, remaining > 0 ? remaining : DEFILE_MIN_SHOT));
+    defileShotConfigs.push({ duration: dur });
+    renderDefileShotDesigner();
+}
+
+function removeDefileShot(idx) {
+    if (defileShotConfigs.length <= 1) return;
+    defileShotConfigs.splice(idx, 1);
+    renderDefileShotDesigner();
+}
 
 // ─── Location State ─────────────────────────────────────────────────
 let selectedLocation = "studio";
@@ -783,7 +838,7 @@ window.clearLibraryBg    = clearLibraryBg;
 function openDefile() {
     videoMode = "defile";
     defileOutfits = [];
-    defileShotsPerOutfit = 1;
+    defileShotConfigs = [{ duration: 5 }];
     defileBgUrl = null;
     defileBgExtraUrls = [];
     defileAspectRatio = "9:16";
@@ -817,8 +872,9 @@ function openDefile() {
         d.classList.toggle("active", i === 0);
     });
 
-    // Render initial defile grid
+    // Render initial defile grid + shot designer
     renderDefileGrid();
+    renderDefileShotDesigner();
 
     wizardModal.style.display = "flex";
     document.body.style.overflow = "hidden";
@@ -858,11 +914,7 @@ function removeDefileOutfit(idx) {
     renderDefileGrid();
 }
 
-function updateDefileShots(val) {
-    defileShotsPerOutfit = parseInt(val);
-    const label = document.getElementById("defile-shots-label");
-    if (label) label.textContent = `${val} sahne`;
-}
+// updateDefileShots removed — replaced by renderDefileShotDesigner
 
 function clearDefileBg() {
     defileBgUrl = null;
@@ -1029,7 +1081,7 @@ async function startDefileCollection() {
     generationStarted = true;
     wizardFooter.style.display = "none";
     step4Title.textContent = "Defile Üretiliyor...";
-    step4Sub.textContent = `${defileOutfits.length} kıyafet, sahne başına ${defileShotsPerOutfit} çekim. Lütfen bekleyin.`;
+    step4Sub.textContent = `${defileOutfits.length} kıyafet, ${defileShotConfigs.length} sahne (${_defileTotalDuration()}s). Lütfen bekleyin.`;
     resetSteps();
     updateProgress(0, "Defile başlatılıyor...");
 
@@ -1039,9 +1091,9 @@ async function startDefileCollection() {
 
     const payload = {
         outfits: defileOutfits,
+        shot_configs: defileShotConfigs,
         runway_background_url: defileBgUrl || null,
         runway_background_extra_urls: defileBgExtraUrls.length > 0 ? defileBgExtraUrls : null,
-        shots_per_outfit: defileShotsPerOutfit,
         aspect_ratio: defileAspectRatio,
         generate_audio: document.getElementById("defile-audio-toggle")?.checked ?? true,
     };
@@ -1065,10 +1117,12 @@ async function startDefileCollection() {
     }
 }
 
-window.removeDefileOutfit = removeDefileOutfit;
-window.updateDefileShots  = updateDefileShots;
-window.clearDefileBg      = clearDefileBg;
-window.confirmDefileOutfits = confirmDefileOutfits;
+window.removeDefileOutfit        = removeDefileOutfit;
+window.updateDefileShotDuration  = updateDefileShotDuration;
+window.addDefileShot             = addDefileShot;
+window.removeDefileShot          = removeDefileShot;
+window.clearDefileBg             = clearDefileBg;
+window.confirmDefileOutfits      = confirmDefileOutfits;
 
 // ─── Wizard Events ──────────────────────────────────────────────────
 document.getElementById("open-wizard-btn")?.addEventListener("click", openWizard);
@@ -1079,6 +1133,7 @@ document.getElementById("card-defile")?.addEventListener("click", openDefile);
 document.getElementById("wizard-close")?.addEventListener("click", closeWizard);
 document.getElementById("defile-add-outfit-btn")?.addEventListener("click", openDefileOutfitPicker);
 document.getElementById("defile-bg-btn")?.addEventListener("click", openDefileBgPicker);
+document.getElementById("defile-add-shot-btn")?.addEventListener("click", addDefileShot);
 
 wizardModal?.addEventListener("click", (e) => {
     if (e.target === wizardModal) closeWizard();
@@ -1404,7 +1459,7 @@ newBtn?.addEventListener("click", () => {
     // Reset defile state
     videoMode = "video";
     defileOutfits = [];
-    defileShotsPerOutfit = 1;
+    defileShotConfigs = [{ duration: 5 }];
     defileBgUrl = null;
     step4Title.textContent = "Video Üretmeye Hazır";
     step4Sub.textContent = "Ayarlarınız kaydedildi. Üretimi başlatın.";

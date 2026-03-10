@@ -48,22 +48,35 @@ async def generate_multishot_video(
     Returns:
         URL of the generated video.
     """
-    # Always called with a single shot — use first entry
-    shot = multi_prompt[0] if multi_prompt else {}
-    prompt = shot.get("prompt", "")
-    shot_duration = str(shot.get("duration", duration))
-
-    logger.info("Starting Kling 3.0 Pro via fal.ai – duration=%ss, aspect=%s, audio=%s",
-                shot_duration, aspect_ratio, generate_audio)
-
-    arguments: dict = {
-        "start_image_url": start_image_url,
-        "prompt": prompt,
-        "duration": shot_duration,
-        "aspect_ratio": aspect_ratio,
-        "generate_audio": generate_audio,
-        "negative_prompt": negative_prompt,
-    }
+    # Multishot mode: more than one prompt segment → use multi_prompt API
+    if multi_prompt and len(multi_prompt) > 1:
+        total_duration = sum(int(s.get("duration", 5)) for s in multi_prompt)
+        normalized = [{"prompt": s.get("prompt", ""), "duration": str(s.get("duration", 5))} for s in multi_prompt]
+        logger.info("Starting Kling 3.0 Pro MULTISHOT via fal.ai – %d shots, total=%ds, aspect=%s, audio=%s",
+                    len(normalized), total_duration, aspect_ratio, generate_audio)
+        arguments: dict = {
+            "start_image_url": start_image_url,
+            "multi_prompt": normalized,
+            "duration": str(total_duration),
+            "aspect_ratio": aspect_ratio,
+            "generate_audio": generate_audio,
+            "negative_prompt": negative_prompt,
+        }
+    else:
+        # Single shot — use simple prompt
+        shot = multi_prompt[0] if multi_prompt else {}
+        prompt = shot.get("prompt", "")
+        shot_duration = str(shot.get("duration", duration))
+        logger.info("Starting Kling 3.0 Pro via fal.ai – duration=%ss, aspect=%s, audio=%s",
+                    shot_duration, aspect_ratio, generate_audio)
+        arguments = {
+            "start_image_url": start_image_url,
+            "prompt": prompt,
+            "duration": shot_duration,
+            "aspect_ratio": aspect_ratio,
+            "generate_audio": generate_audio,
+            "negative_prompt": negative_prompt,
+        }
 
     if elements:
         arguments["elements"] = elements

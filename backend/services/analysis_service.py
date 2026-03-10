@@ -487,6 +487,105 @@ async def refine_shot_description(request: RefineShotRequest) -> str:
     return (response.choices[0].message.content or "").strip().strip('"').strip("'")
 
 
+_DEFILE_MULTISHOT_SYSTEM = """You are a luxury fashion film director. You receive a composed runway scene image showing a fashion model in a garment, and a list of shot durations.
+
+Your task: Write one cinematic English prompt per shot for Kling 3.0 Pro multishot video generation.
+
+RULES:
+- Shot 1: MUST be wide/establishing — full body visible, set the scene, model entering or standing at runway start
+- Each subsequent shot continues seamlessly from the previous (chained within one video generation)
+- NEVER repeat the same camera angle or movement twice
+- Each prompt references what you see in the image: garment color, silhouette, runway setting
+- Style: luxury fashion film, editorial Vogue aesthetic, smooth cinematic movement, shallow depth of field
+- Each prompt: 35-55 words, in English only
+- Model actions: walking toward camera, pivoting, pausing, turning, fabric swinging with movement
+- Keep lighting consistent across all shots (match what you see in the image)
+
+Camera vocabulary to use (vary across shots):
+Wide Shot, Medium Shot, Close-Up, Extreme Close-Up, Low Angle, High Angle, Bird's Eye, Tracking Shot, Dolly In, Dolly Out, Arc Shot, Tilt Up, Tilt Down, Follow Shot, Steadicam, Slow Motion
+
+Return ONLY a JSON array with exactly N objects:
+[
+  {"duration": "5", "prompt": "..."},
+  {"duration": "4", "prompt": "..."}
+]"""
+
+
+async def generate_defile_multishot_prompt(
+    scene_frame_url: str,
+    shot_configs: list,
+    outfit_name: str = "",
+) -> list[dict]:
+    """Analyze a NB2-composed runway scene frame and generate multishot prompts for Kling.
+
+    Args:
+        scene_frame_url: fal.ai CDN URL of the composed scene frame (NB2 output).
+        shot_configs: List of DefileShotConfig objects with .duration attributes.
+        outfit_name: Optional outfit name for logging.
+
+    Returns:
+        List of {"duration": str, "prompt": str} dicts, one per shot.
+    """
+    import re as _re
+
+    n_shots = len(shot_configs)
+    durations = [str(s.duration) for s in shot_configs]
+    shots_description = "\n".join(
+        f"  Shot {i + 1}: {d} seconds" for i, d in enumerate(durations)
+    )
+
+    user_text = (
+        f"Outfit: {outfit_name or 'fashion garment'}\n"
+        f"Number of shots: {n_shots}\n"
+        f"Shot durations:\n{shots_description}\n\n"
+        "Analyze the runway scene in the image and write a cinematic multishot script. "
+        "Return exactly the JSON array with the durations specified above."
+    )
+
+    response = await client.chat.completions.create(
+        model="gpt-5.4",
+        messages=[
+            {"role": "system", "content": _DEFILE_MULTISHOT_SYSTEM},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_text},
+                    {"type": "image_url", "image_url": {"url": scene_frame_url, "detail": "high"}},
+                ],
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.75,
+        max_tokens=1200,
+    )
+
+    raw = (response.choices[0].message.content or "").strip()
+
+    # Unwrap if GPT returned {"shots": [...]} or similar wrapper
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            shots = parsed
+        else:
+            # Find first list value in the dict
+            shots = next(v for v in parsed.values() if isinstance(v, list))
+    except Exception:
+        match = _re.search(r'\[.*\]', raw, _re.DOTALL)
+        if match:
+            shots = json.loads(match.group(0))
+        else:
+            raise ValueError(f"Could not parse defile multishot prompts: {raw[:200]}")
+
+    # Enforce correct durations (GPT sometimes changes them) and count
+    result = []
+    for i, cfg in enumerate(shot_configs):
+        prompt_text = shots[i]["prompt"] if i < len(shots) else f"Fashion model walks runway, cinematic shot {i + 1}, elegant movement, luxury editorial"
+        result.append({"duration": str(cfg.duration), "prompt": prompt_text})
+
+    logger.info("Defile multishot prompts for '%s': %d shots", outfit_name, len(result))
+    return result
+
+
 async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
     """Generate cinematic shot descriptions for the multishot designer."""
     location_str = (

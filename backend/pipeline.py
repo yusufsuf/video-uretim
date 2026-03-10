@@ -30,7 +30,7 @@ from models import (
     JobStatus,
     MultiScenePrompt,
 )
-from services.analysis_service import analyse_dress, generate_multi_scene_prompt
+from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt
 from services.nano_banana_service import generate_background, generate_scene_frame
 from services.video_service import (
     download_file,
@@ -592,11 +592,23 @@ async def run_defile_collection_pipeline(
     job_id: str,
     request: DefileCollectionRequest,
 ):
-    """Execute the defile collection pipeline — one Kling call per outfit shot, concatenated."""
+    """Execute the defile collection pipeline.
+
+    New flow (per outfit):
+      1. NB2 compose: background + outfit images → establishing scene frame
+      2. GPT-4o Vision: analyze scene frame → generate multishot prompts
+      3. Single Kling call with multi_prompt list → one cohesive video per outfit
+      4. Concatenate all outfit clips
+    """
     try:
         n_outfits = len(request.outfits)
-        shots_per = max(1, min(3, request.shots_per_outfit))
-        total_shots = n_outfits * shots_per
+        shot_configs = request.shot_configs
+        n_shots = len(shot_configs)
+        total_duration = sum(s.duration for s in shot_configs)
+        total_clips = n_outfits  # one clip per outfit
+
+        logger.info("[%s] Defile: %d outfits, %d shots/outfit, %ds total per outfit",
+                    job_id, n_outfits, n_shots, total_duration)
 
         # ── Step 1: Generate/fetch runway background ──────────────────────
         _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=5,
@@ -613,14 +625,11 @@ async def run_defile_collection_pipeline(
             )
             logger.info("[%s] Defile: background generated %s", job_id, background_url[:80])
 
-        _update_job(job_id, progress=15, message="Arka plan hazır. Defile başlıyor...")
+        _update_job(job_id, progress=12, message="Arka plan hazır. Görseller yükleniyor...")
 
-        # ── Step 2: Upload background + all outfit images to fal.ai CDN ──────
-        _update_job(job_id, progress=16, message="Görseller hazırlanıyor...")
-
-        # Build background pool (primary + extra angles), upload all to fal.ai CDN
+        # ── Step 2: Upload all images to fal.ai CDN ───────────────────────
         all_bg_urls = [background_url] + (request.runway_background_extra_urls or [])
-        fal_bg_pool = []
+        fal_bg_pool: list = []
         for bg_url in all_bg_urls:
             fal_bg_pool.append(await _to_fal_url(bg_url))
         logger.info("[%s] Defile: bg pool size=%d", job_id, len(fal_bg_pool))
@@ -631,81 +640,78 @@ async def run_defile_collection_pipeline(
             fal_side = await _to_fal_url(outfit.side_url) if outfit.side_url else None
             fal_back = await _to_fal_url(outfit.back_url) if outfit.back_url else None
             fal_outfits.append((fal_front, fal_side, fal_back))
-        logger.info("[%s] Defile: bg + %d outfits on fal.ai CDN", job_id, len(fal_outfits))
+        logger.info("[%s] Defile: %d outfits on fal.ai CDN", job_id, len(fal_outfits))
 
-        # ── Step 3: Per-outfit, per-shot: NB2 compose → Kling animate ────────
+        # ── Step 3: Per-outfit: NB2 compose → GPT prompts → Kling ────────
         clip_paths: list = []
 
         for outfit_idx, outfit in enumerate(request.outfits):
             outfit_name = outfit.name or f"Kıyafet {outfit_idx + 1}"
             fal_front, fal_side, fal_back = fal_outfits[outfit_idx]
+            base_progress = 20 + int((outfit_idx / n_outfits) * 65)
 
-            for shot_idx in range(shots_per):
-                global_shot = outfit_idx * shots_per + shot_idx
-                base_progress = 20 + int((global_shot / total_shots) * 65)
+            # Background for this outfit (cycle pool)
+            bg_for_outfit = fal_bg_pool[outfit_idx % len(fal_bg_pool)]
 
-                # Each shot starts fresh from the background pool (no chaining)
-                current_start_image = fal_bg_pool[global_shot % len(fal_bg_pool)]
+            # Garment refs: front + side (best frontal overview for NB2)
+            garment_refs = [fal_front] + ([fal_side] if fal_side else [])
 
-                # Select shot config (prompt + angle + view) cycling through library
-                shot_config = DEFILE_SHOT_CONFIGS[global_shot % len(DEFILE_SHOT_CONFIGS)]
-                prompt_text = shot_config["prompt"]
-                nb2_angle = shot_config["nb2_angle"]
-                view = shot_config["view"]
+            # ── 3a: NB2 — compose establishing scene frame ────────────────
+            _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
+                        progress=base_progress,
+                        message=f"{outfit_name} — sahne kompoze ediliyor ({outfit_idx + 1}/{n_outfits})...")
 
-                # Build garment refs based on view — use best available reference angle
-                if view == "back":
-                    view_refs = [fal_back] if fal_back else [fal_front]
-                elif view == "side":
-                    view_refs = [fal_side] if fal_side else [fal_front]
-                else:  # front (default)
-                    view_refs = [fal_front] + ([fal_side] if fal_side else [])
+            nb2_prompt = (
+                "Fashion runway show editorial photo: the first image is the runway scene — "
+                "preserve it exactly including architecture, lighting, floor, and audience. "
+                "Place a tall fashion model at the near end of the runway catwalk, "
+                "wearing the garment from the reference images (images 2 onward). "
+                "Full body visible, frontal medium-wide shot, confident runway stance. "
+                "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
+                "Professional fashion show photography, sharp focus, editorial quality."
+            )
 
-                # ── 3a: NB2 scene composition ─────────────────────────────
-                _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
-                            progress=base_progress,
-                            message=f"{outfit_name} — sahne {shot_idx + 1}/{shots_per} kompoze ediliyor...")
+            scene_frame_url = await generate_scene_frame(
+                image_urls=[bg_for_outfit] + garment_refs,
+                prompt=nb2_prompt,
+                aspect_ratio=request.aspect_ratio,
+            )
+            logger.info("[%s] Outfit %d/%d scene frame: %s",
+                        job_id, outfit_idx + 1, n_outfits, scene_frame_url[:80])
 
-                nb2_prompt = (
-                    "Fashion runway show editorial photo: the first image is the runway scene — "
-                    "preserve it exactly including architecture, lighting, floor, and audience. "
-                    f"Place a tall fashion model on the runway catwalk wearing the garment from the reference images (images 2 onward). "
-                    f"Camera composition and angle: {nb2_angle}. "
-                    "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
-                    "Professional fashion show photography, sharp focus."
-                )
+            # ── 3b: GPT-4o Vision — analyze frame + generate multishot prompts
+            _update_job(job_id, progress=base_progress + int(20 / n_outfits),
+                        message=f"{outfit_name} — senaryo üretiliyor ({outfit_idx + 1}/{n_outfits})...")
 
-                scene_frame_url = await generate_scene_frame(
-                    image_urls=[current_start_image] + view_refs,
-                    prompt=nb2_prompt,
-                    aspect_ratio=request.aspect_ratio,
-                )
-                logger.info("[%s] Defile shot %d/%d scene frame: %s",
-                            job_id, global_shot + 1, total_shots, scene_frame_url[:80])
+            multi_prompt = await generate_defile_multishot_prompt(
+                scene_frame_url=scene_frame_url,
+                shot_configs=shot_configs,
+                outfit_name=outfit_name,
+            )
+            logger.info("[%s] Outfit %d/%d prompts: %d shots, %ds total",
+                        job_id, outfit_idx + 1, n_outfits, len(multi_prompt), total_duration)
 
-                # ── 3b: Kling animation ───────────────────────────────────
-                _update_job(job_id, progress=base_progress + max(1, int(32 / total_shots)),
-                            message=f"{outfit_name} — sahne {shot_idx + 1}/{shots_per} animate ediliyor...")
+            # ── 3c: Kling — single multishot call per outfit ──────────────
+            _update_job(job_id, progress=base_progress + int(35 / n_outfits),
+                        message=f"{outfit_name} — video üretiliyor ({outfit_idx + 1}/{n_outfits})...")
 
-                logger.info("[%s] Defile shot %d/%d: outfit=%s view=%s prompt=%.60s",
-                            job_id, global_shot + 1, total_shots, outfit_name, view, prompt_text)
+            clip_url = await generate_multishot_video(
+                start_image_url=scene_frame_url,
+                multi_prompt=multi_prompt,
+                elements=None,  # outfit baked into start frame via NB2
+                duration=str(total_duration),
+                aspect_ratio=request.aspect_ratio,
+                generate_audio=request.generate_audio,
+            )
 
-                clip_url = await generate_multishot_video(
-                    start_image_url=scene_frame_url,
-                    multi_prompt=[{"duration": "4", "prompt": prompt_text}],
-                    elements=None,  # outfit already baked into start frame via NB2
-                    duration="4",
-                    aspect_ratio=request.aspect_ratio,
-                    generate_audio=request.generate_audio,
-                )
+            clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
+            clip_paths.append(clip_path)
+            logger.info("[%s] Outfit %d/%d clip downloaded: %s",
+                        job_id, outfit_idx + 1, n_outfits, clip_path)
 
-                clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
-                clip_paths.append(clip_path)
-                logger.info("[%s] Defile shot %d downloaded: %s", job_id, global_shot + 1, clip_path)
-
-
-        # ── Step 3: Concatenate all clips ─────────────────────────────────
-        _update_job(job_id, progress=87, message=f"{total_shots} sahne birleştiriliyor...")
+        # ── Step 4: Concatenate all outfit clips ──────────────────────────
+        _update_job(job_id, progress=87,
+                    message=f"{n_outfits} kıyafet birleştiriliyor...")
 
         final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
         if len(clip_paths) > 1:
@@ -720,7 +726,7 @@ async def run_defile_collection_pipeline(
 
         logger.info("[%s] Defile final video: %s", job_id, final_path)
 
-        # ── Step 4: Upload to Supabase ────────────────────────────────────
+        # ── Step 5: Upload to Supabase ────────────────────────────────────
         result_url = None
         try:
             _update_job(job_id, progress=96, message="Video yükleniyor...")
@@ -743,7 +749,7 @@ async def run_defile_collection_pipeline(
             job_id,
             status=JobStatus.COMPLETED,
             progress=100,
-            message=f"Defile videosu hazır! {n_outfits} kıyafet, {total_shots} sahne.",
+            message=f"Defile videosu hazır! {n_outfits} kıyafet, kıyafet başına {n_shots} sahne.",
             result_url=result_url,
         )
         logger.info("[%s] Defile pipeline completed", job_id)

@@ -129,12 +129,20 @@ class DefileOutfit(BaseModel):
     name: Optional[str] = None
 
 
+class DefileShotConfig(BaseModel):
+    """Global defile multishot konfigürasyonu — tek bir sahne."""
+    duration: int = Field(default=5, ge=3, le=10, description="Sahne süresi (saniye)")
+
+
 class DefileCollectionRequest(BaseModel):
     """Defile koleksiyon video üretim talebi."""
-    outfits: List[DefileOutfit]           # 2–12 kıyafet
+    outfits: List[DefileOutfit]                        # 2–12 kıyafet
+    shot_configs: List[DefileShotConfig] = Field(      # Global multishot konfigürasyonu
+        default_factory=lambda: [DefileShotConfig(duration=5)],
+        description="Her kıyafet için uygulanacak sahne listesi (global)",
+    )
     runway_background_url: Optional[str] = None
-    runway_background_extra_urls: Optional[List[str]] = None  # extra angles from library
-    shots_per_outfit: int = 1             # Her kıyafet için Kling çağrısı sayısı (1–3)
+    runway_background_extra_urls: Optional[List[str]] = None
     aspect_ratio: str = "9:16"
     generate_audio: bool = True
 
