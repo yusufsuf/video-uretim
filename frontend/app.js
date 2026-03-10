@@ -11,9 +11,63 @@ function getAuthHeaders() {
     return token ? { "Authorization": "Bearer " + token } : {};
 }
 
-function handleAuthError(status) {
+// ─── Session Management ────────────────────────────────────────────────────
+const INACTIVE_TIMEOUT_MS = 30 * 60 * 1000; // 30 dk hareketsizlik → çıkış
+const REFRESH_BEFORE_MS   = 10 * 60 * 1000; // dolmadan 10 dk önce yenile
+let _lastActivity = Date.now();
+
+["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"].forEach(evt =>
+    document.addEventListener(evt, () => { _lastActivity = Date.now(); }, { passive: true })
+);
+
+function _isUserActive() {
+    return (Date.now() - _lastActivity) < INACTIVE_TIMEOUT_MS;
+}
+
+function _clearSession() {
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_refresh_token");
+    localStorage.removeItem("auth_expires_at");
+}
+
+async function _tryRefreshToken() {
+    const refreshToken = localStorage.getItem("auth_refresh_token");
+    if (!refreshToken) return false;
+    try {
+        const res = await fetch("/auth/refresh", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+        if (!res.ok) return false;
+        const data = await res.json();
+        localStorage.setItem("auth_token", data.access_token);
+        localStorage.setItem("auth_refresh_token", data.refresh_token || refreshToken);
+        localStorage.setItem("auth_expires_at", String(data.expires_at || ""));
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+// Her 4 dakikada bir kontrol: aktifse yenile, pasifse süresi dolmuşsa çıkış
+setInterval(async () => {
+    const expiresAt = parseInt(localStorage.getItem("auth_expires_at") || "0", 10) * 1000;
+    const timeLeft  = expiresAt - Date.now();
+    if (_isUserActive()) {
+        if (expiresAt > 0 && timeLeft < REFRESH_BEFORE_MS) await _tryRefreshToken();
+    } else {
+        if (expiresAt > 0 && timeLeft < 0) { _clearSession(); window.location.href = "/login"; }
+    }
+}, 4 * 60 * 1000);
+
+async function handleAuthError(status) {
     if (status === 401) {
-        localStorage.removeItem("auth_token");
+        if (_isUserActive()) {
+            const refreshed = await _tryRefreshToken();
+            if (refreshed) { window.location.reload(); return true; }
+        }
+        _clearSession();
         window.location.href = "/login";
         return true;
     }
@@ -30,7 +84,7 @@ function handleAuthError(status) {
     if (!token) { window.location.replace("/login"); return; }
     try {
         const res = await fetch("/auth/me", { headers: getAuthHeaders() });
-        if (handleAuthError(res.status)) return;
+        if (await handleAuthError(res.status)) return;
         const user = await res.json();
         const nameEl = document.querySelector(".user-name");
         const avatarEl = document.querySelector(".user-avatar");

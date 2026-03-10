@@ -111,12 +111,35 @@ async def login_user(email: str, password: str) -> dict:
 
     return {
         "access_token": res.session.access_token,
+        "refresh_token": res.session.refresh_token,
+        "expires_at": res.session.expires_at,
         "user": {
             "id": uid,
             "email": profile["email"],
             "full_name": profile["full_name"],
             "role": profile["role"],
         },
+    }
+
+
+async def refresh_session(refresh_token: str) -> dict:
+    """Exchange a refresh token for a new access token."""
+    auth = _fresh_auth_client()
+    try:
+        res = await asyncio.to_thread(
+            lambda: auth.auth.refresh_session(refresh_token)
+        )
+        if not res.session:
+            raise HTTPException(status_code=401, detail="Token yenilenemedi.")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="Token yenilenemedi.")
+
+    return {
+        "access_token": res.session.access_token,
+        "refresh_token": res.session.refresh_token,
+        "expires_at": res.session.expires_at,
     }
 
 

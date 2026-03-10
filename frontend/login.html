@@ -442,6 +442,8 @@
             }
 
             localStorage.setItem('auth_token', data.access_token);
+            localStorage.setItem('auth_refresh_token', data.refresh_token || '');
+            localStorage.setItem('auth_expires_at', String(data.expires_at || ''));
             localStorage.setItem('auth_user', JSON.stringify(data.user));
             window.location.href = '/';
         } catch {

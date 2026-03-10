@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from dependencies import get_current_user
 from limiter import limiter
-from services.auth_service import login_user, register_user
+from services.auth_service import login_user, register_user, refresh_session
 
 router = APIRouter(tags=["auth"])
 
@@ -36,3 +36,12 @@ async def login(request: Request, req: LoginRequest):
 @router.get("/me")
 async def me(user: dict = Depends(get_current_user)):
     return user
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post("/refresh")
+async def refresh(req: RefreshRequest):
+    return await refresh_session(req.refresh_token)
