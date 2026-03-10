@@ -133,6 +133,7 @@ class DefileCollectionRequest(BaseModel):
     """Defile koleksiyon video üretim talebi."""
     outfits: List[DefileOutfit]           # 2–12 kıyafet
     runway_background_url: Optional[str] = None
+    runway_background_extra_urls: Optional[List[str]] = None  # extra angles from library
     shots_per_outfit: int = 1             # Her kıyafet için Kling çağrısı sayısı (1–3)
     aspect_ratio: str = "9:16"
     generate_audio: bool = True

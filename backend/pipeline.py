@@ -617,7 +617,13 @@ async def run_defile_collection_pipeline(
 
         # ── Step 2: Upload background + all outfit images to fal.ai CDN ──────
         _update_job(job_id, progress=16, message="Görseller hazırlanıyor...")
-        fal_background_url = await _to_fal_url(background_url)
+
+        # Build background pool (primary + extra angles), upload all to fal.ai CDN
+        all_bg_urls = [background_url] + (request.runway_background_extra_urls or [])
+        fal_bg_pool = []
+        for bg_url in all_bg_urls:
+            fal_bg_pool.append(await _to_fal_url(bg_url))
+        logger.info("[%s] Defile: bg pool size=%d", job_id, len(fal_bg_pool))
 
         fal_outfits: list = []
         for outfit in request.outfits:
@@ -634,13 +640,12 @@ async def run_defile_collection_pipeline(
             outfit_name = outfit.name or f"Kıyafet {outfit_idx + 1}"
             fal_front, fal_side, fal_back = fal_outfits[outfit_idx]
 
-            # Garment reference list for NB2 (front always present, side/back optional)
-            # Each outfit starts fresh from the runway background
-            current_start_image = fal_background_url
-
             for shot_idx in range(shots_per):
                 global_shot = outfit_idx * shots_per + shot_idx
                 base_progress = 20 + int((global_shot / total_shots) * 65)
+
+                # Each shot starts fresh from the background pool (no chaining)
+                current_start_image = fal_bg_pool[global_shot % len(fal_bg_pool)]
 
                 # Select shot config (prompt + angle + view) cycling through library
                 shot_config = DEFILE_SHOT_CONFIGS[global_shot % len(DEFILE_SHOT_CONFIGS)]
@@ -698,15 +703,6 @@ async def run_defile_collection_pipeline(
                 clip_paths.append(clip_path)
                 logger.info("[%s] Defile shot %d downloaded: %s", job_id, global_shot + 1, clip_path)
 
-                # Chain: last frame of this clip feeds next NB2 compose (within outfit)
-                if shot_idx < shots_per - 1:
-                    last_frame_path = extract_last_frame(clip_path, settings.TEMP_DIR)
-                    current_start_image = await upload_to_fal(last_frame_path)
-                    try:
-                        os.remove(last_frame_path)
-                    except Exception:
-                        pass
-                    logger.info("[%s] Chain: next shot starts from last frame", job_id)
 
         # ── Step 3: Concatenate all clips ─────────────────────────────────
         _update_job(job_id, progress=87, message=f"{total_shots} sahne birleştiriliyor...")

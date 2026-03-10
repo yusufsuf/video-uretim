@@ -142,6 +142,7 @@ let videoMode = "video";          // "video" | "defile"
 let defileOutfits = [];           // [{front_url, side_url, back_url, name}]
 let defileShotsPerOutfit = 1;
 let defileBgUrl = null;
+let defileBgExtraUrls = [];
 let defileAspectRatio = "9:16";
 
 // ─── Location State ─────────────────────────────────────────────────
@@ -665,6 +666,7 @@ function selectLibraryItem(itemJson) {
 
     if (target === "defile-bg") {
         defileBgUrl = item.image_url;
+        defileBgExtraUrls = item.extra_urls || [];
         const preview = document.getElementById("defile-bg-preview");
         const img = document.getElementById("defile-bg-img");
         const name = document.getElementById("defile-bg-name");
@@ -783,6 +785,7 @@ function openDefile() {
     defileOutfits = [];
     defileShotsPerOutfit = 1;
     defileBgUrl = null;
+    defileBgExtraUrls = [];
     defileAspectRatio = "9:16";
 
     const titleEl = document.getElementById("wizard-title");
@@ -863,6 +866,7 @@ function updateDefileShots(val) {
 
 function clearDefileBg() {
     defileBgUrl = null;
+    defileBgExtraUrls = [];
     const preview = document.getElementById("defile-bg-preview");
     if (preview) preview.style.display = "none";
 }
@@ -1036,6 +1040,7 @@ async function startDefileCollection() {
     const payload = {
         outfits: defileOutfits,
         runway_background_url: defileBgUrl || null,
+        runway_background_extra_urls: defileBgExtraUrls.length > 0 ? defileBgExtraUrls : null,
         shots_per_outfit: defileShotsPerOutfit,
         aspect_ratio: defileAspectRatio,
         generate_audio: document.getElementById("defile-audio-toggle")?.checked ?? true,
