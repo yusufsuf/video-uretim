@@ -257,21 +257,8 @@ async def run_pipeline(
             logger.info("[%s] Background generated: %s", job_id, background_url[:100])
             _update_job(job_id, progress=50, message="Arka plan hazır. Video üretiliyor...")
 
-        # ── Step 4: Build elements + generate multishot video (chained) ─
+        # ── Step 4: Generate multishot video (chained) ─────────────────
         logger.info("[%s] Step 4 – Generating multishot video", job_id)
-
-        # Build element (garment photos)
-        element = {
-            "frontal_image_url": front_url,
-            "reference_image_urls": [],
-        }
-        if side_url:
-            element["reference_image_urls"].append(side_url)
-        if back_url:
-            element["reference_image_urls"].append(back_url)
-
-        elements = [element]
-        logger.info("[%s] Element: frontal=%s, refs=%d", job_id, front_url[:60], len(element["reference_image_urls"]))
 
         # If user provided per-shot configs, override GPT's durations (safeguard)
         if request.shots and len(request.shots) == len(scene_prompt.scenes):
@@ -344,21 +331,10 @@ async def run_pipeline(
 
             _update_job(job_id, progress=72, message="Video üretiliyor (multishot)...")
 
-            # Compress garment images for Kling elements (10 MB limit)
-            elem_front = await _to_fal_url_compressed(front_url)
-            elem_side = await _to_fal_url_compressed(side_url) if side_url else None
-            elem_back = await _to_fal_url_compressed(back_url) if back_url else None
-            ms_element: dict = {"frontal_image_url": elem_front, "reference_image_urls": []}
-            if elem_side:
-                ms_element["reference_image_urls"].append(elem_side)
-            if elem_back:
-                ms_element["reference_image_urls"].append(elem_back)
-
             total_ms_duration = sum(int(p["duration"]) for p in multi_prompt)
             clip_url = await generate_multishot_video(
                 start_image_url=scene_frame_url,
                 multi_prompt=multi_prompt,
-                elements=[ms_element],
                 duration=str(total_ms_duration),
                 aspect_ratio=aspect_ratio,
                 generate_audio=generate_audio,
@@ -420,7 +396,6 @@ async def run_pipeline(
                 clip_url = await generate_multishot_video(
                     start_image_url=scene_frame_url,
                     multi_prompt=[{"duration": scene.duration, "prompt": scene.prompt}],
-                    elements=elements,
                     duration=str(shot_duration),
                     aspect_ratio=aspect_ratio,
                     generate_audio=generate_audio,
@@ -748,19 +723,14 @@ async def run_defile_collection_pipeline(
             fal_bg_pool.append(await _to_fal_url(bg_url))
         logger.info("[%s] Defile: bg pool size=%d", job_id, len(fal_bg_pool))
 
-        # Upload outfit images twice: full-res for NB2, compressed for Kling elements
-        fal_outfits: list = []        # (fal_front, fal_side, fal_back) — full-res for NB2
-        fal_outfits_elem: list = []   # (elem_front, elem_side, elem_back) — compressed for Kling elements
+        # Upload outfit images to fal.ai CDN
+        fal_outfits: list = []  # (fal_front, fal_side, fal_back)
         for outfit in request.outfits:
             fal_front = await _to_fal_url(outfit.front_url)
             fal_side = await _to_fal_url(outfit.side_url) if outfit.side_url else None
             fal_back = await _to_fal_url(outfit.back_url) if outfit.back_url else None
             fal_outfits.append((fal_front, fal_side, fal_back))
-            elem_front = await _to_fal_url_compressed(outfit.front_url)
-            elem_side = await _to_fal_url_compressed(outfit.side_url) if outfit.side_url else None
-            elem_back = await _to_fal_url_compressed(outfit.back_url) if outfit.back_url else None
-            fal_outfits_elem.append((elem_front, elem_side, elem_back))
-        logger.info("[%s] Defile: %d outfits on fal.ai CDN (full + compressed)", job_id, len(fal_outfits))
+        logger.info("[%s] Defile: %d outfits on fal.ai CDN", job_id, len(fal_outfits))
 
         # ── Step 3: Per-outfit: NB2 compose → GPT prompts → Kling ────────
         clip_paths: list = []
@@ -768,7 +738,6 @@ async def run_defile_collection_pipeline(
         for outfit_idx, outfit in enumerate(request.outfits):
             outfit_name = outfit.name or f"Kıyafet {outfit_idx + 1}"
             fal_front, fal_side, fal_back = fal_outfits[outfit_idx]
-            elem_front, elem_side, elem_back = fal_outfits_elem[outfit_idx]
             base_progress = 20 + int((outfit_idx / n_outfits) * 65)
 
             # Background for this outfit (cycle pool)
@@ -819,17 +788,9 @@ async def run_defile_collection_pipeline(
             _update_job(job_id, progress=base_progress + int(35 / n_outfits),
                         message=f"{outfit_name} — video üretiliyor ({outfit_idx + 1}/{n_outfits})...")
 
-            # Build elements: compressed outfit images as garment reference for Kling (10 MB limit)
-            outfit_element: dict = {"frontal_image_url": elem_front, "reference_image_urls": []}
-            if elem_side:
-                outfit_element["reference_image_urls"].append(elem_side)
-            if elem_back:
-                outfit_element["reference_image_urls"].append(elem_back)
-
             clip_url = await generate_multishot_video(
                 start_image_url=scene_frame_url,
                 multi_prompt=multi_prompt,
-                elements=[outfit_element],
                 duration=str(total_duration),
                 aspect_ratio=request.aspect_ratio,
                 generate_audio=request.generate_audio,
