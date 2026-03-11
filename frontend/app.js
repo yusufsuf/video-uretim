@@ -355,8 +355,8 @@ function selectLocation(value, labelTR) {
 
 // ─── Multishot State ────────────────────────────────────────────────
 let shots = [
-    { camera_move: "dolly_in", duration: 5, description: "", camera_angle: "eye_level", shot_size: "wide" },
-    { camera_move: "orbit",    duration: 5, description: "", camera_angle: "eye_level", shot_size: "medium" },
+    { camera_move: "dolly_in", duration: 5, description: "", camera_angle: "", shot_size: "" },
+    { camera_move: "orbit",    duration: 5, description: "", camera_angle: "", shot_size: "" },
 ];
 let selectedAspectRatio = "9:16";
 
@@ -372,6 +372,7 @@ const CAM_MOVES = [
 ];
 
 const CAMERA_ANGLES = [
+    { value: "",           label: "Otomatik" },
     { value: "eye_level",  label: "Eye Level" },
     { value: "low_angle",  label: "Low Angle" },
     { value: "high_angle", label: "High Angle" },
@@ -381,6 +382,7 @@ const CAMERA_ANGLES = [
 ];
 
 const SHOT_SIZES = [
+    { value: "",                 label: "Otomatik" },
     { value: "wide",             label: "Wide" },
     { value: "medium_wide",      label: "Med. Wide" },
     { value: "medium",           label: "Medium" },
@@ -527,7 +529,7 @@ function updateShotSize(idx, val) {
 
 function addShot() {
     const defaults = ["dolly_in", "dolly_out", "orbit", "pan", "tilt_up", "tracking", "crane", "static"];
-    shots.push({ camera_move: defaults[shots.length % defaults.length], duration: 5, description: "", camera_angle: "eye_level", shot_size: "wide" });
+    shots.push({ camera_move: defaults[shots.length % defaults.length], duration: 5, description: "", camera_angle: "", shot_size: "" });
     renderShots();
 }
 

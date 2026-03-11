@@ -73,8 +73,8 @@ class ShotConfig(BaseModel):
     camera_move: str = Field(default="dolly_in", description="Camera movement type (orbit, dolly_in, dolly_out, pan, tilt_up, tracking, crane, static)")
     duration: int = Field(default=5, description="Shot duration in seconds", ge=3, le=10)
     description: Optional[str] = Field(default=None, description="Additional description for this shot")
-    camera_angle: str = Field(default="eye_level", description="Camera angle (eye_level, low_angle, high_angle, profile, rear, dutch)")
-    shot_size: str = Field(default="wide", description="Shot size (wide, medium_wide, medium, close_up, extreme_close_up)")
+    camera_angle: str = Field(default="", description="Camera angle (eye_level, low_angle, high_angle, profile, rear, dutch) — empty = auto")
+    shot_size: str = Field(default="", description="Shot size (wide, medium_wide, medium, close_up, extreme_close_up) — empty = auto")
 
 
 class GenerationRequest(BaseModel):
