@@ -1487,16 +1487,20 @@ async function startGeneration() {
     formData.append("generation_mode", generationMode);
 
     // Custom prompt (Özel mod)
+    let shotsToSend = shots;
     if (generationMode === 'custom') {
         const customPrompt = (document.getElementById('custom-prompt-input')?.value || '').trim();
         if (!customPrompt) { alert('Özel mod için video promptu zorunludur.'); return; }
         formData.append("video_description", customPrompt);
+        const nShots  = Math.max(1, parseInt(document.getElementById('custom-shot-count')?.value || '4', 10));
+        const shotDur = Math.max(3, parseInt(document.getElementById('custom-shot-duration')?.value || '4', 10));
+        shotsToSend = Array.from({ length: nShots }, () => ({ duration: shotDur, camera_move: 'static', camera_angle: 'eye_level', shot_size: 'wide', description: '' }));
     }
 
     // Shots — serialize to JSON
-    formData.append("shots",         JSON.stringify(shots));
-    formData.append("duration",      String(getTotalDuration()));
-    formData.append("scene_count",   String(shots.length));
+    formData.append("shots",         JSON.stringify(shotsToSend));
+    formData.append("duration",      String(shotsToSend.reduce((s, sh) => s + (sh.duration || 5), 0)));
+    formData.append("scene_count",   String(shotsToSend.length));
     formData.append("aspect_ratio",  selectedAspectRatio);
     formData.append("generate_audio", audioToggle ? audioToggle.checked : true);
     formData.append("location",      selectedLocation);
