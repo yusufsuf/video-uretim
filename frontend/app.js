@@ -718,6 +718,12 @@ function setGenerationMode(mode) {
         activeBtn.style.boxShadow  = '0 1px 4px rgba(0,0,0,0.15)';
     }
 
+    const shotsDesigner = document.getElementById('shots-designer-section');
+    const formatAudio   = document.getElementById('format-audio-section');
+    const isCustom = mode === 'custom';
+    if (shotsDesigner) shotsDesigner.style.display = isCustom ? 'none' : '';
+    if (formatAudio)   formatAudio.style.display   = isCustom ? 'none' : '';
+
     if (mode === 'classic') {
         if (desc) desc.textContent = 'Her sahne ayrı ayrı üretilip birleştirilir.';
         if (customArea) customArea.style.display = 'none';
