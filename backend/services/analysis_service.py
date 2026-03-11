@@ -614,42 +614,38 @@ async def generate_defile_multishot_prompt(
     return result
 
 
-_CUSTOM_MULTISHOT_SYSTEM = """You are a cinematic video director. You receive a detailed creative brief and a list of shot durations.
+_CUSTOM_MULTISHOT_SYSTEM = """You are a cinematic video director. You receive a detailed creative brief.
 
-Your task: Split the brief into exactly N sequential per-shot prompts for Kling 3.0 Pro multishot video generation.
+Your task: Analyze the brief and split it into sequential per-shot prompts for Kling 3.0 Pro multishot video generation.
 
-RULES:
+SHOT DETECTION:
+- If the brief contains explicit timing segments (e.g. "0-3 sec", "3–7 sec", "Shot 1:", "Scene 2:"), extract those exact shots and use their durations
+- If no timings are given, split the content into logical shots of 4-5 seconds each
+- Each shot duration: minimum 3 seconds, maximum 10 seconds
+
+PROMPT RULES:
 - Each shot prompt: 35-60 words, in English only
 - Each shot continues seamlessly from the previous (one continuous chained video)
-- Follow the user's scene direction, model description, camera style, and environment rules EXACTLY
+- Follow the user's scene direction, camera style, model, and environment EXACTLY
 - Do NOT invent new settings, props, or characters not mentioned in the brief
 - Preserve visual continuity: same location, same model, same outfit across all shots
-- Apply the user's specified camera movements per shot (slow push-in, static, subtle float, etc.)
+- Apply the user's specified camera movements per shot
 - Each prompt must describe: action/pose, camera movement, framing, and atmosphere
 - Do NOT default to a runway walk structure unless explicitly requested
 
 Return JSON:
-{"shots": [{"duration": "5", "prompt": "..."}, {"duration": "4", "prompt": "..."}, ...]}"""
+{"shots": [{"duration": "3", "prompt": "..."}, {"duration": "4", "prompt": "..."}, ...]}"""
 
 
 async def generate_custom_multishot_prompt(
     video_description: str,
-    shot_configs: list,
 ) -> list[dict]:
-    """Generate Kling multishot prompts from a user's custom prompt only (no scene frame image)."""
+    """Generate Kling multishot prompts from a user's custom prompt — GPT determines shot count and durations."""
     import re as _re
 
-    n_shots = len(shot_configs)
-    durations = [str(s.duration) for s in shot_configs]
-    shots_description = "\n".join(
-        f"  Shot {i + 1}: {d} seconds" for i, d in enumerate(durations)
-    )
-
     user_text = (
-        f"Number of shots: {n_shots}\n"
-        f"Shot durations:\n{shots_description}\n\n"
         f"Creative brief:\n{video_description}\n\n"
-        f"Split this brief into exactly {n_shots} sequential Kling prompts with the durations above."
+        "Analyze this brief and return the shots JSON."
     )
 
     response = await client.chat.completions.create(
@@ -680,12 +676,12 @@ async def generate_custom_multishot_prompt(
         else:
             raise ValueError(f"Could not parse custom multishot prompts: {raw[:200]}")
 
-    result = []
-    for i, cfg in enumerate(shot_configs):
-        prompt_text = shots[i]["prompt"] if i < len(shots) else f"Cinematic fashion shot {i + 1}, elegant movement, luxury editorial"
-        result.append({"duration": str(cfg.duration), "prompt": prompt_text})
+    result = [
+        {"duration": str(max(3, min(10, int(s.get("duration", 4))))), "prompt": s["prompt"]}
+        for s in shots
+    ]
 
-    logger.info("Custom multishot prompts: %d shots", len(result))
+    logger.info("Custom multishot prompts: %d shots, total %ds", len(result), sum(int(s["duration"]) for s in result))
     return result
 
 

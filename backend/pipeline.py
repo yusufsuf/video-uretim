@@ -225,16 +225,8 @@ async def run_pipeline(
 
             _update_job(job_id, progress=45, message="Senaryo üretiliyor (özel prompt)...")
 
-            if request.shots:
-                shot_configs_custom = request.shots
-            else:
-                from models import DefileShotConfig
-                per_shot_dur = max(3, duration // max(scene_count, 1))
-                shot_configs_custom = [DefileShotConfig(duration=per_shot_dur) for _ in range(scene_count)]
-
             multi_prompt_custom = await generate_custom_multishot_prompt(
                 video_description=video_description,
-                shot_configs=shot_configs_custom,
             )
             logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
 
