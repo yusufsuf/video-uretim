@@ -719,10 +719,8 @@ function setGenerationMode(mode) {
     }
 
     const shotsDesigner = document.getElementById('shots-designer-section');
-    const formatAudio   = document.getElementById('format-audio-section');
     const isCustom = mode === 'custom';
     if (shotsDesigner) shotsDesigner.style.display = isCustom ? 'none' : '';
-    if (formatAudio)   formatAudio.style.display   = isCustom ? 'none' : '';
 
     if (mode === 'classic') {
         if (desc) desc.textContent = 'Her sahne ayrı ayrı üretilip birleştirilir.';
