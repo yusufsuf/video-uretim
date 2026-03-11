@@ -614,24 +614,25 @@ async def generate_defile_multishot_prompt(
     return result
 
 
-_CUSTOM_MULTISHOT_SYSTEM = """You are a cinematic video director. You receive a detailed creative brief.
+_CUSTOM_MULTISHOT_SYSTEM = """You are a cinematic video director. You receive a creative brief and a reference image of the outfit/model.
 
-Your task: Analyze the brief and split it into sequential per-shot prompts for Kling 3.0 Pro multishot video generation.
+Your task: Analyze both the brief AND the image, then create sequential per-shot prompts for Kling 3.0 Pro multishot video generation.
 
-SHOT DETECTION:
-- If the brief contains explicit timing segments (e.g. "0-3 sec", "3–7 sec", "Shot 1:", "Scene 2:"), extract those exact shots and use their durations
-- If no timings are given, split the content into logical shots of 4-5 seconds each
+BRIEF HANDLING:
+- If the brief is detailed (explicit scenes, timings, camera instructions) → follow it exactly
+- If the brief is vague (e.g. "make a 15s video, 5 shots, flow is up to you") → use the image to determine the garment style, color, and silhouette, then invent cinematic shots appropriate for that garment
+- If the brief specifies shot count and/or total duration → respect those numbers exactly
+- If explicit timing segments exist (e.g. "0-3 sec", "Shot 1:") → use those exact durations
+- Otherwise → split into logical shots of 3-5 seconds each
 - Each shot duration: minimum 3 seconds, maximum 10 seconds
 
 PROMPT RULES:
 - Each shot prompt: 35-60 words, in English only
 - Each shot continues seamlessly from the previous (one continuous chained video)
-- Follow the user's scene direction, camera style, model, and environment EXACTLY
-- Do NOT invent new settings, props, or characters not mentioned in the brief
-- Preserve visual continuity: same location, same model, same outfit across all shots
-- Apply the user's specified camera movements per shot
-- Each prompt must describe: action/pose, camera movement, framing, and atmosphere
-- Do NOT default to a runway walk structure unless explicitly requested
+- Preserve visual continuity: same model, same outfit, same environment across all shots
+- Each prompt must describe: model action/pose, camera movement, framing, and atmosphere
+- Vary camera angles and shot sizes across shots for cinematic flow
+- Do NOT default to a plain runway walk — choose elegant, editorial movements
 
 Return JSON:
 {"shots": [{"duration": "3", "prompt": "..."}, {"duration": "4", "prompt": "..."}, ...]}"""
@@ -639,20 +640,27 @@ Return JSON:
 
 async def generate_custom_multishot_prompt(
     video_description: str,
+    image_url: str,
 ) -> list[dict]:
-    """Generate Kling multishot prompts from a user's custom prompt — GPT determines shot count and durations."""
+    """Generate Kling multishot prompts using the brief + outfit image — GPT determines shot count and durations."""
     import re as _re
 
     user_text = (
         f"Creative brief:\n{video_description}\n\n"
-        "Analyze this brief and return the shots JSON."
+        "Analyze the brief and the outfit image above, then return the shots JSON."
     )
 
     response = await client.chat.completions.create(
         model="gpt-5.4",
         messages=[
             {"role": "system", "content": _CUSTOM_MULTISHOT_SYSTEM},
-            {"role": "user", "content": user_text},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_url, "detail": "high"}},
+                    {"type": "text", "text": user_text},
+                ],
+            },
         ],
         response_format={"type": "json_object"},
         temperature=0.7,

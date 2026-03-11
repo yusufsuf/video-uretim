@@ -227,6 +227,7 @@ async def run_pipeline(
 
             multi_prompt_custom = await generate_custom_multishot_prompt(
                 video_description=video_description,
+                image_url=fal_start_url,
             )
             logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
 
