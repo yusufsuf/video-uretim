@@ -120,8 +120,8 @@ async def _to_fal_url(url: str) -> str:
     local-server URLs. This helper downloads the file and re-uploads it so
     fal.ai can fetch it reliably.
     """
-    # Already on fal.ai CDN — skip
-    if any(s in url for s in ("fal.media", "fal.run", "v3.fal.media", "storage.googleapis.com/isolate")):
+    # Already on fal.ai CDN — skip (but NOT fal.media scene frames which Kling may time out on)
+    if any(s in url for s in ("fal.run", "storage.googleapis.com/isolate")):
         return url
     clean_url: str = url.split("?")[0]  # strip trailing ?. artefacts from Supabase SDK
     if not _is_ssrf_safe(clean_url):
@@ -331,6 +331,9 @@ async def run_pipeline(
 
             _update_job(job_id, progress=72, message="Video üretiliyor (multishot)...")
 
+            # Re-upload scene frame so Kling can download it reliably
+            scene_frame_url = await _to_fal_url(scene_frame_url)
+
             total_ms_duration = sum(int(p["duration"]) for p in multi_prompt)
             clip_url = await generate_multishot_video(
                 start_image_url=scene_frame_url,
@@ -392,6 +395,9 @@ async def run_pipeline(
                 # ── 4b: Animate scene frame via Kling ────────────────
                 _update_job(job_id, progress=base_progress + int(14 / n_shots),
                             message=f"Sahne {shot_idx + 1}/{n_shots} animate ediliyor...")
+
+                # Re-upload scene frame so Kling can download it reliably
+                scene_frame_url = await _to_fal_url(scene_frame_url)
 
                 clip_url = await generate_multishot_video(
                     start_image_url=scene_frame_url,
@@ -787,6 +793,9 @@ async def run_defile_collection_pipeline(
             # ── 3c: Kling — single multishot call per outfit ──────────────
             _update_job(job_id, progress=base_progress + int(35 / n_outfits),
                         message=f"{outfit_name} — video üretiliyor ({outfit_idx + 1}/{n_outfits})...")
+
+            # Re-upload scene frame so Kling can download it reliably
+            scene_frame_url = await _to_fal_url(scene_frame_url)
 
             clip_url = await generate_multishot_video(
                 start_image_url=scene_frame_url,
