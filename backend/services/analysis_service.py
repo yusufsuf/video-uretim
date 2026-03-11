@@ -614,6 +614,81 @@ async def generate_defile_multishot_prompt(
     return result
 
 
+_CUSTOM_MULTISHOT_SYSTEM = """You are a cinematic video director. You receive a detailed creative brief and a list of shot durations.
+
+Your task: Split the brief into exactly N sequential per-shot prompts for Kling 3.0 Pro multishot video generation.
+
+RULES:
+- Each shot prompt: 35-60 words, in English only
+- Each shot continues seamlessly from the previous (one continuous chained video)
+- Follow the user's scene direction, model description, camera style, and environment rules EXACTLY
+- Do NOT invent new settings, props, or characters not mentioned in the brief
+- Preserve visual continuity: same location, same model, same outfit across all shots
+- Apply the user's specified camera movements per shot (slow push-in, static, subtle float, etc.)
+- Each prompt must describe: action/pose, camera movement, framing, and atmosphere
+- Do NOT default to a runway walk structure unless explicitly requested
+
+Return JSON:
+{"shots": [{"duration": "5", "prompt": "..."}, {"duration": "4", "prompt": "..."}, ...]}"""
+
+
+async def generate_custom_multishot_prompt(
+    video_description: str,
+    shot_configs: list,
+) -> list[dict]:
+    """Generate Kling multishot prompts from a user's custom prompt only (no scene frame image)."""
+    import re as _re
+
+    n_shots = len(shot_configs)
+    durations = [str(s.duration) for s in shot_configs]
+    shots_description = "\n".join(
+        f"  Shot {i + 1}: {d} seconds" for i, d in enumerate(durations)
+    )
+
+    user_text = (
+        f"Number of shots: {n_shots}\n"
+        f"Shot durations:\n{shots_description}\n\n"
+        f"Creative brief:\n{video_description}\n\n"
+        f"Split this brief into exactly {n_shots} sequential Kling prompts with the durations above."
+    )
+
+    response = await client.chat.completions.create(
+        model="gpt-5.4",
+        messages=[
+            {"role": "system", "content": _CUSTOM_MULTISHOT_SYSTEM},
+            {"role": "user", "content": user_text},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.7,
+        max_completion_tokens=1500,
+    )
+
+    raw = (response.choices[0].message.content or "").strip()
+
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict) and "shots" in parsed:
+            shots = parsed["shots"]
+        elif isinstance(parsed, list):
+            shots = parsed
+        else:
+            shots = next(v for v in parsed.values() if isinstance(v, list))
+    except Exception:
+        match = _re.search(r'\[.*\]', raw, _re.DOTALL)
+        if match:
+            shots = json.loads(match.group(0))
+        else:
+            raise ValueError(f"Could not parse custom multishot prompts: {raw[:200]}")
+
+    result = []
+    for i, cfg in enumerate(shot_configs):
+        prompt_text = shots[i]["prompt"] if i < len(shots) else f"Cinematic fashion shot {i + 1}, elegant movement, luxury editorial"
+        result.append({"duration": str(cfg.duration), "prompt": prompt_text})
+
+    logger.info("Custom multishot prompts: %d shots", len(result))
+    return result
+
+
 async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
     """Generate cinematic shot descriptions for the multishot designer."""
     location_str = (

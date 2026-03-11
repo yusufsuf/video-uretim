@@ -697,24 +697,56 @@ function setGenerationMode(mode) {
     generationMode = mode;
     const btnClassic   = document.getElementById('mode-btn-classic');
     const btnMultishot = document.getElementById('mode-btn-multishot');
+    const btnCustom    = document.getElementById('mode-btn-custom');
     const desc         = document.getElementById('mode-desc');
+    const customArea   = document.getElementById('custom-prompt-area');
     if (!btnClassic) return;
+
+    // Reset all buttons
+    [btnClassic, btnMultishot, btnCustom].forEach(b => {
+        if (!b) return;
+        b.style.background = 'transparent';
+        b.style.color      = 'var(--text-secondary)';
+        b.style.boxShadow  = 'none';
+    });
+
+    // Activate selected
+    const activeBtn = { classic: btnClassic, multishot: btnMultishot, custom: btnCustom }[mode];
+    if (activeBtn) {
+        activeBtn.style.background = '#fff';
+        activeBtn.style.color      = '#0a0a0a';
+        activeBtn.style.boxShadow  = '0 1px 4px rgba(0,0,0,0.15)';
+    }
+
     if (mode === 'classic') {
-        btnClassic.style.background   = '#fff';
-        btnClassic.style.color        = '#0a0a0a';
-        btnClassic.style.boxShadow    = '0 1px 4px rgba(0,0,0,0.15)';
-        btnMultishot.style.background = 'transparent';
-        btnMultishot.style.color      = 'var(--text-secondary)';
-        btnMultishot.style.boxShadow  = 'none';
         if (desc) desc.textContent = 'Her sahne ayrı ayrı üretilip birleştirilir.';
-    } else {
-        btnMultishot.style.background = '#fff';
-        btnMultishot.style.color      = '#0a0a0a';
-        btnMultishot.style.boxShadow  = '0 1px 4px rgba(0,0,0,0.15)';
-        btnClassic.style.background   = 'transparent';
-        btnClassic.style.color        = 'var(--text-secondary)';
-        btnClassic.style.boxShadow    = 'none';
+        if (customArea) customArea.style.display = 'none';
+    } else if (mode === 'multishot') {
         if (desc) desc.textContent = 'Tek NB2 + tek Kling çağrısıyla tüm sahneler üretilir.';
+        if (customArea) customArea.style.display = 'none';
+    } else {
+        if (desc) desc.textContent = 'Yüklenen fotoğraf başlangıç karesi — analiz ve NB2 atlanır.';
+        if (customArea) customArea.style.display = 'block';
+    }
+
+    _updateGenerateBtnCustomState();
+}
+
+function onCustomPromptInput() {
+    _updateGenerateBtnCustomState();
+}
+
+function _updateGenerateBtnCustomState() {
+    const btn = document.getElementById('generate-btn');
+    if (!btn) return;
+    if (generationMode === 'custom') {
+        const val = (document.getElementById('custom-prompt-input')?.value || '').trim();
+        btn.disabled = val.length === 0;
+        if (val.length === 0) btn.title = 'Özel mod için video promptu zorunludur';
+        else btn.title = '';
+    } else {
+        btn.disabled = false;
+        btn.title = '';
     }
 }
 
@@ -1447,6 +1479,13 @@ async function startGeneration() {
 
     // Generation mode
     formData.append("generation_mode", generationMode);
+
+    // Custom prompt (Özel mod)
+    if (generationMode === 'custom') {
+        const customPrompt = (document.getElementById('custom-prompt-input')?.value || '').trim();
+        if (!customPrompt) { alert('Özel mod için video promptu zorunludur.'); return; }
+        formData.append("video_description", customPrompt);
+    }
 
     // Shots — serialize to JSON
     formData.append("shots",         JSON.stringify(shots));

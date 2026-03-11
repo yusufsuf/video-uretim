@@ -30,7 +30,7 @@ from models import (
     JobStatus,
     MultiScenePrompt,
 )
-from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt
+from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt, generate_custom_multishot_prompt
 from services.nano_banana_service import generate_background, generate_scene_frame
 from services.video_service import (
     download_file,
@@ -212,231 +212,250 @@ async def run_pipeline(
         duration = max(3, min(15, duration))
         scene_count = max(1, min(8, scene_count))
 
-        # ── Step 1: Analyse the garment ─────────────────────────
-        _update_job(job_id, status=JobStatus.ANALYZING, progress=5, message="Elbise analiz ediliyor...")
-        logger.info("[%s] Step 1 – Analysing garment", job_id)
+        if generation_mode == "custom":
+            # ── CUSTOM MODE: skip analysis / NB2 / background ─────────────
+            # Use the uploaded photo directly as start frame + user's prompt
+            logger.info("[%s] Custom mode: bypassing analysis, NB2, background", job_id)
 
-        analysis = await analyse_dress(front_path, back_path)
-        _update_job(job_id, analysis=analysis, progress=15, message="Elbise analizi tamamlandı.")
-        logger.info("[%s] Analysis result: %s", job_id, analysis.garment_type)
+            if not video_description:
+                raise ValueError("Özel modda video promptu zorunludur.")
 
-        # ── Step 2: Generate multi-scene prompts ────────────────
-        _update_job(job_id, status=JobStatus.GENERATING_PROMPTS, progress=20, message="Sahneler planlanıyor...")
-        logger.info("[%s] Step 2 – Generating multi-scene prompts (duration=%ds, scenes=%d)", job_id, duration, scene_count)
+            _update_job(job_id, progress=20, message="Görsel hazırlanıyor...")
+            fal_start_url = await _to_fal_url(front_url)
 
-        scene_prompt = await generate_multi_scene_prompt(
-            analysis=analysis,
-            request=request,
-            total_duration=duration,
-            scene_count=scene_count,
-            video_description=video_description,
-            location_image_path=reference_image_path,
-            style_image_url=library_style_url,
-        )
-        _update_job(job_id, scene_prompt=scene_prompt, progress=30, message=f"{scene_prompt.scene_count} sahne planlandı.")
-        logger.info("[%s] Planned %d scenes", job_id, scene_prompt.scene_count)
+            _update_job(job_id, progress=45, message="Senaryo üretiliyor (özel prompt)...")
 
-        # ── Step 3: Background image ─────────────────────────────
-        if reference_image_url:
-            # User uploaded a reference background — use it directly, skip Nano Banana
-            background_url = reference_image_url
-            logger.info("[%s] Step 3 – Using uploaded reference image as background: %s", job_id, background_url[:100])
-            _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=50, message="Yüklenen arka plan kullanılıyor...")
-        else:
-            # No reference — generate background via Nano Banana 2
-            _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=35, message="Arka plan üretiliyor...")
-            logger.info("[%s] Step 3 – Generating background image via Nano Banana 2", job_id)
-
-            bg_prompt = scene_prompt.background_image_prompt
-            logger.info("[%s] Background prompt: %s", job_id, bg_prompt[:120])
-
-            background_url = await generate_background(
-                prompt=bg_prompt,
-                aspect_ratio=aspect_ratio,
-            )
-            logger.info("[%s] Background generated: %s", job_id, background_url[:100])
-            _update_job(job_id, progress=50, message="Arka plan hazır. Video üretiliyor...")
-
-        # ── Step 4: Generate multishot video (chained) ─────────────────
-        logger.info("[%s] Step 4 – Generating multishot video", job_id)
-
-        # If user provided per-shot configs, override GPT's durations (safeguard)
-        if request.shots and len(request.shots) == len(scene_prompt.scenes):
-            for scene, shot in zip(scene_prompt.scenes, request.shots):
-                scene.duration = str(shot.duration)
-
-        # Build background pool for per-shot cycling
-        # If multiple backgrounds provided: each shot gets its own background (no chaining)
-        # If single background: chain via last-frame extraction
-        bg_pool = [background_url] + (background_extra_urls or [])
-        multi_bg = len(bg_pool) > 1
-        logger.info("[%s] Background pool: %d image(s), mode=%s",
-                    job_id, len(bg_pool), "cycle" if multi_bg else "chain")
-
-        # Garment reference URLs for NB2 scene composition
-        # NB2 Edit cannot access Supabase / local-server URLs — re-upload to fal.ai CDN
-        garment_ref_urls = [front_url] + ([side_url] if side_url else []) + ([back_url] if back_url else [])
-
-        _update_job(job_id, progress=52, message="Görseller hazırlanıyor...")
-        fal_garment_refs: list = []
-        for gurl in garment_ref_urls:
-            fal_garment_refs.append(await _to_fal_url(gurl))
-        logger.info("[%s] Garment refs on fal.ai CDN: %d", job_id, len(fal_garment_refs))
-
-        # Background URLs also need fal.ai CDN upload — NB2 Edit cannot access Supabase URLs
-        fal_bg_pool: list = []
-        for bg_url in bg_pool:
-            fal_bg_pool.append(await _to_fal_url(bg_url))
-        logger.info("[%s] Background pool on fal.ai CDN: %d", job_id, len(fal_bg_pool))
-
-        if generation_mode == "multishot":
-            # ── MULTISHOT MODE: single NB2 compose → GPT prompts → single Kling call ──
-            logger.info("[%s] Multishot mode: single NB2 + GPT multishot prompts + Kling", job_id)
-
-            _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
-                        progress=55, message="Sahne kompoze ediliyor (multishot)...")
-
-            garment_hint = f"{analysis.color} {analysis.garment_type}"
-            nb2_prompt = (
-                f"Fashion editorial photo: the first image is the background scene — keep it exactly. "
-                f"Place a fashion model wearing the {garment_hint} from the garment reference images "
-                f"(images 2 onward) into this background. "
-                f"Preserve every garment detail: exact colors, pattern, texture, cut, length. "
-                f"Camera angle: eye level. Shot framing: full body, medium-wide. "
-                f"Professional fashion photography, sharp focus, natural elegant pose."
-            )
-
-            scene_frame_url = await generate_scene_frame(
-                image_urls=[fal_bg_pool[0]] + fal_garment_refs,
-                prompt=nb2_prompt,
-                aspect_ratio=aspect_ratio,
-            )
-            logger.info("[%s] Multishot scene frame: %s", job_id, scene_frame_url[:80])
-
-            _update_job(job_id, progress=65, message="Senaryo üretiliyor (multishot)...")
-
-            # Build shot configs: use user-specified shots or fall back to GPT scenes
             if request.shots:
-                shot_configs_ms = request.shots
+                shot_configs_custom = request.shots
             else:
                 from models import DefileShotConfig
-                shot_configs_ms = [DefileShotConfig(duration=int(s.duration)) for s in scene_prompt.scenes]
+                per_shot_dur = max(3, duration // max(scene_count, 1))
+                shot_configs_custom = [DefileShotConfig(duration=per_shot_dur) for _ in range(scene_count)]
 
-            multi_prompt = await generate_defile_multishot_prompt(
-                scene_frame_url=scene_frame_url,
-                shot_configs=shot_configs_ms,
-                outfit_name="",
+            multi_prompt_custom = await generate_custom_multishot_prompt(
                 video_description=video_description,
+                shot_configs=shot_configs_custom,
             )
-            logger.info("[%s] Multishot: %d prompt(s) generated", job_id, len(multi_prompt))
+            logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
 
-            _update_job(job_id, progress=72, message="Video üretiliyor (multishot)...")
+            _update_job(job_id, progress=65, message="Video üretiliyor (özel mod)...")
+            fal_start_url = await _to_fal_url(fal_start_url)  # re-upload for Kling
 
-            # Re-upload scene frame so Kling can download it reliably
-            scene_frame_url = await _to_fal_url(scene_frame_url)
-
-            total_ms_duration = sum(int(p["duration"]) for p in multi_prompt)
-            clip_url = await generate_multishot_video(
-                start_image_url=scene_frame_url,
-                multi_prompt=multi_prompt,
-                duration=str(total_ms_duration),
+            total_custom_dur = sum(int(p["duration"]) for p in multi_prompt_custom)
+            clip_url_custom = await generate_multishot_video(
+                start_image_url=fal_start_url,
+                multi_prompt=multi_prompt_custom,
+                duration=str(total_custom_dur),
                 aspect_ratio=aspect_ratio,
                 generate_audio=generate_audio,
             )
 
             _update_job(job_id, progress=85, message="Video indiriliyor...")
             final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
-            clip_path_ms = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
-            shutil.move(clip_path_ms, final_path)
-            logger.info("[%s] Multishot video ready: %s", job_id, final_path)
+            clip_path_c = await download_file(clip_url_custom, settings.TEMP_DIR, extension=".mp4")
+            shutil.move(clip_path_c, final_path)
+            logger.info("[%s] Custom video ready: %s", job_id, final_path)
 
         else:
-            # ── CLASSIC MODE: per-shot NB2 compose + Kling animate ──────
-            all_scenes = scene_prompt.scenes
-            n_shots = len(all_scenes)
-            logger.info("[%s] %d scene(s) — NB2 compose + Kling per shot (classic)", job_id, n_shots)
+            # ── Steps 1-3: analysis + prompts + background ─────────────────
+            _update_job(job_id, status=JobStatus.ANALYZING, progress=5, message="Elbise analiz ediliyor...")
+            logger.info("[%s] Step 1 – Analysing garment", job_id)
 
-            clip_paths = []
-            current_start_image = fal_bg_pool[0]
+            analysis = await analyse_dress(front_path, back_path)
+            _update_job(job_id, analysis=analysis, progress=15, message="Elbise analizi tamamlandı.")
+            logger.info("[%s] Analysis result: %s", job_id, analysis.garment_type)
 
-            for shot_idx, scene in enumerate(all_scenes):
-                base_progress = 55 + int((shot_idx / n_shots) * 28)
+            _update_job(job_id, status=JobStatus.GENERATING_PROMPTS, progress=20, message="Sahneler planlanıyor...")
+            logger.info("[%s] Step 2 – Generating multi-scene prompts (duration=%ds, scenes=%d)", job_id, duration, scene_count)
 
-                # Choose start image: cycle pool (multi-bg) or chain from previous clip
-                start_image = fal_bg_pool[shot_idx % len(fal_bg_pool)] if multi_bg else current_start_image
-                shot_duration = int(scene.duration)
+            scene_prompt = await generate_multi_scene_prompt(
+                analysis=analysis,
+                request=request,
+                total_duration=duration,
+                scene_count=scene_count,
+                video_description=video_description,
+                location_image_path=reference_image_path,
+                style_image_url=library_style_url,
+            )
+            _update_job(job_id, scene_prompt=scene_prompt, progress=30, message=f"{scene_prompt.scene_count} sahne planlandı.")
+            logger.info("[%s] Planned %d scenes", job_id, scene_prompt.scene_count)
 
-                logger.info("[%s] Shot %d/%d: %ds", job_id, shot_idx + 1, n_shots, shot_duration)
+            if reference_image_url:
+                background_url = reference_image_url
+                logger.info("[%s] Step 3 – Using uploaded reference image as background: %s", job_id, background_url[:100])
+                _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=50, message="Yüklenen arka plan kullanılıyor...")
+            else:
+                _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=35, message="Arka plan üretiliyor...")
+                logger.info("[%s] Step 3 – Generating background image via Nano Banana 2", job_id)
+                bg_prompt = scene_prompt.background_image_prompt
+                logger.info("[%s] Background prompt: %s", job_id, bg_prompt[:120])
+                background_url = await generate_background(prompt=bg_prompt, aspect_ratio=aspect_ratio)
+                logger.info("[%s] Background generated: %s", job_id, background_url[:100])
+                _update_job(job_id, progress=50, message="Arka plan hazır. Video üretiliyor...")
 
-                # ── 4a: Compose scene frame via Nano Banana 2 Edit ───
+            logger.info("[%s] Step 4 – Generating multishot video", job_id)
+
+            if request.shots and len(request.shots) == len(scene_prompt.scenes):
+                for scene, shot in zip(scene_prompt.scenes, request.shots):
+                    scene.duration = str(shot.duration)
+
+            bg_pool = [background_url] + (background_extra_urls or [])
+            multi_bg = len(bg_pool) > 1
+            logger.info("[%s] Background pool: %d image(s), mode=%s",
+                        job_id, len(bg_pool), "cycle" if multi_bg else "chain")
+
+            garment_ref_urls = [front_url] + ([side_url] if side_url else []) + ([back_url] if back_url else [])
+            _update_job(job_id, progress=52, message="Görseller hazırlanıyor...")
+            fal_garment_refs: list = []
+            for gurl in garment_ref_urls:
+                fal_garment_refs.append(await _to_fal_url(gurl))
+            logger.info("[%s] Garment refs on fal.ai CDN: %d", job_id, len(fal_garment_refs))
+
+            fal_bg_pool: list = []
+            for bg_url in bg_pool:
+                fal_bg_pool.append(await _to_fal_url(bg_url))
+            logger.info("[%s] Background pool on fal.ai CDN: %d", job_id, len(fal_bg_pool))
+
+            if generation_mode == "multishot":
+                # ── MULTISHOT MODE: single NB2 compose → GPT prompts → single Kling call ──
+                logger.info("[%s] Multishot mode: single NB2 + GPT multishot prompts + Kling", job_id)
+
                 _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
-                            progress=base_progress,
-                            message=f"Sahne {shot_idx + 1}/{n_shots} kompoze ediliyor...")
+                            progress=55, message="Sahne kompoze ediliyor (multishot)...")
 
-                angle = (scene.camera_angle or "eye_level").replace("_", " ")
-                size = (scene.shot_size or "full_body").replace("_", " ")
                 garment_hint = f"{analysis.color} {analysis.garment_type}"
                 nb2_prompt = (
                     f"Fashion editorial photo: the first image is the background scene — keep it exactly. "
                     f"Place a fashion model wearing the {garment_hint} from the garment reference images "
                     f"(images 2 onward) into this background. "
                     f"Preserve every garment detail: exact colors, pattern, texture, cut, length. "
-                    f"Camera angle: {angle}. Shot framing: {size}. "
-                    f"Context: {scene.prompt}. "
+                    f"Camera angle: eye level. Shot framing: full body, medium-wide. "
                     f"Professional fashion photography, sharp focus, natural elegant pose."
                 )
 
                 scene_frame_url = await generate_scene_frame(
-                    image_urls=[start_image] + fal_garment_refs,
+                    image_urls=[fal_bg_pool[0]] + fal_garment_refs,
                     prompt=nb2_prompt,
                     aspect_ratio=aspect_ratio,
                 )
-                logger.info("[%s] Shot %d scene frame: %s", job_id, shot_idx + 1, scene_frame_url[:80])
+                logger.info("[%s] Multishot scene frame: %s", job_id, scene_frame_url[:80])
 
-                # ── 4b: Animate scene frame via Kling ────────────────
-                _update_job(job_id, progress=base_progress + int(14 / n_shots),
-                            message=f"Sahne {shot_idx + 1}/{n_shots} animate ediliyor...")
+                _update_job(job_id, progress=65, message="Senaryo üretiliyor (multishot)...")
 
-                # Re-upload scene frame so Kling can download it reliably
+                if request.shots:
+                    shot_configs_ms = request.shots
+                else:
+                    from models import DefileShotConfig
+                    shot_configs_ms = [DefileShotConfig(duration=int(s.duration)) for s in scene_prompt.scenes]
+
+                multi_prompt = await generate_defile_multishot_prompt(
+                    scene_frame_url=scene_frame_url,
+                    shot_configs=shot_configs_ms,
+                    outfit_name="",
+                    video_description=video_description,
+                )
+                logger.info("[%s] Multishot: %d prompt(s) generated", job_id, len(multi_prompt))
+
+                _update_job(job_id, progress=72, message="Video üretiliyor (multishot)...")
+
                 scene_frame_url = await _to_fal_url(scene_frame_url)
 
+                total_ms_duration = sum(int(p["duration"]) for p in multi_prompt)
                 clip_url = await generate_multishot_video(
                     start_image_url=scene_frame_url,
-                    multi_prompt=[{"duration": scene.duration, "prompt": scene.prompt}],
-                    duration=str(shot_duration),
+                    multi_prompt=multi_prompt,
+                    duration=str(total_ms_duration),
                     aspect_ratio=aspect_ratio,
                     generate_audio=generate_audio,
                 )
 
-                clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
-                clip_paths.append(clip_path)
-                logger.info("[%s] Shot %d downloaded: %s", job_id, shot_idx + 1, clip_path)
+                _update_job(job_id, progress=85, message="Video indiriliyor...")
+                final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
+                clip_path_ms = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
+                shutil.move(clip_path_ms, final_path)
+                logger.info("[%s] Multishot video ready: %s", job_id, final_path)
 
-                # Chain via last frame only in single-background mode
-                if not multi_bg and shot_idx < n_shots - 1:
-                    logger.info("[%s] Extracting last frame for chaining...", job_id)
-                    last_frame_path = extract_last_frame(clip_path, settings.TEMP_DIR)
-                    current_start_image = await upload_to_fal(last_frame_path)
-                    try:
-                        os.remove(last_frame_path)
-                    except Exception:
-                        pass
-                    logger.info("[%s] Chain: next shot starts from %s", job_id, current_start_image[:80])
-
-            # Merge clips or move single clip to OUTPUT_DIR
-            merge_msg = "Sahneler birleştiriliyor..." if n_shots > 1 else "Video indiriliyor..."
-            _update_job(job_id, progress=85, message=merge_msg)
-
-            final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
-            if n_shots > 1:
-                concatenate_clips(clip_paths, final_path)
-                for p in clip_paths:
-                    try:
-                        os.remove(p)
-                    except Exception:
-                        pass
             else:
-                shutil.move(clip_paths[0], final_path)
+                # ── CLASSIC MODE: per-shot NB2 compose + Kling animate ──────
+                all_scenes = scene_prompt.scenes
+                n_shots = len(all_scenes)
+                logger.info("[%s] %d scene(s) — NB2 compose + Kling per shot (classic)", job_id, n_shots)
+
+                clip_paths = []
+                current_start_image = fal_bg_pool[0]
+
+                for shot_idx, scene in enumerate(all_scenes):
+                    base_progress = 55 + int((shot_idx / n_shots) * 28)
+
+                    start_image = fal_bg_pool[shot_idx % len(fal_bg_pool)] if multi_bg else current_start_image
+                    shot_duration = int(scene.duration)
+
+                    logger.info("[%s] Shot %d/%d: %ds", job_id, shot_idx + 1, n_shots, shot_duration)
+
+                    _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
+                                progress=base_progress,
+                                message=f"Sahne {shot_idx + 1}/{n_shots} kompoze ediliyor...")
+
+                    angle = (scene.camera_angle or "eye_level").replace("_", " ")
+                    size = (scene.shot_size or "full_body").replace("_", " ")
+                    garment_hint = f"{analysis.color} {analysis.garment_type}"
+                    nb2_prompt = (
+                        f"Fashion editorial photo: the first image is the background scene — keep it exactly. "
+                        f"Place a fashion model wearing the {garment_hint} from the garment reference images "
+                        f"(images 2 onward) into this background. "
+                        f"Preserve every garment detail: exact colors, pattern, texture, cut, length. "
+                        f"Camera angle: {angle}. Shot framing: {size}. "
+                        f"Context: {scene.prompt}. "
+                        f"Professional fashion photography, sharp focus, natural elegant pose."
+                    )
+
+                    scene_frame_url = await generate_scene_frame(
+                        image_urls=[start_image] + fal_garment_refs,
+                        prompt=nb2_prompt,
+                        aspect_ratio=aspect_ratio,
+                    )
+                    logger.info("[%s] Shot %d scene frame: %s", job_id, shot_idx + 1, scene_frame_url[:80])
+
+                    _update_job(job_id, progress=base_progress + int(14 / n_shots),
+                                message=f"Sahne {shot_idx + 1}/{n_shots} animate ediliyor...")
+
+                    scene_frame_url = await _to_fal_url(scene_frame_url)
+
+                    clip_url = await generate_multishot_video(
+                        start_image_url=scene_frame_url,
+                        multi_prompt=[{"duration": scene.duration, "prompt": scene.prompt}],
+                        duration=str(shot_duration),
+                        aspect_ratio=aspect_ratio,
+                        generate_audio=generate_audio,
+                    )
+
+                    clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
+                    clip_paths.append(clip_path)
+                    logger.info("[%s] Shot %d downloaded: %s", job_id, shot_idx + 1, clip_path)
+
+                    if not multi_bg and shot_idx < n_shots - 1:
+                        logger.info("[%s] Extracting last frame for chaining...", job_id)
+                        last_frame_path = extract_last_frame(clip_path, settings.TEMP_DIR)
+                        current_start_image = await upload_to_fal(last_frame_path)
+                        try:
+                            os.remove(last_frame_path)
+                        except Exception:
+                            pass
+                        logger.info("[%s] Chain: next shot starts from %s", job_id, current_start_image[:80])
+
+                merge_msg = "Sahneler birleştiriliyor..." if n_shots > 1 else "Video indiriliyor..."
+                _update_job(job_id, progress=85, message=merge_msg)
+
+                final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
+                if n_shots > 1:
+                    concatenate_clips(clip_paths, final_path)
+                    for p in clip_paths:
+                        try:
+                            os.remove(p)
+                        except Exception:
+                            pass
+                else:
+                    shutil.move(clip_paths[0], final_path)
 
             logger.info("[%s] Final video: %s", job_id, final_path)
 

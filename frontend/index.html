@@ -354,8 +354,28 @@
                             style="padding:6px 16px;border-radius:7px;border:none;font-family:inherit;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;background:transparent;color:var(--text-secondary)">
                             Multishot
                         </button>
+                        <button id="mode-btn-custom" onclick="setGenerationMode('custom')"
+                            style="padding:6px 16px;border-radius:7px;border:none;font-family:inherit;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;background:transparent;color:var(--text-secondary)">
+                            Özel
+                        </button>
                     </div>
                     <div id="mode-desc" style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:6px;margin-top:4px">Her sahne ayrı ayrı üretilip birleştirilir.</div>
+
+                    <!-- Custom prompt area (Özel mod) -->
+                    <div id="custom-prompt-area" style="display:none;margin-top:10px;margin-bottom:4px">
+                        <label class="form-label" style="margin-bottom:6px">
+                            Video Promptu <span style="color:#e05a5a">*</span>
+                        </label>
+                        <textarea id="custom-prompt-input" rows="9"
+                            placeholder="Detaylı video yönlendirmenizi buraya yapıştırın&#10;(sahne, kamera, elbise, model, ortam talimatları)..."
+                            style="width:100%;font-family:inherit;font-size:0.75rem;padding:12px;
+                                   background:var(--bg-secondary);border:1px solid var(--border-subtle);
+                                   border-radius:8px;color:var(--text-primary);resize:vertical;line-height:1.6"
+                            oninput="onCustomPromptInput()"></textarea>
+                        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:4px">
+                            Yüklediğiniz fotoğraf doğrudan başlangıç karesi olarak kullanılır — NB2 ve elbise analizi adımları atlanır.
+                        </div>
+                    </div>
 
                     <!-- JSON Load -->
                     <div style="margin-top:4px;margin-bottom:2px">
