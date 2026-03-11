@@ -528,6 +528,7 @@ async def generate_defile_multishot_prompt(
     scene_frame_url: str,
     shot_configs: list,
     outfit_name: str = "",
+    video_description: Optional[str] = None,
 ) -> list[dict]:
     """Analyze a NB2-composed runway scene frame and generate multishot prompts for Kling.
 
@@ -547,13 +548,25 @@ async def generate_defile_multishot_prompt(
         f"  Shot {i + 1}: {d} seconds" for i, d in enumerate(durations)
     )
 
-    user_text = (
-        f"Outfit: {outfit_name or 'fashion garment'}\n"
-        f"Number of shots: {n_shots}\n"
-        f"Shot durations:\n{shots_description}\n\n"
-        "Analyze the runway scene in the image and write a cinematic multishot script. "
-        "Return exactly the JSON array with the durations specified above."
-    )
+    if video_description:
+        user_text = (
+            f"Outfit: {outfit_name or 'fashion garment'}\n"
+            f"Number of shots: {n_shots}\n"
+            f"Shot durations:\n{shots_description}\n\n"
+            f"CRITICAL — The user has provided specific creative direction for this video. "
+            f"You MUST follow these instructions exactly. Override any default structure with the user's intent:\n\n"
+            f"{video_description}\n\n"
+            f"Analyze the scene image and write a cinematic multishot script that fulfills the above direction. "
+            f"Return exactly the JSON array with the durations specified above."
+        )
+    else:
+        user_text = (
+            f"Outfit: {outfit_name or 'fashion garment'}\n"
+            f"Number of shots: {n_shots}\n"
+            f"Shot durations:\n{shots_description}\n\n"
+            "Analyze the runway scene in the image and write a cinematic multishot script. "
+            "Return exactly the JSON array with the durations specified above."
+        )
 
     response = await client.chat.completions.create(
         model="gpt-5.4",

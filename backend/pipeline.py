@@ -326,6 +326,7 @@ async def run_pipeline(
                 scene_frame_url=scene_frame_url,
                 shot_configs=shot_configs_ms,
                 outfit_name="",
+                video_description=video_description,
             )
             logger.info("[%s] Multishot: %d prompt(s) generated", job_id, len(multi_prompt))
 
