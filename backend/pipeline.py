@@ -223,18 +223,6 @@ async def run_pipeline(
             _update_job(job_id, progress=20, message="Görsel hazırlanıyor...")
             fal_start_url = await _to_fal_url(front_url)
 
-            # Build elements from outfit images (compressed for Kling 10 MB limit)
-            elem_front = await _to_fal_url_compressed(front_url)
-            custom_element: dict = {"frontal_image_url": elem_front, "reference_image_urls": []}
-            if side_url:
-                elem_side = await _to_fal_url_compressed(side_url)
-                custom_element["reference_image_urls"].append(elem_side)
-            if back_url:
-                elem_back = await _to_fal_url_compressed(back_url)
-                custom_element["reference_image_urls"].append(elem_back)
-            custom_elements = [custom_element]
-            logger.info("[%s] Custom elements: frontal=%s, refs=%d", job_id, elem_front[:60], len(custom_element["reference_image_urls"]))
-
             _update_job(job_id, progress=45, message="Senaryo üretiliyor (özel prompt)...")
 
             multi_prompt_custom = await generate_custom_multishot_prompt(
@@ -252,7 +240,6 @@ async def run_pipeline(
                 duration=str(total_custom_dur),
                 aspect_ratio=aspect_ratio,
                 generate_audio=generate_audio,
-                elements=custom_elements,
             )
 
             _update_job(job_id, progress=85, message="Video indiriliyor...")
