@@ -353,6 +353,9 @@ async def run_pipeline(
 
                 scene_frame_url = await _to_fal_url(scene_frame_url)
 
+                garment_lock = scene_prompt.garment_lock_description
+                if garment_lock:
+                    multi_prompt = [{"duration": p["duration"], "prompt": f"{garment_lock}. {p['prompt']}"} for p in multi_prompt]
                 total_ms_duration = sum(int(p["duration"]) for p in multi_prompt)
                 clip_url = await generate_multishot_video(
                     start_image_url=scene_frame_url,
@@ -414,9 +417,11 @@ async def run_pipeline(
 
                     scene_frame_url = await _to_fal_url(scene_frame_url)
 
+                    garment_lock = scene_prompt.garment_lock_description
+                    locked_prompt = f"{garment_lock}. {scene.prompt}" if garment_lock else scene.prompt
                     clip_url = await generate_multishot_video(
                         start_image_url=scene_frame_url,
-                        multi_prompt=[{"duration": scene.duration, "prompt": scene.prompt}],
+                        multi_prompt=[{"duration": scene.duration, "prompt": locked_prompt}],
                         duration=str(shot_duration),
                         aspect_ratio=aspect_ratio,
                         generate_audio=generate_audio,

@@ -194,6 +194,13 @@ PROMPT STRUCTURE (each shot, 40-80 words):
 - Model action and garment interaction (reference @Element1)
 - Lighting and atmosphere (MUST mention bright/well-lit conditions)
 - Each shot should use a DIFFERENT angle/movement for variety
+- MUST include the exact garment_lock_description in every prompt (color, silhouette, key details)
+
+GARMENT CONSISTENCY RULES (CRITICAL):
+- Extract the garment's key identifiers from the analysis: exact color, fabric, silhouette shape, and 1-2 defining structural details
+- Embed these identifiers verbatim into EVERY scene prompt — e.g. "ivory silk bias-cut gown with deep V neckline"
+- The garment must appear IDENTICAL in every shot — same color, same cut, same details
+- Do NOT let the AI infer or simplify the garment — always state it explicitly
 
 SCENE CONTINUITY RULES (critical — videos are chained clip-to-clip, each clip starts from the last frame of the previous):
 - Scene 1 MUST clearly establish: model full body, garment front view, lighting, environment — this sets the visual anchor for all subsequent clips
@@ -626,11 +633,15 @@ BRIEF HANDLING:
 - Otherwise → split into logical shots of 3-5 seconds each
 - Each shot duration: minimum 3 seconds, maximum 10 seconds
 
+GARMENT CONSISTENCY (CRITICAL):
+- First, identify the garment from the image: exact color, fabric type, silhouette, and 1-2 key structural details (e.g. "deep burgundy velvet gown with corseted bodice and full skirt")
+- Embed this garment description verbatim into EVERY shot prompt — never omit it
+- The outfit must appear identical across all shots — same color, same cut, same details
+
 PROMPT RULES:
-- Each shot prompt: 35-60 words, in English only
+- Each shot prompt: 40-70 words, in English only
 - Each shot continues seamlessly from the previous (one continuous chained video)
-- Preserve visual continuity: same model, same outfit, same environment across all shots
-- Each prompt must describe: model action/pose, camera movement, framing, and atmosphere
+- Each prompt must describe: garment (exact description), model action/pose, camera movement, framing, and atmosphere
 - Vary camera angles and shot sizes across shots for cinematic flow
 - Do NOT default to a plain runway walk — choose elegant, editorial movements
 
