@@ -1666,8 +1666,8 @@ newBtn?.addEventListener("click", () => {
     libraryStyleUrl    = null;
     // Reset shots to default
     shots = [
-        { camera_move: "dolly_in", duration: 5, description: "" },
-        { camera_move: "orbit",    duration: 5, description: "" },
+        { camera_move: "", duration: 5, description: "", camera_angle: "", shot_size: "" },
+        { camera_move: "", duration: 5, description: "", camera_angle: "", shot_size: "" },
     ];
     // Reset defile state
     videoMode = "video";
