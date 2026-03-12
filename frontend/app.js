@@ -355,12 +355,13 @@ function selectLocation(value, labelTR) {
 
 // ─── Multishot State ────────────────────────────────────────────────
 let shots = [
-    { camera_move: "dolly_in", duration: 5, description: "", camera_angle: "", shot_size: "" },
-    { camera_move: "orbit",    duration: 5, description: "", camera_angle: "", shot_size: "" },
+    { camera_move: "", duration: 5, description: "", camera_angle: "", shot_size: "" },
+    { camera_move: "", duration: 5, description: "", camera_angle: "", shot_size: "" },
 ];
 let selectedAspectRatio = "9:16";
 
 const CAM_MOVES = [
+    { value: "",          label: "Otomatik", animClass: "cam-anim-static" },
     { value: "dolly_in",  label: "Dolly In",  animClass: "cam-anim-dolly-in" },
     { value: "dolly_out", label: "Dolly Out", animClass: "cam-anim-dolly-out" },
     { value: "orbit",     label: "Orbit",     animClass: "cam-anim-orbit" },
@@ -528,8 +529,7 @@ function updateShotSize(idx, val) {
 }
 
 function addShot() {
-    const defaults = ["dolly_in", "dolly_out", "orbit", "pan", "tilt_up", "tracking", "crane", "static"];
-    shots.push({ camera_move: defaults[shots.length % defaults.length], duration: 5, description: "", camera_angle: "", shot_size: "" });
+    shots.push({ camera_move: "", duration: 5, description: "", camera_angle: "", shot_size: "" });
     renderShots();
 }
 

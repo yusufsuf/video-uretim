@@ -294,10 +294,12 @@ async def generate_multi_scene_prompt(
     if request.shots:
         user_text += "\n[CRITICAL] Per-shot configuration — you MUST follow this EXACTLY:\n"
         for i, shot in enumerate(request.shots):
-            cam_term   = _cam_move_map.get(shot.camera_move, shot.camera_move)
+            cam_term   = _cam_move_map.get(shot.camera_move, shot.camera_move) if shot.camera_move else ""
             angle_term = _angle_map.get(shot.camera_angle, shot.camera_angle) if shot.camera_angle else ""
             size_term  = _size_map.get(shot.shot_size, shot.shot_size) if shot.shot_size else ""
-            user_text += f"  Shot {i + 1}: camera_movement=\"{cam_term}\""
+            user_text += f"  Shot {i + 1}:"
+            if cam_term:
+                user_text += f" camera_movement=\"{cam_term}\""
             if angle_term:
                 user_text += f", camera_angle=\"{angle_term}\""
             if size_term:
