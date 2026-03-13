@@ -1312,7 +1312,7 @@ async function startDefileCollection() {
         currentJobId = job.job_id;
         startPolling();
     } catch (err) {
-        showError(`Bağlantı hatası: ${err.message}`);
+        showError(err.message);
         generationStarted = false;
         wizardFooter.style.display = "flex";
         document.getElementById("wizard-next-btn").textContent = "Tekrar Dene";
@@ -1513,7 +1513,7 @@ async function startGeneration() {
         currentJobId = job.job_id;
         startPolling();
     } catch (err) {
-        showError(`Bağlantı hatası: ${err.message}`);
+        showError(err.message);
         generationStarted = false;
         wizardFooter.style.display = "flex";
         wizardNextBtn.textContent = "Tekrar Dene";
@@ -1683,8 +1683,25 @@ newBtn?.addEventListener("click", () => {
 });
 
 // ─── Error Handling ──────────────────────────────────────────────
+function _trNetworkError(errMsg) {
+    const m = (errMsg || "").toLowerCase();
+    if (m.includes("http 401")) return "Oturum süresi doldu. Lütfen sayfayı yenileyip tekrar giriş yapın.";
+    if (m.includes("http 403")) return "Bu işlem için yetkiniz yok.";
+    if (m.includes("http 400")) return "Geçersiz istek. Lütfen girdiğiniz bilgileri kontrol edin.";
+    if (m.includes("http 413")) return "Yüklenen dosya çok büyük. Lütfen daha küçük bir dosya seçin.";
+    if (m.includes("http 429")) return "Çok fazla istek gönderildi. Lütfen birkaç dakika bekleyip tekrar deneyin.";
+    if (m.includes("http 500") || m.includes("http 502") || m.includes("http 503"))
+        return "Sunucu hatası oluştu. Lütfen biraz bekleyip tekrar deneyin.";
+    if (m.includes("failed to fetch") || m.includes("network") || m.includes("load failed"))
+        return "İnternet bağlantısı kesildi. Bağlantınızı kontrol edip tekrar deneyin.";
+    if (m.includes("timeout") || m.includes("timed out"))
+        return "Bağlantı zaman aşımına uğradı. Lütfen tekrar deneyin.";
+    return null;
+}
+
 function showError(msg) {
-    errorText.textContent = msg;
+    const translated = _trNetworkError(msg);
+    errorText.textContent = translated || msg;
     errorMsg.classList.add("active");
 }
 

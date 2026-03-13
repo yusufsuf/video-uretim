@@ -46,6 +46,69 @@ from PIL import Image
 
 logger = logging.getLogger(__name__)
 
+
+def _tr_error(exc: Exception) -> str:
+    """Convert a raw exception into a user-friendly Turkish error message."""
+    msg = str(exc).lower()
+
+    # ── OpenAI / GPT ──────────────────────────────────────────────────────────
+    if "insufficient_quota" in msg or "you exceeded your current quota" in msg:
+        return "OpenAI krediniz tükendi. Lütfen platform.openai.com adresinden hesabınıza kredi yükleyin."
+    if "rate_limit_exceeded" in msg or "rate limit" in msg:
+        return "OpenAI istek limiti aşıldı. Lütfen birkaç dakika bekleyip tekrar deneyin."
+    if "invalid_api_key" in msg or "incorrect api key" in msg:
+        return "OpenAI API anahtarı geçersiz. Lütfen ayarlarınızı kontrol edin."
+    if "context_length_exceeded" in msg or "max_tokens" in msg:
+        return "Prompt çok uzun, OpenAI işleyemedi. Lütfen açıklama uzunluğunu azaltın."
+    if "openai" in msg and ("timeout" in msg or "timed out" in msg):
+        return "OpenAI yanıt vermedi (zaman aşımı). Lütfen tekrar deneyin."
+
+    # ── fal.ai / Kling ────────────────────────────────────────────────────────
+    if "fal" in msg and ("quota" in msg or "limit" in msg or "credit" in msg):
+        return "fal.ai krediniz tükendi. Lütfen fal.ai hesabınıza kredi yükleyin."
+    if "fal" in msg and ("timeout" in msg or "timed out" in msg):
+        return "Video üretimi zaman aşımına uğradı. Lütfen tekrar deneyin."
+    if "kling" in msg and "error" in msg:
+        return f"Kling video üretimi başarısız oldu. Lütfen tekrar deneyin."
+    if "422" in msg and "fal" in msg:
+        return "fal.ai isteği reddetti. Görsel formatı veya parametreler hatalı olabilir."
+    if "image" in msg and ("too large" in msg or "size" in msg or "10mb" in msg or "10 mb" in msg):
+        return "Görsel dosya boyutu çok büyük. Lütfen 10 MB'dan küçük bir görsel yükleyin."
+
+    # ── Nano Banana / Arka plan ───────────────────────────────────────────────
+    if "nano" in msg or "background" in msg and "timeout" in msg:
+        return "Arka plan üretimi zaman aşımına uğradı. Lütfen tekrar deneyin."
+
+    # ── Ağ / Bağlantı ─────────────────────────────────────────────────────────
+    if "connection" in msg and ("refused" in msg or "reset" in msg or "aborted" in msg):
+        return "Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin ve tekrar deneyin."
+    if "timeout" in msg or "timed out" in msg:
+        return "İşlem zaman aşımına uğradı. Lütfen tekrar deneyin."
+    if "name or service not known" in msg or "dns" in msg or "nodename" in msg:
+        return "DNS hatası: sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edin."
+    if "ssl" in msg or "certificate" in msg:
+        return "SSL/Sertifika hatası oluştu. Lütfen tekrar deneyin."
+
+    # ── Görsel / Dosya ────────────────────────────────────────────────────────
+    if "ssrf" in msg:
+        return "Güvenlik hatası: geçersiz görsel URL'si. Lütfen farklı bir görsel deneyin."
+    if "cannot identify image file" in msg or "not an image" in msg:
+        return "Yüklenen dosya geçerli bir görsel değil. Lütfen JPG, PNG veya WEBP dosyası yükleyin."
+    if "permission denied" in msg or "access denied" in msg:
+        return "Dosya erişim hatası. Lütfen tekrar deneyin."
+    if "no space left" in msg or "disk full" in msg:
+        return "Sunucu diski dolu. Lütfen daha sonra tekrar deneyin."
+    if "özel modda video promptu zorunludur" in msg:
+        return "Özel mod için video açıklaması boş bırakılamaz. Lütfen bir açıklama girin."
+
+    # ── Supabase / Depolama ───────────────────────────────────────────────────
+    if "supabase" in msg or "storage" in msg and "error" in msg:
+        return "Video kaydedilirken hata oluştu. Lütfen tekrar deneyin."
+
+    # ── Genel fallback ────────────────────────────────────────────────────────
+    return f"Beklenmedik bir hata oluştu. Lütfen tekrar deneyin. (Detay: {exc})"
+
+
 _ELEMENTS_MAX_BYTES = 9 * 1024 * 1024  # 9 MB — safe margin under Kling's 10 MB limit
 _ELEMENTS_MAX_PX = 1536  # max dimension for element images
 
@@ -535,7 +598,7 @@ async def run_pipeline(
         _update_job(
             job_id,
             status=JobStatus.FAILED,
-            message=f"Hata: {exc}",
+            message=_tr_error(exc),
         )
 
 
@@ -903,5 +966,5 @@ async def run_defile_collection_pipeline(
         _update_job(
             job_id,
             status=JobStatus.FAILED,
-            message=f"Hata: {exc}",
+            message=_tr_error(exc),
         )
