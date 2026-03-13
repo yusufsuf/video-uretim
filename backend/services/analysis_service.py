@@ -36,32 +36,34 @@ def _image_content(path_or_url: str, detail: str = "high") -> dict:
 
 
 # ─── Dress Analysis ────────────────────────────────────────────────
-ANALYSIS_SYSTEM = """You are an elite fashion garment analyst specializing in haute couture construction and evening wear. You receive TWO photos of the same garment: FRONT view and BACK view. Your job is to describe this garment with such precision that an AI image/video generator can recreate it perfectly from your description alone.
+ANALYSIS_SYSTEM = """You are an elite fashion garment analyst specializing in haute couture construction and evening wear. You receive TWO photos of the same garment: FRONT view and BACK view. Your job is to describe this garment with such precision that an AI image/video generator can recreate it perfectly from your description alone — especially when the model turns and shows the back.
 
 FRONT ANALYSIS RULES:
 - Describe the garment from top to bottom as seen from the front
 - Start with the neckline: exact shape, depth, width
 - Then shoulders and sleeves: sleeve type, length, cuff style, how they attach to the bodice
+- STRUCTURAL ELEMENTS: if there are 3D appliqués, sculptural cord/rope work, foam structures, pleated panels, floral constructions — describe each one: location on body, shape, size, how many, how they are attached, direction they face
 - Then bodice: fit type, structure, boning, panels, seam lines
 - Then waist area: belt type, buckle/embellishment description, peplum shape and size
 - Then skirt: silhouette shape, volume, how it falls from waist, number of layers if visible
 - Then hem: exactly where it ends, how it finishes at the bottom
 - Note the fabric behavior: how it catches light, folds, drapes
 
-BACK ANALYSIS RULES:
-- Describe the garment from top to bottom as seen from the back
-- Start with back neckline: shape, depth, how it differs from front
-- Then upper back: fabric panels, seam lines, how fabric sits on shoulder blades
-- Then closure: zipper/buttons/hooks - exact type, starting position, ending position, visibility
-- Then mid-back to waist: how fabric follows the body contour, darting, panels
-- Then skirt from behind: how it falls, panels, volume, shape compared to front
-- Then back hem: how it ends at floor level from behind
+BACK ANALYSIS RULES (CRITICAL — this is used to maintain accuracy when the model turns):
+- Describe EXACTLY what becomes visible when the model faces away from camera
+- SHOULDER/CAPE STRUCTURE: if there is a cape, cord structure, or draping element over the shoulders — describe it precisely from the back: how many strands, how they fan/drape, starting from neck/collar and going over shoulders, whether the back is exposed between them
+- BACK OPENING: describe the exact exposure level — fully open, partially open, keyhole, V-cut, etc. — and the depth it reaches (nape of neck / mid-back / lower back / waist / hip)
+- CLOSURE: zipper/buttons/hooks — exact type, material (exposed metal / concealed / decorative), starting position (top of back / below shoulder cape), ending position (waist / hips / hem)
+- MID-BACK TO WAIST: how fabric follows the body contour, darting, panels, any seam lines visible
+- BACK SKIRT: how it falls from behind, whether there is a back slit (how deep), back hem shape
+- Write this as a complete sentence description that an AI can use as a prompt: e.g. "Back view reveals a deeply open back with multi-strand rope cape draping over both shoulders from a high collar, center metal zipper running from mid-back to waist, fitted mermaid skirt with center back slit at lower hem"
 
 CRITICAL RULES:
-- NEVER use the word 'train' or 'trailing' - the hem ends at floor level
+- NEVER use the word 'train' or 'trailing' — the hem ends at floor level
 - NEVER exaggerate or add details not visible in the photos
-- Be precise about colors - use exact color terms, not vague ones
+- Be precise about colors — use exact color terms, not vague ones
 - If something is not clearly visible, say 'not clearly visible'
+- The back_details field must be detailed enough to use as a standalone AI video prompt for a back-view shot
 
 Return JSON only:
 {
@@ -75,10 +77,10 @@ Return JSON only:
   "sleeve_type": "sleeve style, length, cuff detail",
   "cut_style": "detailed fit from bodice through skirt",
   "length": "exact garment length",
-  "details": "ALL unique features: belt, buckle, peplum, decorative elements",
-  "front_silhouette": "complete front description from neckline to hem",
-  "back_details": "complete back description: neckline, closure, panels, skirt, hem",
-  "back_silhouette": "how the garment shapes the body from behind",
+  "details": "ALL unique features: 3D appliqués, sculptural elements, cord/rope work, belt, buckle, peplum — each described precisely",
+  "front_silhouette": "complete front description from neckline to hem — include all structural/sculptural elements with positions",
+  "back_details": "FULL back view description as a standalone AI prompt: shoulder/cape structure from behind, back exposure depth, closure type and position, skirt from behind, back slit if any — enough detail to generate an accurate back-view shot",
+  "back_silhouette": "how the garment shapes the body silhouette from behind — include any asymmetry or unique structure",
   "hem_description": "how the hem finishes from BOTH front and back views",
   "description_en": "comprehensive 3-4 sentence description covering front and back views. NEVER use words train or trailing.",
   "season": "suitable season",
@@ -117,7 +119,7 @@ async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> Dre
         ],
         response_format={"type": "json_object"},
         temperature=0.2,
-        max_completion_tokens=1200,
+        max_completion_tokens=1800,
     )
 
     raw = response.choices[0].message.content.strip()
@@ -202,6 +204,12 @@ GARMENT CONSISTENCY RULES (CRITICAL):
 - Embed these identifiers verbatim into EVERY scene prompt — e.g. "ivory silk bias-cut gown with deep V neckline"
 - The garment must appear IDENTICAL in every shot — same color, same cut, same details
 - Do NOT let the AI infer or simplify the garment — always state it explicitly
+
+BACK VIEW SHOTS (when camera shows model from behind or turning away):
+- You MUST embed the full back_details from the analysis into the prompt verbatim
+- Include: back shoulder/cape structure, back opening depth, closure type, back skirt shape, back slit if any
+- Example: "...turning away reveals multi-strand rope cape draping over both shoulders from high collar, deep open back, center metal zipper, fitted skirt with back slit..."
+- Never omit back structural details from back-facing shots — this is the main cause of inconsistency
 
 SCENE CONTINUITY RULES (critical — videos are chained clip-to-clip, each clip starts from the last frame of the previous):
 - Scene 1 MUST clearly establish: model full body, garment front view, lighting, environment — this sets the visual anchor for all subsequent clips
@@ -520,6 +528,7 @@ CRITICAL RULES:
 - Each shot continues seamlessly from the previous (chained within one video generation)
 - NEVER repeat the same camera angle or movement twice
 - Reference the garment color and silhouette visible in the image
+- For back-view shots: explicitly describe the back structure visible in the image — shoulder elements, back opening, closure, skirt from behind
 - Style: luxury fashion film, editorial Vogue aesthetic, smooth cinematic movement
 - Each prompt: 30-50 words, HARD LIMIT: 480 characters, in English only
 - Keep lighting consistent across all shots
@@ -656,7 +665,10 @@ STEP 2 — BRIEF HANDLING:
 STEP 3 — GENERATE SHOTS:
 GARMENT CONSISTENCY (CRITICAL):
 - Embed the complete garment description (front AND back details) verbatim into EVERY shot prompt
-- For shots showing the back of the model → explicitly include back details (e.g. "revealing the open-back V cut with lace-up closure and floor-length train")
+- For shots showing the back of the model → you MUST explicitly include ALL back details from the images:
+  shoulder/cape structure from behind, exact back opening depth, closure type and position, back skirt shape, back slit if any
+  Example: "...turning reveals multi-strand rope cape over shoulders, deep open back, center zipper, fitted skirt with back slit"
+- NEVER simplify or omit back structural elements — they are the most likely to be generated incorrectly
 - The outfit must appear identical across all shots — never omit or simplify garment details
 
 PROMPT RULES:
