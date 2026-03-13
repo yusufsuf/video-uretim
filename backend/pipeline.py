@@ -112,6 +112,26 @@ def _tr_error(exc: Exception) -> str:
 _ELEMENTS_MAX_BYTES = 9 * 1024 * 1024  # 9 MB — safe margin under Kling's 10 MB limit
 _ELEMENTS_MAX_PX = 1536  # max dimension for element images
 
+_BASE_NEGATIVE = (
+    "blur, distort, low quality, deformed hands, deformed face, "
+    "changed outfit, different dress, altered silhouette, different fabric, "
+    "costume change, wardrobe change, morphing clothes"
+)
+_TRAIN_NEGATIVE = ", train, trailing fabric, floor-length train, dragging hem, sweeping train"
+
+_TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem"}
+
+
+def _has_train(analysis) -> bool:
+    """Return True if the garment analysis indicates a train/trailing hem."""
+    combined = " ".join([
+        analysis.hem_description or "",
+        analysis.back_details or "",
+        analysis.back_silhouette or "",
+        analysis.length or "",
+    ]).lower()
+    return any(w in combined for w in _TRAIN_WORDS)
+
 
 async def _to_fal_url_compressed(url: str) -> str:
     """Like _to_fal_url but also resizes/compresses the image to stay under Kling's
@@ -309,6 +329,11 @@ async def run_pipeline(
             _update_job(job_id, progress=65, message="Video üretiliyor (özel mod)...")
             fal_start_url = await _to_fal_url(fal_start_url)  # re-upload for Kling
 
+            # For custom mode, detect train from description text
+            _desc_lower = (video_description or "").lower()
+            _custom_has_train = any(w in _desc_lower for w in ("train", "trailing", "kuyruk", "sweep"))
+            _custom_negative = _BASE_NEGATIVE if _custom_has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
+
             total_custom_dur = sum(int(p["duration"]) for p in multi_prompt_custom)
             clip_url_custom = await generate_multishot_video(
                 start_image_url=fal_start_url,
@@ -317,6 +342,7 @@ async def run_pipeline(
                 aspect_ratio=aspect_ratio,
                 generate_audio=generate_audio,
                 elements=custom_elements,
+                negative_prompt=_custom_negative,
             )
 
             _update_job(job_id, progress=85, message="Video indiriliyor...")
@@ -333,6 +359,11 @@ async def run_pipeline(
             analysis = await analyse_dress(front_path, back_path)
             _update_job(job_id, analysis=analysis, progress=15, message="Elbise analizi tamamlandı.")
             logger.info("[%s] Analysis result: %s", job_id, analysis.garment_type)
+
+            has_train = _has_train(analysis)
+            no_train_note = "" if has_train else "No train, flat hem."
+            kling_negative = _BASE_NEGATIVE if has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
+            logger.info("[%s] Train detected: %s", job_id, has_train)
 
             _update_job(job_id, status=JobStatus.GENERATING_PROMPTS, progress=20, message="Sahneler planlanıyor...")
             logger.info("[%s] Step 2 – Generating multi-scene prompts (duration=%ds, scenes=%d)", job_id, duration, scene_count)
@@ -440,8 +471,12 @@ async def run_pipeline(
                 scene_frame_url = await _to_fal_url(scene_frame_url)
 
                 garment_lock = scene_prompt.garment_lock_description
-                if garment_lock:
+                if garment_lock and no_train_note:
+                    multi_prompt = [{"duration": p["duration"], "prompt": f"{garment_lock} {no_train_note}. {p['prompt']}"} for p in multi_prompt]
+                elif garment_lock:
                     multi_prompt = [{"duration": p["duration"], "prompt": f"{garment_lock}. {p['prompt']}"} for p in multi_prompt]
+                elif no_train_note:
+                    multi_prompt = [{"duration": p["duration"], "prompt": f"{no_train_note}. {p['prompt']}"} for p in multi_prompt]
                 total_ms_duration = sum(int(p["duration"]) for p in multi_prompt)
                 clip_url = await generate_multishot_video(
                     start_image_url=scene_frame_url,
@@ -450,6 +485,7 @@ async def run_pipeline(
                     aspect_ratio=aspect_ratio,
                     generate_audio=generate_audio,
                     elements=kling_elements,
+                    negative_prompt=kling_negative,
                 )
 
                 _update_job(job_id, progress=85, message="Video indiriliyor...")
@@ -505,7 +541,14 @@ async def run_pipeline(
                     scene_frame_url = await _to_fal_url(scene_frame_url)
 
                     garment_lock = scene_prompt.garment_lock_description
-                    locked_prompt = f"{garment_lock}. {scene.prompt}" if garment_lock else scene.prompt
+                    if garment_lock and no_train_note:
+                        locked_prompt = f"{garment_lock} {no_train_note}. {scene.prompt}"
+                    elif garment_lock:
+                        locked_prompt = f"{garment_lock}. {scene.prompt}"
+                    elif no_train_note:
+                        locked_prompt = f"{no_train_note}. {scene.prompt}"
+                    else:
+                        locked_prompt = scene.prompt
                     clip_url = await generate_multishot_video(
                         start_image_url=scene_frame_url,
                         multi_prompt=[{"duration": scene.duration, "prompt": locked_prompt}],
@@ -513,6 +556,7 @@ async def run_pipeline(
                         aspect_ratio=aspect_ratio,
                         generate_audio=generate_audio,
                         elements=kling_elements,
+                        negative_prompt=kling_negative,
                     )
 
                     clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
