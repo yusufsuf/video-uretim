@@ -679,14 +679,38 @@ async def generate_custom_multishot_prompt(
     video_description: str,
     image_url: str,
     back_image_url: Optional[str] = None,
+    scene_count: Optional[int] = None,
+    total_duration: Optional[int] = None,
 ) -> list[dict]:
     """Generate Kling multishot prompts using the brief + outfit images — GPT analyzes garment and enriches prompts."""
     import re as _re
 
     images_note = "Front view image provided." if not back_image_url else "Front and back view images provided."
+
+    constraint_note = ""
+    if scene_count and total_duration:
+        per_shot = max(3, min(10, round(total_duration / scene_count)))
+        constraint_note = (
+            f"\n\nCONSTRAINT (MANDATORY): Generate EXACTLY {scene_count} shots. "
+            f"Total duration must be EXACTLY {total_duration} seconds. "
+            f"Distribute evenly: each shot approximately {per_shot} seconds. "
+            f"You MUST return exactly {scene_count} shot objects in the JSON."
+        )
+    elif scene_count:
+        constraint_note = (
+            f"\n\nCONSTRAINT (MANDATORY): Generate EXACTLY {scene_count} shots. "
+            f"You MUST return exactly {scene_count} shot objects in the JSON."
+        )
+    elif total_duration:
+        constraint_note = (
+            f"\n\nCONSTRAINT (MANDATORY): Total video duration must be EXACTLY {total_duration} seconds. "
+            f"Split into logical shots of 3–10 seconds each to reach exactly {total_duration} seconds total."
+        )
+
     user_text = (
         f"{images_note}\n\n"
-        f"Creative brief:\n{video_description}\n\n"
+        f"Creative brief:\n{video_description}"
+        f"{constraint_note}\n\n"
         "Analyze the garment from the images, enrich any missing details, then return the shots JSON."
     )
 

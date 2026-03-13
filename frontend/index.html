@@ -375,6 +375,45 @@
                         <div style="font-size:0.68rem;color:var(--text-muted);margin-top:8px">
                             Yüklediğiniz fotoğraf doğrudan başlangıç karesi olarak kullanılır — NB2 ve elbise analizi adımları atlanır.
                         </div>
+
+                        <!-- Optional scene/duration override -->
+                        <div style="margin-top:14px">
+                            <button type="button" id="custom-scene-toggle"
+                                onclick="toggleCustomSceneOptions()"
+                                style="display:flex;align-items:center;gap:7px;background:none;border:1px solid var(--border-subtle);
+                                       border-radius:7px;padding:6px 12px;cursor:pointer;color:var(--text-secondary);
+                                       font-family:inherit;font-size:0.72rem;font-weight:600;transition:all 0.15s">
+                                <span id="custom-scene-toggle-icon" style="font-size:1rem;line-height:1">＋</span>
+                                Sahne sayısı ve süre belirle <span style="font-weight:400;opacity:.7">(isteğe bağlı)</span>
+                            </button>
+                            <div id="custom-scene-options" style="display:none;margin-top:10px;
+                                background:var(--bg-secondary);border:1px solid var(--border-subtle);
+                                border-radius:8px;padding:12px 14px;">
+                                <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
+                                    <div style="flex:1;min-width:100px">
+                                        <label style="display:block;font-size:0.7rem;color:var(--text-secondary);margin-bottom:5px;font-weight:600">
+                                            Sahne Sayısı
+                                        </label>
+                                        <input type="number" id="custom-scene-count" min="1" max="10" value="3"
+                                            style="width:100%;padding:7px 10px;background:var(--bg-primary);
+                                                   border:1px solid var(--border-subtle);border-radius:6px;
+                                                   color:var(--text-primary);font-family:inherit;font-size:0.82rem">
+                                    </div>
+                                    <div style="flex:1;min-width:100px">
+                                        <label style="display:block;font-size:0.7rem;color:var(--text-secondary);margin-bottom:5px;font-weight:600">
+                                            Toplam Süre (sn)
+                                        </label>
+                                        <input type="number" id="custom-total-duration" min="3" max="60" value="15"
+                                            style="width:100%;padding:7px 10px;background:var(--bg-primary);
+                                                   border:1px solid var(--border-subtle);border-radius:6px;
+                                                   color:var(--text-primary);font-family:inherit;font-size:0.82rem">
+                                    </div>
+                                </div>
+                                <div style="font-size:0.67rem;color:var(--text-muted);margin-top:8px">
+                                    Belirtilmezse yapay zeka otomatik karar verir.
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- JSON Load -->

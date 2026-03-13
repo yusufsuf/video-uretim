@@ -742,6 +742,18 @@ function onCustomPromptInput() {
     _updateGenerateBtnCustomState();
 }
 
+function toggleCustomSceneOptions() {
+    const panel = document.getElementById("custom-scene-options");
+    const icon  = document.getElementById("custom-scene-toggle-icon");
+    const btn   = document.getElementById("custom-scene-toggle");
+    if (!panel) return;
+    const open = panel.style.display === "none";
+    panel.style.display = open ? "block" : "none";
+    if (icon) icon.textContent = open ? "−" : "＋";
+    if (btn)  btn.style.borderColor = open ? "var(--accent)" : "var(--border-subtle)";
+}
+window.toggleCustomSceneOptions = toggleCustomSceneOptions;
+
 function _updateGenerateBtnCustomState() {
     const btn = document.getElementById('generate-btn');
     if (!btn) return;
@@ -1491,6 +1503,15 @@ async function startGeneration() {
         const customPrompt = (document.getElementById('custom-prompt-input')?.value || '').trim();
         if (!customPrompt) { alert('Özel mod için video promptu zorunludur.'); return; }
         formData.append("video_description", customPrompt);
+
+        // Optional scene count + duration override
+        const scenePanel = document.getElementById("custom-scene-options");
+        if (scenePanel && scenePanel.style.display !== "none") {
+            const sc = parseInt(document.getElementById("custom-scene-count")?.value || "0");
+            const td = parseInt(document.getElementById("custom-total-duration")?.value || "0");
+            if (sc >= 1 && sc <= 10)  formData.append("custom_scene_count", String(sc));
+            if (td >= 3 && td <= 120) formData.append("custom_total_duration", String(td));
+        }
     }
 
     // Shots — serialize to JSON

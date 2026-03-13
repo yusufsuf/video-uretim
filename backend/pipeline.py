@@ -284,6 +284,8 @@ async def run_pipeline(
     duration: int = 10,
     scene_count: int = 2,
     video_description: Optional[str] = None,
+    custom_scene_count: Optional[int] = None,
+    custom_total_duration: Optional[int] = None,
     aspect_ratio: str = "9:16",
     generate_audio: bool = True,
     library_style_url: Optional[str] = None,
@@ -315,6 +317,8 @@ async def run_pipeline(
                 video_description=video_description,
                 image_url=fal_start_url,
                 back_image_url=fal_back_url,
+                scene_count=custom_scene_count,
+                total_duration=custom_total_duration,
             )
             logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
 
