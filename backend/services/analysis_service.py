@@ -672,9 +672,9 @@ GARMENT CONSISTENCY (NON-NEGOTIABLE):
 - NEVER invent, add, simplify, or omit garment details — only what is visible in the images
 
 TRAIN / HEM RULE (ABSOLUTE):
-- If no train is visible in ANY of the provided images → every prompt MUST include "no train, hem grazes floor flat"
 - If a train IS visible → describe its exact length and behavior
 - NEVER add a train that is not in the images
+- NEVER write "no train" or "flat hem" — the pipeline injects this automatically
 
 PROMPT RULES:
 - Each shot prompt: 30-50 words, HARD LIMIT: 480 characters, in English only
