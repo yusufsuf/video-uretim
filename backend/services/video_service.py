@@ -31,7 +31,7 @@ async def generate_multishot_video(
     duration: str = "10",
     aspect_ratio: str = "9:16",
     generate_audio: bool = True,
-    negative_prompt: str = "blur, distort, low quality, deformed hands, deformed face, changed outfit, different dress, altered silhouette, different fabric, costume change, wardrobe change, morphing clothes, feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, floating hem, lifted skirt, hem above ground, gap between dress and floor",
+    negative_prompt: str = "blur, distort, low quality, deformed hands, deformed face, changed outfit, different dress, altered silhouette, different fabric, costume change, wardrobe change, morphing clothes, feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, floating hem, lifted skirt, hem above ground, gap between dress and floor, short dress, mini dress, midi dress, knee-length dress, calf-length dress, cropped skirt, raised hemline, above-ankle hem, shortened dress",
 ) -> str:
     """Generate a fashion video using Kling 3.0 Pro via fal.ai.
 
@@ -101,7 +101,7 @@ async def generate_motion_control_video(
     elements: Optional[List[dict]] = None,
     aspect_ratio: str = "9:16",
     generate_audio: bool = True,
-    negative_prompt: str = "blur, distort, low quality, deformed hands, deformed face, changed outfit, different dress, altered silhouette, different fabric, costume change, wardrobe change, morphing clothes, feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, floating hem, lifted skirt, hem above ground, gap between dress and floor",
+    negative_prompt: str = "blur, distort, low quality, deformed hands, deformed face, changed outfit, different dress, altered silhouette, different fabric, costume change, wardrobe change, morphing clothes, feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, floating hem, lifted skirt, hem above ground, gap between dress and floor, short dress, mini dress, midi dress, knee-length dress, calf-length dress, cropped skirt, raised hemline, above-ankle hem, shortened dress",
     character_orientation: str = "video",
 ) -> str:
     """Generate a fashion video using Kling v3 Pro Motion Control via fal.ai.

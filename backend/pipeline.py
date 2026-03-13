@@ -118,7 +118,9 @@ _BASE_NEGATIVE = (
     "changed outfit, different dress, altered silhouette, different fabric, "
     "costume change, wardrobe change, morphing clothes, "
     "feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, "
-    "floating hem, lifted skirt, hem above ground, gap between dress and floor"
+    "floating hem, lifted skirt, hem above ground, gap between dress and floor, "
+    "short dress, mini dress, midi dress, knee-length dress, calf-length dress, "
+    "cropped skirt, raised hemline, above-ankle hem, shortened dress"
 )
 _TRAIN_NEGATIVE = ", train, trailing fabric, floor-length train, dragging hem, sweeping train"
 
@@ -312,7 +314,7 @@ async def run_pipeline(
             _desc_lower = (video_description or "").lower()
             _custom_has_train = any(w in _desc_lower for w in ("train", "trailing", "kuyruk", "sweep"))
             _custom_negative = _BASE_NEGATIVE if _custom_has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
-            _custom_no_train_note = "" if _custom_has_train else "No train, flat hem, dress hem grazes floor."
+            _custom_no_train_note = "" if _custom_has_train else "Full-length floor-length gown, hem grazes floor flat, no train."
 
             # Build elements for garment consistency
             _update_job(job_id, progress=55, message="Görseller hazırlanıyor (elements)...")
@@ -396,7 +398,7 @@ async def run_pipeline(
             logger.info("[%s] Analysis result: %s", job_id, analysis.garment_type)
 
             has_train = _has_train(analysis)
-            no_train_note = "" if has_train else "No train, flat hem."
+            no_train_note = "" if has_train else "Full-length floor-length gown, hem grazes floor flat, no train."
             kling_negative = _BASE_NEGATIVE if has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
             logger.info("[%s] Train detected: %s", job_id, has_train)
 
