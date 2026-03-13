@@ -645,42 +645,47 @@ async def generate_defile_multishot_prompt(
     return result
 
 
-_CUSTOM_MULTISHOT_SYSTEM = """You are a cinematic video director and garment analyst. You receive a creative brief and one or two reference images of the outfit (front view, and optionally back view).
+_CUSTOM_MULTISHOT_SYSTEM = """You are a cinematic video director and garment analyst. You receive a creative brief and up to three reference images of the outfit (front view, and optionally side and back views).
 
-STEP 1 — GARMENT ANALYSIS:
-Examine all provided images carefully and extract:
-- Exact color and fabric (e.g. "peach satin", "ivory silk charmeuse")
-- Front silhouette: neckline, bodice construction, skirt shape, length
-- Back details (if back image provided): back neckline, closure (zipper/buttons/lace-up), back cut, train or no train
-- 2-3 defining structural details that make this garment unique
+STEP 1 — GARMENT ANALYSIS (examine ALL provided images before writing a single prompt):
+Extract and lock these details — they are NON-NEGOTIABLE across all shots:
+- Exact color name (e.g. "royal cobalt blue", not just "blue")
+- Fabric type and behavior (matte, structured, draping, etc.)
+- ALL structural/sculptural elements on the front: 3D appliqués, rope/cord work, cutouts, neckline shape — describe each precisely with its location
+- Side silhouette (if side image provided): how the garment reads from the side, waist definition, skirt flare
+- Back structure (if back image provided): shoulder/cape construction from behind, back opening depth, closure type and position, back skirt shape, back slit depth
+- Hem behavior: does it touch the floor flat? Is there a slit? NO train unless explicitly visible
 
-STEP 2 — BRIEF HANDLING:
-- If the brief is detailed (explicit scenes, timings, camera instructions) → follow it exactly, but FILL IN any missing garment details from your Step 1 analysis
-- If the brief is vague → use Step 1 analysis to invent cinematic shots appropriate for this garment
+STEP 2 — BRIEF INTERPRETATION:
+The creative brief is a MOVEMENT AND SCENE DIRECTOR — it tells you what the model does and the mood.
+- Translate each described movement/moment into a separate shot
+- The brief does NOT define garment details — you locked those in Step 1, inject them into every shot
 - If the brief specifies shot count and/or total duration → respect those numbers exactly
-- If explicit timing segments exist (e.g. "0-3 sec", "Shot 1:") → use those exact durations
-- Otherwise → split into logical shots of 3-5 seconds each
+- If the brief has no timing → split movements into logical shots of 3-6 seconds each
 - Each shot duration: minimum 3 seconds, maximum 10 seconds
 
 STEP 3 — GENERATE SHOTS:
-GARMENT CONSISTENCY (CRITICAL):
-- Embed the complete garment description (front AND back details) verbatim into EVERY shot prompt
-- For shots showing the back of the model → you MUST explicitly include ALL back details from the images:
-  shoulder/cape structure from behind, exact back opening depth, closure type and position, back skirt shape, back slit if any
-  Example: "...turning reveals multi-strand rope cape over shoulders, deep open back, center zipper, fitted skirt with back slit"
-- NEVER simplify or omit back structural elements — they are the most likely to be generated incorrectly
-- The outfit must appear identical across all shots — never omit or simplify garment details
+GARMENT CONSISTENCY (NON-NEGOTIABLE):
+- Every single shot prompt MUST contain: exact color + key structural detail (e.g. "royal blue gown, 3D swirl rope appliqué bodice, multi-strand halter cape")
+- For shots where model turns or shows side: embed side silhouette details from Step 1
+- For shots where model shows back: embed FULL back structure verbatim — cape from behind, open back depth, closure, back slit
+- NEVER invent, add, simplify, or omit garment details — only what is visible in the images
+
+TRAIN / HEM RULE (ABSOLUTE):
+- If no train is visible in ANY of the provided images → every prompt MUST include "no train, hem grazes floor flat"
+- If a train IS visible → describe its exact length and behavior
+- NEVER add a train that is not in the images
 
 PROMPT RULES:
 - Each shot prompt: 30-50 words, HARD LIMIT: 480 characters, in English only
-- Each shot continues seamlessly from the previous (one continuous chained video)
-- Each prompt must describe: garment details, model action/pose, camera movement, framing, atmosphere — be concise
-- Vary camera angles and shot sizes across shots for cinematic flow
-- CRITICAL: Count characters before finalizing. If a prompt exceeds 480 characters, shorten it.
+- Each shot continues seamlessly from the previous
+- Include: garment lock description, model action from brief, camera movement/framing, atmosphere
+- Vary camera angles across shots for cinematic flow
+- CRITICAL: If prompt exceeds 480 characters, cut filler — garment details are priority
 
 ABSOLUTE RULES (every shot, no exceptions):
-- Dress hem ALWAYS touches or grazes the floor — use phrasing like "hem grazing the floor"
-- NEVER frame below the hem — feet, shoes, ankles must NOT appear in any shot
+- Dress hem ALWAYS touches or grazes the floor
+- NEVER frame below the hem — feet, shoes, ankles must NOT appear
 - NEVER mention feet, shoes, heels, boots, ankles, or toes
 
 Return JSON:
@@ -691,13 +696,19 @@ async def generate_custom_multishot_prompt(
     video_description: str,
     image_url: str,
     back_image_url: Optional[str] = None,
+    side_image_url: Optional[str] = None,
     scene_count: Optional[int] = None,
     total_duration: Optional[int] = None,
 ) -> list[dict]:
     """Generate Kling multishot prompts using the brief + outfit images — GPT analyzes garment and enriches prompts."""
     import re as _re
 
-    images_note = "Front view image provided." if not back_image_url else "Front and back view images provided."
+    views = ["Front view"]
+    if side_image_url:
+        views.append("side view")
+    if back_image_url:
+        views.append("back view")
+    images_note = ", ".join(views) + " image(s) provided."
 
     if not video_description:
         video_description = (
@@ -735,6 +746,8 @@ async def generate_custom_multishot_prompt(
 
     content: list = []
     content.append({"type": "image_url", "image_url": {"url": image_url, "detail": "high"}})
+    if side_image_url:
+        content.append({"type": "image_url", "image_url": {"url": side_image_url, "detail": "high"}})
     if back_image_url:
         content.append({"type": "image_url", "image_url": {"url": back_image_url, "detail": "high"}})
     content.append({"type": "text", "text": user_text})

@@ -348,10 +348,12 @@ async def run_pipeline(
                 # ── STANDARD CUSTOM PATH ───────────────────────────────────
                 _update_job(job_id, progress=45, message="Senaryo üretiliyor...")
                 fal_back_url = await _to_fal_url(back_url) if back_url else None
+                fal_side_url_prompt = await _to_fal_url(side_url) if side_url else None
                 multi_prompt_custom = await generate_custom_multishot_prompt(
                     video_description=video_description,
                     image_url=fal_front_url,
                     back_image_url=fal_back_url,
+                    side_image_url=fal_side_url_prompt,
                     scene_count=custom_scene_count,
                     total_duration=custom_total_duration,
                 )
