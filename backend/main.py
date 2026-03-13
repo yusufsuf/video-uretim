@@ -242,6 +242,11 @@ async def generate_video_endpoint(
         # Library background bypasses Nano Banana — use directly
         reference_image_url = library_background_url
 
+    reference_video_url = None
+    if reference_video:
+        ref_video_path = await _save_upload(reference_video)
+        reference_video_url = _file_to_url(ref_video_path)
+
     # Parse extra background URLs (for per-shot cycling)
     bg_extra_urls: list = []
     if library_background_extra_urls:
@@ -290,6 +295,7 @@ async def generate_video_endpoint(
             background_extra_urls=bg_extra_urls or None,
             watermark_path=await _save_upload(watermark_image) if watermark_image else None,
             generation_mode=generation_mode,
+            reference_video_url=reference_video_url,
         )
     )
 

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 os.environ["FAL_KEY"] = settings.FAL_KEY
 
 _FAL_KLING_ENDPOINT = "fal-ai/kling-video/v3/pro/image-to-video"
+_FAL_KLING_MOTION_ENDPOINT = "fal-ai/kling-video/v3/pro/motion-control"
 
 
 async def generate_multishot_video(
@@ -91,6 +92,49 @@ async def generate_multishot_video(
     video_url: str = str(result["video"]["url"])
     logger.info("Kling 3.0 video completed: %s", video_url)
     return video_url
+
+
+async def generate_motion_control_video(
+    image_url: str,
+    video_url: str,
+    prompt: str = "",
+    elements: Optional[List[dict]] = None,
+    aspect_ratio: str = "9:16",
+    generate_audio: bool = True,
+    negative_prompt: str = "blur, distort, low quality, deformed hands, deformed face, changed outfit, different dress, altered silhouette, different fabric, costume change, wardrobe change, morphing clothes, feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, floating hem, lifted skirt, hem above ground, gap between dress and floor",
+    character_orientation: str = "video",
+) -> str:
+    """Generate a fashion video using Kling v3 Pro Motion Control via fal.ai.
+
+    The reference video drives the motion; the image drives the visual appearance.
+    character_orientation='video' follows complex motions (up to 30s).
+    character_orientation='image' is better for camera-driven movement (up to 10s).
+    """
+    logger.info(
+        "Starting Kling v3 Pro Motion Control – orientation=%s, aspect=%s, audio=%s",
+        character_orientation, aspect_ratio, generate_audio,
+    )
+    arguments: dict = {
+        "image_url": image_url,
+        "video_url": video_url,
+        "aspect_ratio": aspect_ratio,
+        "generate_audio": generate_audio,
+        "negative_prompt": negative_prompt,
+        "character_orientation": character_orientation,
+    }
+    if prompt:
+        arguments["prompt"] = prompt  # caller is responsible for 512-char limit
+    if elements:
+        arguments["elements"] = elements
+
+    result = await fal_client.run_async(
+        _FAL_KLING_MOTION_ENDPOINT,
+        arguments=arguments,
+    )
+
+    video_url_out: str = str(result["video"]["url"])
+    logger.info("Kling Motion Control video completed: %s", video_url_out)
+    return video_url_out
 
 
 # ─── Last-frame chaining helpers ─────────────────────────────────

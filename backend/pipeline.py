@@ -35,6 +35,7 @@ from services.nano_banana_service import generate_background, generate_scene_fra
 from services.video_service import (
     download_file,
     generate_multishot_video,
+    generate_motion_control_video,
     extract_last_frame,
     upload_to_fal,
     concatenate_clips,
@@ -292,6 +293,7 @@ async def run_pipeline(
     background_extra_urls: Optional[list] = None,
     watermark_path: Optional[str] = None,
     generation_mode: str = "classic",
+    reference_video_url: Optional[str] = None,
 ):
     """Execute the full pipeline asynchronously."""
     try:
@@ -301,26 +303,18 @@ async def run_pipeline(
 
         if generation_mode == "custom":
             # ── CUSTOM MODE: skip analysis / NB2 / background ─────────────
-            # Use the uploaded photo directly as start frame + user's prompt
             logger.info("[%s] Custom mode: bypassing analysis, NB2, background", job_id)
 
-            # video_description is optional — GPT auto-generates scenario from images if not provided
             _update_job(job_id, progress=20, message="Görsel hazırlanıyor...")
-            fal_start_url = await _to_fal_url(front_url)
+            fal_front_url = await _to_fal_url(front_url)
 
-            _update_job(job_id, progress=45, message="Senaryo üretiliyor...")
+            # For custom mode, detect train from description text
+            _desc_lower = (video_description or "").lower()
+            _custom_has_train = any(w in _desc_lower for w in ("train", "trailing", "kuyruk", "sweep"))
+            _custom_negative = _BASE_NEGATIVE if _custom_has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
 
-            fal_back_url = await _to_fal_url(back_url) if back_url else None
-            multi_prompt_custom = await generate_custom_multishot_prompt(
-                video_description=video_description,
-                image_url=fal_start_url,
-                back_image_url=fal_back_url,
-                scene_count=custom_scene_count,
-                total_duration=custom_total_duration,
-            )
-            logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
-
-            _update_job(job_id, progress=60, message="Görseller hazırlanıyor (elements)...")
+            # Build elements for garment consistency
+            _update_job(job_id, progress=55, message="Görseller hazırlanıyor (elements)...")
             elem_front_c = await _to_fal_url_compressed(front_url)
             custom_element: dict = {"frontal_image_url": elem_front_c, "reference_image_urls": []}
             if side_url:
@@ -330,24 +324,50 @@ async def run_pipeline(
             custom_elements = [custom_element]
             logger.info("[%s] Custom elements ready: frontal + %d refs", job_id, len(custom_element["reference_image_urls"]))
 
-            _update_job(job_id, progress=65, message="Video üretiliyor (özel mod)...")
-            fal_start_url = await _to_fal_url(fal_start_url)  # re-upload for Kling
+            if reference_video_url:
+                # ── MOTION CONTROL PATH ────────────────────────────────────
+                logger.info("[%s] Motion control path active", job_id)
+                _update_job(job_id, progress=65, message="Referans video yükleniyor...")
+                fal_ref_video = await _to_fal_url(reference_video_url)
 
-            # For custom mode, detect train from description text
-            _desc_lower = (video_description or "").lower()
-            _custom_has_train = any(w in _desc_lower for w in ("train", "trailing", "kuyruk", "sweep"))
-            _custom_negative = _BASE_NEGATIVE if _custom_has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
+                _update_job(job_id, progress=70, message="Video üretiliyor (hareket kontrolü)...")
+                _motion_prompt = str(video_description or "")
+                clip_url_custom = await generate_motion_control_video(
+                    image_url=fal_front_url,
+                    video_url=fal_ref_video,
+                    prompt=_motion_prompt,
+                    elements=custom_elements,
+                    aspect_ratio=aspect_ratio,
+                    generate_audio=generate_audio,
+                    negative_prompt=_custom_negative,
+                    character_orientation="video",
+                )
+            else:
+                # ── STANDARD CUSTOM PATH ───────────────────────────────────
+                _update_job(job_id, progress=45, message="Senaryo üretiliyor...")
+                fal_back_url = await _to_fal_url(back_url) if back_url else None
+                multi_prompt_custom = await generate_custom_multishot_prompt(
+                    video_description=video_description,
+                    image_url=fal_front_url,
+                    back_image_url=fal_back_url,
+                    scene_count=custom_scene_count,
+                    total_duration=custom_total_duration,
+                )
+                logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
 
-            total_custom_dur = sum(int(p["duration"]) for p in multi_prompt_custom)
-            clip_url_custom = await generate_multishot_video(
-                start_image_url=fal_start_url,
-                multi_prompt=multi_prompt_custom,
-                duration=str(total_custom_dur),
-                aspect_ratio=aspect_ratio,
-                generate_audio=generate_audio,
-                elements=custom_elements,
-                negative_prompt=_custom_negative,
-            )
+                _update_job(job_id, progress=65, message="Video üretiliyor (özel mod)...")
+                fal_start_url = await _to_fal_url(fal_front_url)
+
+                total_custom_dur = sum(int(p["duration"]) for p in multi_prompt_custom)
+                clip_url_custom = await generate_multishot_video(
+                    start_image_url=fal_start_url,
+                    multi_prompt=multi_prompt_custom,
+                    duration=str(total_custom_dur),
+                    aspect_ratio=aspect_ratio,
+                    generate_audio=generate_audio,
+                    elements=custom_elements,
+                    negative_prompt=_custom_negative,
+                )
 
             _update_job(job_id, progress=85, message="Video indiriliyor...")
             final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
