@@ -189,12 +189,13 @@ DURATION RULES:
 - First shot should establish the scene (wider angle)
 - Last shot should be a closing/signature shot
 
-PROMPT STRUCTURE (each shot, 40-80 words):
+PROMPT STRUCTURE (each shot, 30-50 words, HARD LIMIT: 480 characters):
 - Camera position and movement
 - Model action and garment interaction (reference @Element1)
 - Lighting and atmosphere (MUST mention bright/well-lit conditions)
 - Each shot should use a DIFFERENT angle/movement for variety
 - MUST include the exact garment_lock_description in every prompt (color, silhouette, key details)
+- CRITICAL: Keep each shot prompt under 480 characters. Be concise — cut filler words.
 
 GARMENT CONSISTENCY RULES (CRITICAL):
 - Extract the garment's key identifiers from the analysis: exact color, fabric, silhouette shape, and 1-2 defining structural details
@@ -513,7 +514,7 @@ CRITICAL RULES:
 - NEVER repeat the same camera angle or movement twice
 - Reference the garment color and silhouette visible in the image
 - Style: luxury fashion film, editorial Vogue aesthetic, smooth cinematic movement
-- Each prompt: 35-55 words, in English only
+- Each prompt: 30-50 words, HARD LIMIT: 480 characters, in English only
 - Keep lighting consistent across all shots
 
 SHOT COUNT GUIDANCE:
@@ -647,10 +648,11 @@ GARMENT CONSISTENCY (CRITICAL):
 - The outfit must appear identical across all shots — never omit or simplify garment details
 
 PROMPT RULES:
-- Each shot prompt: 40-80 words, in English only
+- Each shot prompt: 30-50 words, HARD LIMIT: 480 characters, in English only
 - Each shot continues seamlessly from the previous (one continuous chained video)
-- Each prompt must describe: full garment details, model action/pose, camera movement, framing, and atmosphere
+- Each prompt must describe: garment details, model action/pose, camera movement, framing, atmosphere — be concise
 - Vary camera angles and shot sizes across shots for cinematic flow
+- CRITICAL: Count characters before finalizing. If a prompt exceeds 480 characters, shorten it.
 
 Return JSON:
 {"shots": [{"duration": "3", "prompt": "..."}, {"duration": "4", "prompt": "..."}, ...]}"""
