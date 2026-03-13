@@ -122,12 +122,16 @@ _BASE_NEGATIVE = (
     "short dress, mini dress, midi dress, knee-length dress, calf-length dress, "
     "cropped skirt, raised hemline, above-ankle hem, shortened dress"
 )
-_TRAIN_NEGATIVE = ", train, trailing fabric, floor-length train, dragging hem, sweeping train"
+_TRAIN_NEGATIVE = (
+    ", train, trailing fabric, floor-length train, dragging hem, sweeping train, "
+    "extended hem, pooling fabric, cathedral train, chapel train, court train, "
+    "brush train, fabric trail, hem trail, skirt extension, elongated skirt back"
+)
 
 # Always prepended to EVERY shot — enforces full-length regardless of train detection
 _HEM_LOCK = "Full-length floor-length gown, hem grazes floor."
 
-_TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem"}
+_TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem", "kuyruk", "uzun kuyruk"}
 
 
 def _has_train(analysis) -> bool:
@@ -137,6 +141,8 @@ def _has_train(analysis) -> bool:
         analysis.back_details or "",
         analysis.back_silhouette or "",
         analysis.length or "",
+        analysis.front_silhouette or "",
+        analysis.description_en or "",
     ]).lower()
     return any(w in combined for w in _TRAIN_WORDS)
 
@@ -315,7 +321,7 @@ async def run_pipeline(
 
             # Detect train from description text (no analysis in custom mode)
             _desc_lower = (video_description or "").lower()
-            _custom_has_train = any(w in _desc_lower for w in ("train", "trailing", "kuyruk", "sweep"))
+            _custom_has_train = any(w in _desc_lower for w in _TRAIN_WORDS)
             _custom_negative = _BASE_NEGATIVE if _custom_has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
             _custom_no_train_note = _HEM_LOCK if _custom_has_train else f"{_HEM_LOCK} No train."
 
