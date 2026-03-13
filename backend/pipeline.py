@@ -115,7 +115,9 @@ _ELEMENTS_MAX_PX = 1536  # max dimension for element images
 _BASE_NEGATIVE = (
     "blur, distort, low quality, deformed hands, deformed face, "
     "changed outfit, different dress, altered silhouette, different fabric, "
-    "costume change, wardrobe change, morphing clothes"
+    "costume change, wardrobe change, morphing clothes, "
+    "feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, "
+    "floating hem, lifted skirt, hem above ground, gap between dress and floor"
 )
 _TRAIN_NEGATIVE = ", train, trailing fabric, floor-length train, dragging hem, sweeping train"
 

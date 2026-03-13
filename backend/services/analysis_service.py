@@ -213,12 +213,19 @@ SCENE CONTINUITY RULES (critical — videos are chained clip-to-clip, each clip 
 - Do NOT introduce new environments, new backgrounds, or new lighting sources mid-sequence
 - The model's body position at the end of scene N should connect naturally with the start of scene N+1
 
+FRAMING & HEM RULES (ABSOLUTE — apply to every single shot):
+- The dress hem ALWAYS touches the ground — never write shots where hem floats, lifts, or shows a gap above floor
+- NEVER frame below the hem — feet, shoes, ankles, and toes must NEVER appear in any shot
+- Framing floor: the bottom of every frame must cut at or just above the hem, NOT below it
+- Reinforce this with language like "dress hem grazing the floor", "full-length gown pooling at ground level"
+
 FORBIDDEN:
 - '8k', 'hyper-realistic', 'unreal engine', 'masterpiece'
 - Do NOT zoom into face close-up in first shot
 - NEVER use Turkish — all output in English
 - Do NOT mention specific model appearance (skin color, hair etc.)
 - Do NOT use nighttime/dark settings by default
+- NEVER mention feet, shoes, heels, boots, ankles, or toes
 
 Return JSON only:
 {
@@ -527,6 +534,11 @@ SHOT COUNT GUIDANCE:
 Camera vocabulary (vary across shots):
 Wide Shot, Medium Shot, Close-Up, Extreme Close-Up, Low Angle, High Angle, Tracking Shot, Dolly In, Dolly Out, Arc Shot, Tilt Up, Follow Shot, Steadicam, Slow Motion
 
+ABSOLUTE RULES (every shot, no exceptions):
+- Dress hem ALWAYS touches the ground — reinforce with "hem grazing the floor" or "gown pooling at ground"
+- NEVER frame below the hem — feet, shoes, ankles must NOT appear in any shot
+- NEVER mention feet, shoes, heels, boots, ankles, or toes
+
 Return a JSON object with a single key "shots" containing exactly N objects:
 {"shots": [
   {"duration": "5", "prompt": "..."},
@@ -653,6 +665,11 @@ PROMPT RULES:
 - Each prompt must describe: garment details, model action/pose, camera movement, framing, atmosphere — be concise
 - Vary camera angles and shot sizes across shots for cinematic flow
 - CRITICAL: Count characters before finalizing. If a prompt exceeds 480 characters, shorten it.
+
+ABSOLUTE RULES (every shot, no exceptions):
+- Dress hem ALWAYS touches or grazes the floor — use phrasing like "hem grazing the floor"
+- NEVER frame below the hem — feet, shoes, ankles must NOT appear in any shot
+- NEVER mention feet, shoes, heels, boots, ankles, or toes
 
 Return JSON:
 {"shots": [{"duration": "3", "prompt": "..."}, {"duration": "4", "prompt": "..."}, ...]}"""
