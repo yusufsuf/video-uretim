@@ -308,10 +308,11 @@ async def run_pipeline(
             _update_job(job_id, progress=20, message="Görsel hazırlanıyor...")
             fal_front_url = await _to_fal_url(front_url)
 
-            # For custom mode, detect train from description text
+            # Detect train from description text (no analysis in custom mode)
             _desc_lower = (video_description or "").lower()
             _custom_has_train = any(w in _desc_lower for w in ("train", "trailing", "kuyruk", "sweep"))
             _custom_negative = _BASE_NEGATIVE if _custom_has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
+            _custom_no_train_note = "" if _custom_has_train else "No train, flat hem, dress hem grazes floor."
 
             # Build elements for garment consistency
             _update_job(job_id, progress=55, message="Görseller hazırlanıyor (elements)...")
@@ -331,7 +332,8 @@ async def run_pipeline(
                 fal_ref_video = await _to_fal_url(reference_video_url)
 
                 _update_job(job_id, progress=70, message="Video üretiliyor (hareket kontrolü)...")
-                _motion_prompt = str(video_description or "")
+                _base_motion = str(video_description or "")
+                _motion_prompt = (_custom_no_train_note + " " + _base_motion).strip() if _custom_no_train_note else _base_motion
                 clip_url_custom = await generate_motion_control_video(
                     image_url=fal_front_url,
                     video_url=fal_ref_video,
@@ -354,6 +356,13 @@ async def run_pipeline(
                     total_duration=custom_total_duration,
                 )
                 logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
+
+                # Inject no-train note into every shot prompt (positive reinforcement)
+                if _custom_no_train_note:
+                    multi_prompt_custom = [
+                        {"duration": p["duration"], "prompt": _custom_no_train_note + " " + p["prompt"]}
+                        for p in multi_prompt_custom
+                    ]
 
                 _update_job(job_id, progress=65, message="Video üretiliyor (özel mod)...")
                 fal_start_url = await _to_fal_url(fal_front_url)
