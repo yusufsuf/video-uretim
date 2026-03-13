@@ -225,9 +225,11 @@ async def run_pipeline(
 
             _update_job(job_id, progress=45, message="Senaryo üretiliyor (özel prompt)...")
 
+            fal_back_url = await _to_fal_url(back_url) if back_url else None
             multi_prompt_custom = await generate_custom_multishot_prompt(
                 video_description=video_description,
                 image_url=fal_start_url,
+                back_image_url=fal_back_url,
             )
             logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
 

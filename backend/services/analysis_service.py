@@ -623,29 +623,34 @@ async def generate_defile_multishot_prompt(
     return result
 
 
-_CUSTOM_MULTISHOT_SYSTEM = """You are a cinematic video director. You receive a creative brief and a reference image of the outfit/model.
+_CUSTOM_MULTISHOT_SYSTEM = """You are a cinematic video director and garment analyst. You receive a creative brief and one or two reference images of the outfit (front view, and optionally back view).
 
-Your task: Analyze both the brief AND the image, then create sequential per-shot prompts for Kling 3.0 Pro multishot video generation.
+STEP 1 — GARMENT ANALYSIS:
+Examine all provided images carefully and extract:
+- Exact color and fabric (e.g. "peach satin", "ivory silk charmeuse")
+- Front silhouette: neckline, bodice construction, skirt shape, length
+- Back details (if back image provided): back neckline, closure (zipper/buttons/lace-up), back cut, train or no train
+- 2-3 defining structural details that make this garment unique
 
-BRIEF HANDLING:
-- If the brief is detailed (explicit scenes, timings, camera instructions) → follow it exactly
-- If the brief is vague (e.g. "make a 15s video, 5 shots, flow is up to you") → use the image to determine the garment style, color, and silhouette, then invent cinematic shots appropriate for that garment
+STEP 2 — BRIEF HANDLING:
+- If the brief is detailed (explicit scenes, timings, camera instructions) → follow it exactly, but FILL IN any missing garment details from your Step 1 analysis
+- If the brief is vague → use Step 1 analysis to invent cinematic shots appropriate for this garment
 - If the brief specifies shot count and/or total duration → respect those numbers exactly
 - If explicit timing segments exist (e.g. "0-3 sec", "Shot 1:") → use those exact durations
 - Otherwise → split into logical shots of 3-5 seconds each
 - Each shot duration: minimum 3 seconds, maximum 10 seconds
 
+STEP 3 — GENERATE SHOTS:
 GARMENT CONSISTENCY (CRITICAL):
-- First, identify the garment from the image: exact color, fabric type, silhouette, and 1-2 key structural details (e.g. "deep burgundy velvet gown with corseted bodice and full skirt")
-- Embed this garment description verbatim into EVERY shot prompt — never omit it
-- The outfit must appear identical across all shots — same color, same cut, same details
+- Embed the complete garment description (front AND back details) verbatim into EVERY shot prompt
+- For shots showing the back of the model → explicitly include back details (e.g. "revealing the open-back V cut with lace-up closure and floor-length train")
+- The outfit must appear identical across all shots — never omit or simplify garment details
 
 PROMPT RULES:
-- Each shot prompt: 40-70 words, in English only
+- Each shot prompt: 40-80 words, in English only
 - Each shot continues seamlessly from the previous (one continuous chained video)
-- Each prompt must describe: garment (exact description), model action/pose, camera movement, framing, and atmosphere
+- Each prompt must describe: full garment details, model action/pose, camera movement, framing, and atmosphere
 - Vary camera angles and shot sizes across shots for cinematic flow
-- Do NOT default to a plain runway walk — choose elegant, editorial movements
 
 Return JSON:
 {"shots": [{"duration": "3", "prompt": "..."}, {"duration": "4", "prompt": "..."}, ...]}"""
@@ -654,14 +659,23 @@ Return JSON:
 async def generate_custom_multishot_prompt(
     video_description: str,
     image_url: str,
+    back_image_url: Optional[str] = None,
 ) -> list[dict]:
-    """Generate Kling multishot prompts using the brief + outfit image — GPT determines shot count and durations."""
+    """Generate Kling multishot prompts using the brief + outfit images — GPT analyzes garment and enriches prompts."""
     import re as _re
 
+    images_note = "Front view image provided." if not back_image_url else "Front and back view images provided."
     user_text = (
+        f"{images_note}\n\n"
         f"Creative brief:\n{video_description}\n\n"
-        "Analyze the brief and the outfit image above, then return the shots JSON."
+        "Analyze the garment from the images, enrich any missing details, then return the shots JSON."
     )
+
+    content: list = []
+    content.append({"type": "image_url", "image_url": {"url": image_url, "detail": "high"}})
+    if back_image_url:
+        content.append({"type": "image_url", "image_url": {"url": back_image_url, "detail": "high"}})
+    content.append({"type": "text", "text": user_text})
 
     response = await client.chat.completions.create(
         model="gpt-5.4",
@@ -669,10 +683,7 @@ async def generate_custom_multishot_prompt(
             {"role": "system", "content": _CUSTOM_MULTISHOT_SYSTEM},
             {
                 "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": image_url, "detail": "high"}},
-                    {"type": "text", "text": user_text},
-                ],
+                "content": content,
             },
         ],
         response_format={"type": "json_object"},
