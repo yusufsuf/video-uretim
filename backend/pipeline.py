@@ -306,6 +306,16 @@ async def run_pipeline(
                 fal_garment_refs.append(await _to_fal_url(gurl))
             logger.info("[%s] Garment refs on fal.ai CDN: %d", job_id, len(fal_garment_refs))
 
+            # Build Kling elements for garment consistency
+            elem_front_c = await _to_fal_url_compressed(front_url)
+            kling_element: dict = {"frontal_image_url": elem_front_c, "reference_image_urls": []}
+            if side_url:
+                kling_element["reference_image_urls"].append(await _to_fal_url_compressed(side_url))
+            if back_url:
+                kling_element["reference_image_urls"].append(await _to_fal_url_compressed(back_url))
+            kling_elements = [kling_element]
+            logger.info("[%s] Kling elements ready: frontal + %d refs", job_id, len(kling_element["reference_image_urls"]))
+
             fal_bg_pool: list = []
             for bg_url in bg_pool:
                 fal_bg_pool.append(await _to_fal_url(bg_url))
@@ -365,6 +375,7 @@ async def run_pipeline(
                     duration=str(total_ms_duration),
                     aspect_ratio=aspect_ratio,
                     generate_audio=generate_audio,
+                    elements=kling_elements,
                 )
 
                 _update_job(job_id, progress=85, message="Video indiriliyor...")
@@ -427,6 +438,7 @@ async def run_pipeline(
                         duration=str(shot_duration),
                         aspect_ratio=aspect_ratio,
                         generate_audio=generate_audio,
+                        elements=kling_elements,
                     )
 
                     clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
