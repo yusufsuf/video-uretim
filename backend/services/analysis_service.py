@@ -699,6 +699,13 @@ async def generate_custom_multishot_prompt(
 
     images_note = "Front view image provided." if not back_image_url else "Front and back view images provided."
 
+    if not video_description:
+        video_description = (
+            "No creative brief provided. Analyze the garment from the images and invent a cinematic fashion video scenario "
+            "that best showcases it — highlight key structural details, silhouette, and most dramatic design elements. "
+            "Choose camera angles and model movements that reveal the garment's unique features from multiple perspectives."
+        )
+
     constraint_note = ""
     if scene_count and total_duration:
         per_shot = max(3, min(10, round(total_duration / scene_count)))

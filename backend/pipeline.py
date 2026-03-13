@@ -304,13 +304,11 @@ async def run_pipeline(
             # Use the uploaded photo directly as start frame + user's prompt
             logger.info("[%s] Custom mode: bypassing analysis, NB2, background", job_id)
 
-            if not video_description:
-                raise ValueError("Özel modda video promptu zorunludur.")
-
+            # video_description is optional — GPT auto-generates scenario from images if not provided
             _update_job(job_id, progress=20, message="Görsel hazırlanıyor...")
             fal_start_url = await _to_fal_url(front_url)
 
-            _update_job(job_id, progress=45, message="Senaryo üretiliyor (özel prompt)...")
+            _update_job(job_id, progress=45, message="Senaryo üretiliyor...")
 
             fal_back_url = await _to_fal_url(back_url) if back_url else None
             multi_prompt_custom = await generate_custom_multishot_prompt(

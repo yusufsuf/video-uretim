@@ -758,10 +758,8 @@ function _updateGenerateBtnCustomState() {
     const btn = document.getElementById('generate-btn');
     if (!btn) return;
     if (generationMode === 'custom') {
-        const val = (document.getElementById('custom-prompt-input')?.value || '').trim();
-        btn.disabled = val.length === 0;
-        if (val.length === 0) btn.title = 'Özel mod için video promptu zorunludur';
-        else btn.title = '';
+        btn.disabled = false;
+        btn.title = '';
     } else {
         btn.disabled = false;
         btn.title = '';
@@ -1501,8 +1499,7 @@ async function startGeneration() {
     // Custom prompt (Özel mod)
     if (generationMode === 'custom') {
         const customPrompt = (document.getElementById('custom-prompt-input')?.value || '').trim();
-        if (!customPrompt) { alert('Özel mod için video promptu zorunludur.'); return; }
-        formData.append("video_description", customPrompt);
+        if (customPrompt) formData.append("video_description", customPrompt);
 
         // Optional scene count + duration override
         const scenePanel = document.getElementById("custom-scene-options");
