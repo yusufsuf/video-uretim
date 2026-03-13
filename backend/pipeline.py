@@ -124,6 +124,9 @@ _BASE_NEGATIVE = (
 )
 _TRAIN_NEGATIVE = ", train, trailing fabric, floor-length train, dragging hem, sweeping train"
 
+# Always prepended to EVERY shot — enforces full-length regardless of train detection
+_HEM_LOCK = "Full-length floor-length gown, hem grazes floor."
+
 _TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem"}
 
 
@@ -314,7 +317,7 @@ async def run_pipeline(
             _desc_lower = (video_description or "").lower()
             _custom_has_train = any(w in _desc_lower for w in ("train", "trailing", "kuyruk", "sweep"))
             _custom_negative = _BASE_NEGATIVE if _custom_has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
-            _custom_no_train_note = "" if _custom_has_train else "Full-length floor-length gown, hem grazes floor flat, no train."
+            _custom_no_train_note = _HEM_LOCK if _custom_has_train else f"{_HEM_LOCK} No train."
 
             # Build elements for garment consistency
             _update_job(job_id, progress=55, message="Görseller hazırlanıyor (elements)...")
@@ -398,7 +401,7 @@ async def run_pipeline(
             logger.info("[%s] Analysis result: %s", job_id, analysis.garment_type)
 
             has_train = _has_train(analysis)
-            no_train_note = "" if has_train else "Full-length floor-length gown, hem grazes floor flat, no train."
+            no_train_note = _HEM_LOCK if has_train else f"{_HEM_LOCK} No train."
             kling_negative = _BASE_NEGATIVE if has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
             logger.info("[%s] Train detected: %s", job_id, has_train)
 
