@@ -233,6 +233,16 @@ async def run_pipeline(
             )
             logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
 
+            _update_job(job_id, progress=60, message="Görseller hazırlanıyor (elements)...")
+            elem_front_c = await _to_fal_url_compressed(front_url)
+            custom_element: dict = {"frontal_image_url": elem_front_c, "reference_image_urls": []}
+            if side_url:
+                custom_element["reference_image_urls"].append(await _to_fal_url_compressed(side_url))
+            if back_url:
+                custom_element["reference_image_urls"].append(await _to_fal_url_compressed(back_url))
+            custom_elements = [custom_element]
+            logger.info("[%s] Custom elements ready: frontal + %d refs", job_id, len(custom_element["reference_image_urls"]))
+
             _update_job(job_id, progress=65, message="Video üretiliyor (özel mod)...")
             fal_start_url = await _to_fal_url(fal_start_url)  # re-upload for Kling
 
@@ -243,6 +253,7 @@ async def run_pipeline(
                 duration=str(total_custom_dur),
                 aspect_ratio=aspect_ratio,
                 generate_audio=generate_audio,
+                elements=custom_elements,
             )
 
             _update_job(job_id, progress=85, message="Video indiriliyor...")
