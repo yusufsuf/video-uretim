@@ -792,6 +792,127 @@ async def generate_custom_multishot_prompt(
     return result
 
 
+_OZEL_MULTISHOT_SYSTEM = """You are a fashion film director creating shot prompts for Kling AI video generation.
+
+You receive 2–4 images of the same garment from different angles (front required, back/side optional) and an optional creative brief.
+
+STEP 1 — STUDY THE GARMENT:
+Examine every provided image carefully. Note the silhouette, key design details, hem length, back structure, and any distinctive features. You do NOT describe these in the prompts — @Element1 handles garment appearance.
+
+STEP 2 — GENERATE SHOTS:
+- EVERY shot prompt MUST begin with "@Element1"
+- @Element1 is a Kling reference token — it renders the exact garment from the uploaded images
+- After @Element1, describe: model action, camera movement, environment, atmosphere
+- NEVER describe garment color, fabric, or construction details in text — @Element1 handles it
+- Each shot: 30–50 words, HARD LIMIT 480 characters
+- If creative brief is provided, translate each described movement/moment into a shot
+- If no brief, generate a compelling editorial fashion sequence
+
+ABSOLUTE RULES (every shot, no exceptions):
+- EVERY prompt starts with "@Element1 " — no exceptions
+- NEVER frame below the hem — feet, shoes, ankles must NOT appear
+- NEVER add a train that is not visible in the images
+- Vary camera angles for cinematic flow (wide, medium, close-up, etc.)
+- Each shot continues seamlessly from the previous
+
+Return JSON: {"shots": [{"duration": 5, "prompt": "@Element1 ..."}]}"""
+
+
+async def generate_ozel_multishot_prompt(
+    image_url: str,
+    back_image_url: Optional[str] = None,
+    side_image_url: Optional[str] = None,
+    video_description: Optional[str] = None,
+    scene_count: Optional[int] = None,
+    total_duration: Optional[int] = None,
+) -> list[dict]:
+    """Generate @Element1-based multishot prompts for Özel mode."""
+
+    if not video_description:
+        video_description = "An elegant editorial fashion film. Model moves gracefully — slow walk, gentle turn, standing with presence. Cinematic lighting, atmospheric mood."
+
+    constraint_note = ""
+    if scene_count and total_duration:
+        avg = total_duration // scene_count
+        constraint_note = (
+            f"\n\nCONSTRAINT: Generate EXACTLY {scene_count} shots. "
+            f"Each shot approximately {avg}s (min 3s, max 10s). Total = {total_duration}s."
+        )
+    elif scene_count:
+        constraint_note = f"\n\nCONSTRAINT: Generate EXACTLY {scene_count} shots."
+    elif total_duration:
+        constraint_note = (
+            f"\n\nCONSTRAINT: Total duration must be EXACTLY {total_duration}s. "
+            "Split into logical shots of 3–6s each."
+        )
+
+    views = ["front"]
+    if side_image_url:
+        views.append("side")
+    if back_image_url:
+        views.append("back")
+    images_note = f"Garment images provided: {', '.join(views)} view(s)."
+
+    user_text = (
+        f"{images_note}\n\n"
+        f"Creative brief:\n{video_description}"
+        f"{constraint_note}\n\n"
+        "Generate shots where every prompt begins with @Element1."
+    )
+
+    content: list = []
+    content.append({"type": "image_url", "image_url": {"url": image_url, "detail": "high"}})
+    if side_image_url:
+        content.append({"type": "image_url", "image_url": {"url": side_image_url, "detail": "high"}})
+    if back_image_url:
+        content.append({"type": "image_url", "image_url": {"url": back_image_url, "detail": "high"}})
+    content.append({"type": "text", "text": user_text})
+
+    response = await client.chat.completions.create(
+        model="gpt-5.4",
+        messages=[
+            {"role": "system", "content": _OZEL_MULTISHOT_SYSTEM},
+            {"role": "user", "content": content},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.7,
+        max_completion_tokens=1200,
+    )
+
+    import re as _re
+
+    raw = (response.choices[0].message.content or "").strip()
+
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict) and "shots" in parsed:
+            shots = parsed["shots"]
+        elif isinstance(parsed, list):
+            shots = parsed
+        else:
+            shots = next(v for v in parsed.values() if isinstance(v, list))
+    except Exception:
+        match = _re.search(r'\[.*\]', raw, _re.DOTALL)
+        if match:
+            shots = json.loads(match.group(0))
+        else:
+            raise ValueError(f"Could not parse ozel multishot prompts: {raw[:200]}")
+
+    result = [
+        {"duration": str(max(3, min(10, int(s.get("duration", 5))))), "prompt": s["prompt"]}
+        for s in shots
+    ]
+
+    # Ensure every prompt starts with @Element1
+    result = [
+        {"duration": p["duration"], "prompt": p["prompt"] if p["prompt"].startswith("@Element1") else "@Element1 " + p["prompt"]}
+        for p in result
+    ]
+
+    logger.info("Ozel multishot prompts: %d shots, total %ds", len(result), sum(int(s["duration"]) for s in result))
+    return result
+
+
 async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
     """Generate cinematic shot descriptions for the multishot designer."""
     location_str = (

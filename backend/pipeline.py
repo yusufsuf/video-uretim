@@ -30,7 +30,7 @@ from models import (
     JobStatus,
     MultiScenePrompt,
 )
-from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt, generate_custom_multishot_prompt
+from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt, generate_custom_multishot_prompt, generate_ozel_multishot_prompt
 from services.nano_banana_service import generate_background, generate_scene_frame
 from services.video_service import (
     download_file,
@@ -305,6 +305,7 @@ async def run_pipeline(
     watermark_path: Optional[str] = None,
     generation_mode: str = "classic",
     reference_video_url: Optional[str] = None,
+    start_frame_url: Optional[str] = None,
 ):
     """Execute the full pipeline asynchronously."""
     try:
@@ -396,6 +397,68 @@ async def run_pipeline(
             clip_path_c = await download_file(clip_url_custom, settings.TEMP_DIR, extension=".mp4")
             shutil.move(clip_path_c, final_path)
             logger.info("[%s] Custom video ready: %s", job_id, final_path)
+
+        elif generation_mode == "ozel":
+            # ── ÖZEL MODE: elements with @Element1, separate start frame ──
+            logger.info("[%s] Ozel mode: elements-based @Element1 prompts", job_id)
+
+            _update_job(job_id, progress=15, message="Görsel hazırlanıyor...")
+
+            _desc_lower = (video_description or "").lower()
+            _ozel_has_train = any(w in _desc_lower for w in _TRAIN_WORDS)
+            _ozel_negative = _BASE_NEGATIVE if _ozel_has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
+            _ozel_hem_note = _HEM_LOCK if _ozel_has_train else f"{_HEM_LOCK} No train."
+
+            # Build elements: front = frontal, back+side = reference_image_urls
+            fal_ozel_front = await _to_fal_url_compressed(front_url)
+            ozel_ref_urls = []
+            if back_url:
+                ozel_ref_urls.append(await _to_fal_url_compressed(back_url))
+            if side_url:
+                ozel_ref_urls.append(await _to_fal_url_compressed(side_url))
+
+            ozel_element = {
+                "frontal_image_url": fal_ozel_front,
+                "reference_image_urls": ozel_ref_urls,
+            }
+
+            # Start frame: use dedicated upload or fall back to front image
+            fal_ozel_start = await _to_fal_url(start_frame_url if start_frame_url else front_url)
+
+            _update_job(job_id, progress=30, message="Sahneler planlanıyor...")
+            ozel_shots = await generate_ozel_multishot_prompt(
+                image_url=fal_ozel_front,
+                back_image_url=ozel_ref_urls[0] if back_url and ozel_ref_urls else None,
+                side_image_url=ozel_ref_urls[-1] if side_url and len(ozel_ref_urls) > 1 else None,
+                video_description=video_description,
+                scene_count=custom_scene_count,
+                total_duration=custom_total_duration,
+            )
+
+            # Inject hem lock into every shot
+            ozel_shots = [
+                {"duration": p["duration"], "prompt": (_ozel_hem_note + " " + p["prompt"])[:480]}
+                for p in ozel_shots
+            ]
+
+            total_ozel_dur = sum(int(p["duration"]) for p in ozel_shots)
+
+            _update_job(job_id, progress=55, message="Video üretiliyor (özel mod)...")
+            clip_url_ozel = await generate_multishot_video(
+                start_image_url=fal_ozel_start,
+                multi_prompt=ozel_shots,
+                duration=str(total_ozel_dur),
+                aspect_ratio=aspect_ratio,
+                generate_audio=generate_audio,
+                elements=[ozel_element],
+                negative_prompt=_ozel_negative,
+            )
+
+            _update_job(job_id, progress=85, message="Video indiriliyor...")
+            final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
+            clip_path_o = await download_file(clip_url_ozel, settings.TEMP_DIR, extension=".mp4")
+            shutil.move(clip_path_o, final_path)
+            logger.info("[%s] Ozel video ready: %s", job_id, final_path)
 
         else:
             # ── Steps 1-3: analysis + prompts + background ─────────────────

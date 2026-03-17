@@ -188,6 +188,7 @@ async def generate_video_endpoint(
     library_style_url: Optional[str] = Form(None),
     watermark_image: Optional[UploadFile] = File(None, description="Watermark/logo PNG"),
     generation_mode: str = Form("classic"),
+    ozel_start_frame: Optional[UploadFile] = File(None, description="Özel mod başlangıç karesi"),
 ):
     """Start a new fashion video generation job."""
 
@@ -247,6 +248,11 @@ async def generate_video_endpoint(
         ref_video_path = await _save_upload(reference_video)
         reference_video_url = _file_to_url(ref_video_path)
 
+    start_frame_url = None
+    if ozel_start_frame:
+        sf_path = await _save_upload(ozel_start_frame)
+        start_frame_url = _file_to_url(sf_path)
+
     # Parse extra background URLs (for per-shot cycling)
     bg_extra_urls: list = []
     if library_background_extra_urls:
@@ -296,6 +302,7 @@ async def generate_video_endpoint(
             watermark_path=await _save_upload(watermark_image) if watermark_image else None,
             generation_mode=generation_mode,
             reference_video_url=reference_video_url,
+            start_frame_url=start_frame_url,
         )
     )
 

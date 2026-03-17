@@ -192,7 +192,7 @@ let libraryBgExtraUrls = [];   // extra background images for per-shot cycling
 let libraryStyleUrl    = null;
 
 // ─── Defile State ────────────────────────────────────────────────
-let videoMode = "video";          // "video" | "defile"
+let videoMode = "video";          // "video" | "defile" | "ozel"
 let generationMode = "classic";   // "classic" | "multishot"
 let defileOutfits = [];           // [{front_url, side_url, back_url, name}]
 let defileShotConfigs = [{ duration: 5 }]; // global shot list [{duration}]
@@ -1093,6 +1093,125 @@ function openDefile() {
     document.body.style.overflow = "hidden";
 }
 
+// ─── Özel State ──────────────────────────────────────────────────
+let ozelStartFile = null;
+let ozelFrontFile = null;
+let ozelBackFile  = null;
+let ozelSideFile  = null;
+let ozelAspectRatio = "9:16";
+
+function openOzel() {
+    videoMode = "ozel";
+    ozelStartFile = null;
+    ozelFrontFile = null;
+    ozelBackFile  = null;
+    ozelSideFile  = null;
+    ozelAspectRatio = "9:16";
+
+    const titleEl = document.getElementById("wizard-title");
+    if (titleEl) titleEl.textContent = "Özel Video";
+
+    const stepLabel = document.getElementById("wizard-step-label");
+    if (stepLabel) stepLabel.textContent = "";
+
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
+        const el = document.getElementById(`step-${i}`);
+        if (el) el.style.display = "none";
+    }
+    document.getElementById("step-defile").style.display = "none";
+    document.getElementById("step-ozel").style.display = "block";
+
+    const backBtn = document.getElementById("wizard-back-btn");
+    const nextBtn = document.getElementById("wizard-next-btn");
+    if (backBtn) backBtn.style.display = "none";
+    if (nextBtn) { nextBtn.textContent = "Video Üret"; nextBtn.disabled = true; }
+
+    _setupOzelZone("ozel-start-zone", "ozel-start-input", f => { ozelStartFile = f; _checkOzelReady(); });
+    _setupOzelZone("ozel-front-zone", "ozel-front-input", f => { ozelFrontFile = f; _checkOzelReady(); });
+    _setupOzelZone("ozel-back-zone",  "ozel-back-input",  f => { ozelBackFile  = f; });
+    _setupOzelZone("ozel-side-zone",  "ozel-side-input",  f => { ozelSideFile  = f; });
+
+    document.querySelectorAll("#ozel-ratio-cards .ratio-card").forEach(card => {
+        card.addEventListener("click", () => {
+            document.querySelectorAll("#ozel-ratio-cards .ratio-card").forEach(c => c.classList.remove("active"));
+            card.classList.add("active");
+            ozelAspectRatio = card.dataset.ratio;
+        });
+    });
+
+    wizardModal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+}
+
+function _setupOzelZone(zoneId, inputId, onFile) {
+    const zone = document.getElementById(zoneId);
+    if (!zone) return;
+    const newZone = zone.cloneNode(true);
+    zone.parentNode.replaceChild(newZone, zone);
+    const newInput = newZone.querySelector("input[type=file]");
+    newZone.addEventListener("click", () => newInput?.click());
+    newInput?.addEventListener("change", () => {
+        const f = newInput.files?.[0];
+        if (!f) return;
+        onFile(f);
+        const label = newZone.querySelector(".upload-label");
+        if (label) label.textContent = f.name.length > 18 ? f.name.slice(0, 16) + "…" : f.name;
+        newZone.classList.add("has-file");
+    });
+}
+
+function _checkOzelReady() {
+    const nextBtn = document.getElementById("wizard-next-btn");
+    if (nextBtn) nextBtn.disabled = !(ozelStartFile && ozelFrontFile);
+}
+
+async function startOzelGeneration() {
+    hideError();
+    resultSec.classList.remove("active");
+    progressSec.classList.add("active");
+    generationStarted = true;
+    wizardFooter.style.display = "none";
+    step4Title.textContent = "Video Üretiliyor...";
+    step4Sub.textContent = "Bu işlem 1–3 dakika sürebilir, lütfen bekleyin.";
+    resetSteps();
+    updateProgress(0, "Başlatılıyor...");
+
+    document.getElementById("step-ozel").style.display = "none";
+    document.getElementById("step-3").style.display = "block";
+
+    const formData = new FormData();
+    formData.append("generation_mode", "ozel");
+    formData.append("ozel_start_frame", ozelStartFile);
+    formData.append("front_image", ozelFrontFile);
+    if (ozelBackFile)  formData.append("back_image",  ozelBackFile);
+    if (ozelSideFile)  formData.append("side_image",  ozelSideFile);
+
+    const prompt = (document.getElementById("ozel-prompt-input")?.value || "").trim();
+    if (prompt) formData.append("video_description", prompt);
+
+    const sc = parseInt(document.getElementById("ozel-scene-count")?.value || "3");
+    const td = parseInt(document.getElementById("ozel-total-duration")?.value || "15");
+    if (sc >= 1 && sc <= 10)  formData.append("custom_scene_count",   String(sc));
+    if (td >= 3 && td <= 120) formData.append("custom_total_duration", String(td));
+
+    formData.append("aspect_ratio",   ozelAspectRatio);
+    formData.append("generate_audio", document.getElementById("ozel-audio-toggle")?.checked ? "true" : "false");
+
+    try {
+        const resp = await fetch(`${API_BASE}/api/generate`, { method: "POST", body: formData, headers: getAuthHeaders() });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const job = await resp.json();
+        currentJobId = job.job_id;
+        startPolling();
+    } catch (err) {
+        showError(err.message);
+        generationStarted = false;
+        wizardFooter.style.display = "flex";
+        wizardNextBtn.textContent = "Tekrar Dene";
+        wizardNextBtn.disabled = false;
+    }
+}
+
 function renderDefileGrid() {
     const grid = document.getElementById("defile-collection-grid");
     const emptyMsg = document.getElementById("defile-empty-msg");
@@ -1343,6 +1462,7 @@ document.getElementById("nav-new-video")?.addEventListener("click", openWizard);
 document.getElementById("card-single-video")?.addEventListener("click", openWizard);
 document.getElementById("nav-defile")?.addEventListener("click", openDefile);
 document.getElementById("card-defile")?.addEventListener("click", openDefile);
+document.getElementById("card-ozel")?.addEventListener("click", openOzel);
 document.getElementById("wizard-close")?.addEventListener("click", closeWizard);
 document.getElementById("defile-add-outfit-btn")?.addEventListener("click", openDefileOutfitPicker);
 document.getElementById("defile-bg-btn")?.addEventListener("click", openDefileBgPicker);
@@ -1355,6 +1475,10 @@ wizardModal?.addEventListener("click", (e) => {
 wizardNextBtn?.addEventListener("click", () => {
     if (videoMode === "defile") {
         startDefileCollection();
+        return;
+    }
+    if (videoMode === "ozel") {
+        startOzelGeneration();
         return;
     }
     if (currentWizardStep < TOTAL_STEPS) {
