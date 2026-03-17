@@ -1167,6 +1167,12 @@ function _checkOzelReady() {
 
 async function startOzelGeneration() {
     hideError();
+
+    // Transition to step-3 progress view
+    document.getElementById("step-ozel").style.display = "none";
+    currentWizardStep = TOTAL_STEPS;
+    showWizardStep(TOTAL_STEPS);
+
     resultSec.classList.remove("active");
     progressSec.classList.add("active");
     generationStarted = true;
@@ -1175,9 +1181,6 @@ async function startOzelGeneration() {
     step4Sub.textContent = "Bu işlem 1–3 dakika sürebilir, lütfen bekleyin.";
     resetSteps();
     updateProgress(0, "Başlatılıyor...");
-
-    document.getElementById("step-ozel").style.display = "none";
-    document.getElementById("step-3").style.display = "block";
 
     const formData = new FormData();
     formData.append("generation_mode", "ozel");
