@@ -20,6 +20,10 @@ class Settings:
     SUPABASE_SERVICE_KEY: str = os.getenv("SUPABASE_SERVICE_KEY", "")
     ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "")
 
+    # Telegram notifications
+    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
+
     # Directories
     UPLOAD_DIR: str = os.path.join(os.path.dirname(__file__), "uploads")
     OUTPUT_DIR: str = os.path.join(os.path.dirname(__file__), "outputs")

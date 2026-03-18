@@ -834,6 +834,9 @@ async def run_pipeline(
         )
         logger.info("[%s] Pipeline fully completed – %s", job_id, final_path)
 
+        from services.telegram_service import notify_video_ready
+        await notify_video_ready(result_url or "", job_id, mode=generation_mode)
+
     except Exception as exc:
         logger.exception("[%s] Pipeline failed", job_id)
         _update_job(
@@ -1202,6 +1205,9 @@ async def run_defile_collection_pipeline(
             result_url=result_url,
         )
         logger.info("[%s] Defile pipeline completed", job_id)
+
+        from services.telegram_service import notify_video_ready  # type: ignore[import]
+        await notify_video_ready(result_url or "", job_id, mode="defile", extra=f"{n_outfits} kıyafet")
 
     except Exception as exc:
         logger.exception("[%s] Defile pipeline failed", job_id)
