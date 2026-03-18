@@ -1062,11 +1062,13 @@ function openDefile() {
     const stepLabel = document.getElementById("wizard-step-label");
     if (stepLabel) stepLabel.textContent = "";
 
-    // Hide normal steps, show defile step
+    // Hide all steps, show defile step
     for (let i = 1; i <= TOTAL_STEPS; i++) {
         const el = document.getElementById(`step-${i}`);
         if (el) el.style.display = "none";
     }
+    const ozelStep = document.getElementById("step-ozel");
+    if (ozelStep) ozelStep.style.display = "none";
     document.getElementById("step-defile").style.display = "block";
 
     // Update footer
