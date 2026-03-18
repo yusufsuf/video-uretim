@@ -2326,3 +2326,267 @@ textarea.form-input {
     pointer-events: none;
 }
 
+
+
+/* ── Studio Mode ─────────────────────────────────────────────── */
+
+.mode-card-studio {
+    background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.06) 100%);
+    border-color: rgba(99,102,241,0.25);
+}
+.mode-card-studio:hover {
+    border-color: rgba(99,102,241,0.5);
+    background: linear-gradient(135deg, rgba(99,102,241,0.14) 0%, rgba(139,92,246,0.1) 100%);
+}
+.mode-card-studio .mode-card-icon { color: #6366f1; }
+
+/* Element seçim ekranı */
+.studio-element-empty {
+    text-align: center;
+    padding: 28px 0 18px;
+    color: var(--text-muted);
+}
+.studio-element-empty-icon {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    opacity: 0.4;
+}
+.studio-element-empty-text {
+    font-size: 0.82rem;
+}
+
+.studio-pick-btn {
+    width: 100%;
+    padding: 11px 0;
+    background: var(--gradient-btn);
+    color: var(--btn-text);
+    border: none;
+    border-radius: var(--radius-md);
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity var(--transition-fast);
+    font-family: var(--font-body);
+}
+.studio-pick-btn:hover { opacity: 0.88; }
+
+.studio-or-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 12px 0;
+}
+.studio-or-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+}
+.studio-or-text {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.studio-create-btn {
+    width: 100%;
+    padding: 10px 0;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px dashed var(--border-accent);
+    border-radius: var(--radius-md);
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: var(--font-body);
+}
+.studio-create-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+/* Seçili element kartı */
+.studio-selected-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+}
+.studio-element-thumb {
+    width: 64px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex-shrink: 0;
+    border: 1px solid var(--border-subtle);
+}
+.studio-element-info {
+    flex: 1;
+    min-width: 0;
+}
+.studio-element-name-label {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.studio-element-extras-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+.studio-element-token-badge {
+    display: inline-block;
+    margin-top: 5px;
+    padding: 2px 8px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-family: monospace;
+    color: #a5b4fc;
+    letter-spacing: 0.02em;
+}
+.studio-change-btn {
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: var(--font-body);
+    transition: all var(--transition-fast);
+}
+.studio-change-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+
+/* Studio section label */
+.studio-section-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+}
+
+/* Studio shot card */
+.studio-shot-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+.studio-shot-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.studio-shot-num {
+    font-size: 0.73rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+.studio-shot-dur-label {
+    font-size: 0.73rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+.studio-shot-desc {
+    width: 100%;
+    min-height: 60px;
+    resize: vertical;
+    font-size: 0.78rem;
+    box-sizing: border-box;
+}
+
+/* Add shot / AI btn */
+.studio-add-shot-btn, .studio-ai-shots-btn {
+    padding: 7px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-family: var(--font-body);
+}
+.studio-add-shot-btn {
+    background: transparent;
+    border: 1px solid var(--border-accent);
+    color: var(--text-secondary);
+}
+.studio-add-shot-btn:hover {
+    border-color: var(--accent);
+    color: var(--text-primary);
+}
+.studio-ai-shots-btn {
+    background: var(--gradient-btn);
+    color: var(--btn-text);
+    border: none;
+}
+.studio-ai-shots-btn:hover { opacity: 0.88; }
+.studio-ai-shots-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Element oluştur modal */
+.studio-create-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(4px);
+    z-index: 3001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+.studio-create-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+}
+.studio-create-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+.studio-create-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-family: var(--font-display);
+}
+.studio-create-body {
+    padding: 18px 20px;
+    flex: 1;
+}
+.studio-create-uploads {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+.studio-create-footer {
+    padding: 14px 20px 18px;
+    border-top: 1px solid var(--border-subtle);
+}
+.studio-create-footer .wizard-btn-primary {
+    width: 100%;
+}

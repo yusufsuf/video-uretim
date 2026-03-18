@@ -1053,7 +1053,7 @@ function _hideAllSteps() {
         const el = document.getElementById(`step-${i}`);
         if (el) el.style.display = "none";
     }
-    ["step-ozel", "step-defile", "step-defile-choice"].forEach(id => {
+    ["step-ozel", "step-defile", "step-defile-choice", "step-studio-1", "step-studio-2"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = "none";
     });
@@ -1532,6 +1532,14 @@ wizardNextBtn?.addEventListener("click", () => {
         startOzelGeneration();
         return;
     }
+    if (videoMode === "studio") {
+        if (studioStep === 1) {
+            _studioGoToStep(2);
+        } else {
+            startStudioGeneration();
+        }
+        return;
+    }
     if (currentWizardStep < TOTAL_STEPS) {
         currentWizardStep++;
         showWizardStep(currentWizardStep);
@@ -1541,7 +1549,12 @@ wizardNextBtn?.addEventListener("click", () => {
 });
 
 wizardBackBtn?.addEventListener("click", () => {
-    // From defile sub-modes → back to choice screen
+    // Studio: adım 2 → adım 1
+    if (videoMode === "studio" && studioStep === 2) {
+        _studioGoToStep(1);
+        return;
+    }
+    // Defile sub-modes → choice screen
     if ((videoMode === "defile" || videoMode === "ozel") &&
         (document.getElementById("step-defile")?.style.display === "block" ||
          document.getElementById("step-ozel")?.style.display === "block") &&
@@ -1562,6 +1575,457 @@ wizardBackBtn?.addEventListener("click", () => {
 
 document.getElementById("defile-nb2-card")?.addEventListener("click", openDefileNB2);
 document.getElementById("defile-elements-card")?.addEventListener("click", openDefileElements);
+document.getElementById("nav-studio")?.addEventListener("click", openStudio);
+document.getElementById("card-studio")?.addEventListener("click", openStudio);
+
+// ─── Studio Mode ──────────────────────────────────────────────────
+
+let studioStep = 1;          // 1 | 2
+let studioElement = null;    // {id, name, image_url, extra_urls}
+let studioStartFile = null;
+let studioShots = [
+    { description: "", duration: 5 },
+    { description: "", duration: 5 },
+];
+let studioAspectRatio = "9:16";
+
+const STUDIO_MAX_SHOTS = 5;
+
+function _studioTotalDur() {
+    return studioShots.reduce((s, sh) => s + sh.duration, 0);
+}
+
+function openStudio() {
+    videoMode = "studio";
+    studioStep = 1;
+    studioElement = null;
+    studioStartFile = null;
+    studioShots = [{ description: "", duration: 5 }, { description: "", duration: 5 }];
+    studioAspectRatio = "9:16";
+
+    const titleEl = document.getElementById("wizard-title");
+    if (titleEl) titleEl.textContent = "Stüdyo";
+    const stepLabel = document.getElementById("wizard-step-label");
+    if (stepLabel) stepLabel.textContent = "Adım 1 / 2";
+
+    _hideAllSteps();
+    document.getElementById("step-studio-1").style.display = "block";
+
+    const backBtn = document.getElementById("wizard-back-btn");
+    const nextBtn = document.getElementById("wizard-next-btn");
+    const footer  = document.getElementById("wizard-footer");
+    if (backBtn) backBtn.style.display = "none";
+    if (nextBtn) { nextBtn.textContent = "Devam →"; nextBtn.disabled = true; }
+    if (footer)  footer.style.display = "flex";
+
+    _renderStudioElementState();
+    _setupStudioStartZone();
+    renderStudioShots();
+
+    // Ratio cards
+    document.querySelectorAll("#studio-ratio-cards .ratio-card").forEach(card => {
+        card.addEventListener("click", () => {
+            document.querySelectorAll("#studio-ratio-cards .ratio-card").forEach(c => c.classList.remove("active"));
+            card.classList.add("active");
+            studioAspectRatio = card.dataset.ratio;
+        });
+    });
+
+    wizardModal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+}
+
+function _studioGoToStep(step) {
+    studioStep = step;
+    _hideAllSteps();
+    document.getElementById(`step-studio-${step}`).style.display = "block";
+
+    const stepLabel = document.getElementById("wizard-step-label");
+    if (stepLabel) stepLabel.textContent = `Adım ${step} / 2`;
+
+    const backBtn = document.getElementById("wizard-back-btn");
+    const nextBtn = document.getElementById("wizard-next-btn");
+    const footer  = document.getElementById("wizard-footer");
+    if (footer) footer.style.display = "flex";
+    if (backBtn) backBtn.style.display = step === 1 ? "none" : "inline-flex";
+
+    if (step === 2) {
+        if (nextBtn) { nextBtn.textContent = "Video Üret"; nextBtn.disabled = false; }
+        _setupStudioStartZone();
+        renderStudioShots();
+    } else {
+        if (nextBtn) { nextBtn.textContent = "Devam →"; nextBtn.disabled = !studioElement; }
+        _renderStudioElementState();
+    }
+}
+
+function _renderStudioElementState() {
+    const noEl  = document.getElementById("studio-no-element");
+    const selEl = document.getElementById("studio-element-selected");
+    if (!noEl || !selEl) return;
+
+    if (studioElement) {
+        noEl.style.display  = "none";
+        selEl.style.display = "block";
+        const thumb = document.getElementById("studio-element-thumb");
+        const name  = document.getElementById("studio-element-name-label");
+        const extras = document.getElementById("studio-element-extras-label");
+        if (thumb)  thumb.src = studioElement.image_url;
+        if (name)   name.textContent = studioElement.name;
+        const extraCount = (studioElement.extra_urls || []).length;
+        if (extras) extras.textContent = extraCount > 0 ? `+${extraCount} ek açı` : "Sadece ön görünüm";
+        // Show element token badge
+        let tokenBadge = document.getElementById("studio-element-token-badge");
+        if (!tokenBadge) {
+            tokenBadge = document.createElement("div");
+            tokenBadge.id = "studio-element-token-badge";
+            tokenBadge.className = "studio-element-token-badge";
+            selEl.appendChild(tokenBadge);
+        }
+        tokenBadge.textContent = `Token: @${studioElement.name}`;
+    } else {
+        noEl.style.display  = "block";
+        selEl.style.display = "none";
+    }
+
+    // Re-attach pick/create/change buttons
+    document.getElementById("studio-pick-btn")?.addEventListener("click", openStudioElementPicker);
+    document.getElementById("studio-change-btn")?.addEventListener("click", openStudioElementPicker);
+    document.getElementById("studio-create-btn")?.addEventListener("click", openStudioCreateModal);
+}
+
+function _setupStudioStartZone() {
+    const zone  = document.getElementById("studio-start-zone");
+    const input = document.getElementById("studio-start-input");
+    if (!zone || !input) return;
+
+    const newZone = zone.cloneNode(true);
+    zone.parentNode.replaceChild(newZone, zone);
+    const newInput = newZone.querySelector("input[type=file]");
+
+    newZone.addEventListener("click", () => newInput?.click());
+    newInput?.addEventListener("change", () => {
+        const f = newInput.files?.[0];
+        if (!f) return;
+        studioStartFile = f;
+        const label = newZone.querySelector(".upload-label");
+        if (label) label.textContent = f.name.length > 20 ? f.name.slice(0, 18) + "…" : f.name;
+        newZone.classList.add("has-file");
+    });
+}
+
+function renderStudioShots() {
+    const container = document.getElementById("studio-shots-container");
+    const durLabel  = document.getElementById("studio-total-dur-label");
+    if (!container) return;
+    if (durLabel) durLabel.textContent = `${_studioTotalDur()}s toplam`;
+
+    const addBtn = document.getElementById("studio-add-shot-btn");
+    if (addBtn) addBtn.style.display = studioShots.length >= STUDIO_MAX_SHOTS ? "none" : "inline-flex";
+
+    const elToken = studioElement ? `@${studioElement.name}` : "@Element";
+    const placeholder = `${elToken} ile bu çekimi tanımlayın (örn. ${elToken} yavaşça kameraya doğru yürüyor) veya ✦ AI'ya bırakın`;
+
+    container.innerHTML = studioShots.map((sh, idx) => `
+        <div class="studio-shot-card">
+            <div class="studio-shot-header">
+                <span class="studio-shot-num">Çekim ${idx + 1}</span>
+                <div style="display:flex;align-items:center;gap:6px">
+                    <span class="studio-shot-dur-label">${sh.duration}s</span>
+                    ${studioShots.length > 1 ? `<button class="shot-remove-btn" onclick="removeStudioShot(${idx})">✕</button>` : ""}
+                </div>
+            </div>
+            <textarea class="form-input studio-shot-desc"
+                id="studio-shot-desc-${idx}"
+                placeholder="${placeholder}"
+                oninput="updateStudioShotDesc(${idx}, this.value)">${sh.description || ""}</textarea>
+            <div class="shot-dur-row" style="margin-top:6px">
+                <div class="shot-dur-labels">
+                    <span style="font-size:0.72rem;color:var(--text-secondary)">Süre</span>
+                    <span class="studio-shot-dur-label">${sh.duration}s</span>
+                </div>
+                <input type="range" class="shot-dur-slider" min="3" max="10" value="${sh.duration}"
+                       oninput="updateStudioShotDur(${idx}, this.value, this.closest('.studio-shot-card'))">
+            </div>
+        </div>
+    `).join("");
+}
+
+function updateStudioShotDesc(idx, val) {
+    studioShots[idx].description = val;
+}
+
+function updateStudioShotDur(idx, val, card) {
+    studioShots[idx].duration = parseInt(val);
+    if (card) card.querySelectorAll(".studio-shot-dur-label").forEach(el => el.textContent = val + "s");
+    const durLabel = document.getElementById("studio-total-dur-label");
+    if (durLabel) durLabel.textContent = `${_studioTotalDur()}s toplam`;
+}
+
+function removeStudioShot(idx) {
+    if (studioShots.length <= 1) return;
+    studioShots.splice(idx, 1);
+    renderStudioShots();
+}
+
+function addStudioShot() {
+    if (studioShots.length >= STUDIO_MAX_SHOTS) return;
+    studioShots.push({ description: "", duration: 5 });
+    renderStudioShots();
+}
+
+window.removeStudioShot       = removeStudioShot;
+window.updateStudioShotDesc   = updateStudioShotDesc;
+window.updateStudioShotDur    = updateStudioShotDur;
+
+// ── Element Picker ───────────────────────────────────────────────
+
+function openStudioElementPicker() {
+    const modal  = document.getElementById("lib-picker-modal");
+    const title  = document.getElementById("lib-picker-title");
+    const tabs   = document.getElementById("lib-picker-tabs");
+    const grid   = document.getElementById("lib-picker-grid");
+    const closeBtn = document.getElementById("lib-picker-close");
+
+    title.textContent = "Element Seç";
+    tabs.innerHTML = `<button class="lib-picker-tab active" data-cat="element">Elementler</button>`;
+
+    modal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+
+    closeBtn.onclick = () => closeLibraryPicker();
+    modal.onclick = (e) => { if (e.target === modal) closeLibraryPicker(); };
+
+    _fetchAndRenderStudioElements(grid);
+}
+
+async function _fetchAndRenderStudioElements(grid) {
+    grid.innerHTML = `<div class="lib-picker-loading">Yükleniyor...</div>`;
+    try {
+        const resp = await fetch("/library/items?category=element", { headers: getAuthHeaders() });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const items = await resp.json();
+        if (!items.length) {
+            grid.innerHTML = `<div class="lib-picker-empty">Henüz element oluşturulmadı.<br><button onclick="closeLibraryPicker();openStudioCreateModal();" style="margin-top:10px;padding:6px 14px;background:var(--accent);color:var(--btn-text);border:none;border-radius:6px;cursor:pointer;font-size:0.78rem">+ Yeni Element Oluştur</button></div>`;
+            return;
+        }
+
+        grid.innerHTML = items.map(item => {
+            const extras = item.extra_urls || [];
+            const badge = extras.length > 0 ? `<div class="lib-picker-extras-badge">+${extras.length}</div>` : "";
+            return `
+                <div class="lib-picker-item" data-id="${item.id}">
+                    <img src="${item.image_url}" alt="${item.name}" loading="lazy">
+                    <div class="lib-picker-item-name">${item.name}</div>
+                    ${badge}
+                </div>`;
+        }).join("");
+
+        const itemMap = Object.fromEntries(items.map(it => [it.id, it]));
+        grid.querySelectorAll(".lib-picker-item").forEach(el => {
+            el.addEventListener("click", () => {
+                const item = itemMap[el.dataset.id];
+                if (!item) return;
+                studioElement = item;
+                closeLibraryPicker();
+                _renderStudioElementState();
+                const nextBtn = document.getElementById("wizard-next-btn");
+                if (nextBtn) nextBtn.disabled = false;
+            });
+        });
+    } catch (err) {
+        grid.innerHTML = `<div class="lib-picker-empty">Yüklenemedi: ${err.message}</div>`;
+    }
+}
+
+// ── Element Oluştur Modal ────────────────────────────────────────
+
+let _createFrontFile  = null;
+let _createAngle1File = null;
+let _createAngle2File = null;
+let _createAngle3File = null;
+
+function openStudioCreateModal() {
+    _createFrontFile = _createAngle1File = _createAngle2File = _createAngle3File = null;
+    const modal = document.getElementById("studio-create-modal");
+    if (!modal) return;
+    modal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+
+    // Reset fields
+    const nameInput = document.getElementById("create-elem-name");
+    if (nameInput) nameInput.value = "";
+    _updateCreateSaveBtn();
+
+    // Setup upload zones
+    [
+        ["create-front-zone",  "create-front-input",  f => { _createFrontFile  = f; _updateCreateSaveBtn(); }],
+        ["create-angle1-zone", "create-angle1-input", f => { _createAngle1File = f; }],
+        ["create-angle2-zone", "create-angle2-input", f => { _createAngle2File = f; }],
+        ["create-angle3-zone", "create-angle3-input", f => { _createAngle3File = f; }],
+    ].forEach(([zoneId, inputId, onFile]) => {
+        const zone = document.getElementById(zoneId);
+        const inp  = document.getElementById(inputId);
+        if (!zone || !inp) return;
+        const newZone = zone.cloneNode(true);
+        zone.parentNode.replaceChild(newZone, zone);
+        const newInp = newZone.querySelector("input[type=file]");
+        newZone.addEventListener("click", () => newInp?.click());
+        newInp?.addEventListener("change", () => {
+            const f = newInp.files?.[0];
+            if (!f) return;
+            onFile(f);
+            const lbl = newZone.querySelector(".upload-label");
+            if (lbl) lbl.textContent = f.name.length > 14 ? f.name.slice(0, 12) + "…" : f.name;
+            newZone.classList.add("has-file");
+        });
+    });
+
+    document.getElementById("create-elem-name")?.addEventListener("input", _updateCreateSaveBtn);
+    document.getElementById("studio-create-close")?.addEventListener("click", closeStudioCreateModal);
+    document.getElementById("studio-create-save-btn")?.addEventListener("click", saveStudioElement);
+    modal.addEventListener("click", e => { if (e.target === modal) closeStudioCreateModal(); });
+}
+
+function _updateCreateSaveBtn() {
+    const btn = document.getElementById("studio-create-save-btn");
+    const name = (document.getElementById("create-elem-name")?.value || "").trim();
+    if (btn) btn.disabled = !(_createFrontFile && name);
+}
+
+function closeStudioCreateModal() {
+    const modal = document.getElementById("studio-create-modal");
+    if (modal) modal.style.display = "none";
+    document.body.style.overflow = "";
+}
+
+async function saveStudioElement() {
+    const btn  = document.getElementById("studio-create-save-btn");
+    const name = (document.getElementById("create-elem-name")?.value || "").trim();
+    if (!_createFrontFile || !name) return;
+
+    if (btn) { btn.disabled = true; btn.textContent = "Kaydediliyor..."; }
+
+    const fd = new FormData();
+    fd.append("name",     name);
+    fd.append("category", "element");
+    fd.append("file",     _createFrontFile);
+    if (_createAngle1File) fd.append("file2", _createAngle1File);
+    if (_createAngle2File) fd.append("file3", _createAngle2File);
+    if (_createAngle3File) fd.append("file4", _createAngle3File);
+
+    try {
+        const resp = await fetch("/library/items", { method: "POST", headers: getAuthHeaders(), body: fd });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const item = await resp.json();
+        studioElement = item;
+        closeStudioCreateModal();
+        _renderStudioElementState();
+        const nextBtn = document.getElementById("wizard-next-btn");
+        if (nextBtn) nextBtn.disabled = false;
+    } catch (err) {
+        alert("Element kaydedilemedi: " + err.message);
+        if (btn) { btn.disabled = false; btn.textContent = "Kaydet ve Seç"; }
+    }
+}
+
+// ── AI Çekim Öner ────────────────────────────────────────────────
+
+document.getElementById("studio-add-shot-btn")?.addEventListener("click", addStudioShot);
+
+document.getElementById("studio-ai-shots-btn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("studio-ai-shots-btn");
+    if (!btn || !studioElement) return;
+    btn.disabled = true;
+    btn.textContent = "✦ Üretiliyor...";
+
+    const fd = new FormData();
+    fd.append("element_image_url", studioElement.image_url);
+    fd.append("shot_count", String(studioShots.length));
+    if (studioStartFile) fd.append("start_frame", studioStartFile);
+
+    try {
+        const resp = await fetch("/api/studio/ai-shots", { method: "POST", headers: getAuthHeaders(), body: fd });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const shots = data.shots || [];
+        shots.forEach((s, i) => {
+            if (i < studioShots.length) {
+                studioShots[i].description = s.description;
+                studioShots[i].duration    = s.duration || 5;
+            }
+        });
+        renderStudioShots();
+    } catch (err) {
+        alert("AI çekim üretilemedi: " + err.message);
+    }
+
+    btn.disabled = false;
+    btn.textContent = "✦ AI Çekim Öner";
+});
+
+// ── Studio Generation ────────────────────────────────────────────
+
+async function startStudioGeneration() {
+    if (!studioElement) { alert("Önce bir element seçin."); return; }
+
+    hideError();
+    _hideAllSteps();
+    currentWizardStep = TOTAL_STEPS;
+    showWizardStep(TOTAL_STEPS);
+
+    resultSec.classList.remove("active");
+    progressSec.classList.add("active");
+    generationStarted = true;
+    wizardFooter.style.display = "none";
+    step4Title.textContent = "Video Üretiliyor...";
+    step4Sub.textContent = `Stüdyo modu: ${studioShots.length} çekim, ${_studioTotalDur()}s toplam. Lütfen bekleyin.`;
+    resetSteps();
+    updateProgress(0, "Başlatılıyor...");
+
+    // Replace @ElementName token with @Element1 (fal.ai only supports positional tokens)
+    const elToken = `@${studioElement.name}`;
+    const resolvedShots = studioShots.map(s => ({
+        ...s,
+        description: (s.description || "").replace(new RegExp(elToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "@Element1"),
+    }));
+
+    // Build shots JSON (ShotConfig format)
+    const shotsJson = JSON.stringify(resolvedShots.map(s => ({
+        camera_move: "",
+        duration: s.duration,
+        description: s.description,
+        camera_angle: "",
+        shot_size: "",
+    })));
+
+    const formData = new FormData();
+    formData.append("generation_mode",   "studio");
+    formData.append("library_front_url", studioElement.image_url);
+    const extras = studioElement.extra_urls || [];
+    if (extras[0]) formData.append("library_side_url", extras[0]);
+    if (extras[1]) formData.append("library_back_url", extras[1]);
+    if (studioStartFile) formData.append("ozel_start_frame", studioStartFile);
+    formData.append("shots",          shotsJson);
+    formData.append("aspect_ratio",   studioAspectRatio);
+    formData.append("generate_audio", document.getElementById("studio-audio-toggle")?.checked ? "true" : "false");
+    // Required dummy front_image field (pipeline uses library_front_url when provided)
+    formData.append("front_image", new Blob([], { type: "image/jpeg" }), "placeholder.jpg");
+
+    try {
+        const resp = await fetch(`${API_BASE}/api/generate`, { method: "POST", body: formData, headers: getAuthHeaders() });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const job = await resp.json();
+        currentJobId = job.job_id;
+        startPolling();
+    } catch (err) {
+        showError(err.message);
+        generationStarted = false;
+        wizardFooter.style.display = "flex";
+        wizardNextBtn.textContent = "Tekrar Dene";
+        wizardNextBtn.disabled = false;
+    }
+}
 
 // ─── Upload Zone Interactions ────────────────────────────────────
 function setupUploadZone(zone, input, type) {

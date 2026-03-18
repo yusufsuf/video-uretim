@@ -64,6 +64,10 @@
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                     Defile Modu
                 </button>
+                <button class="nav-item" id="nav-studio">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5"/><line x1="12" y1="22" x2="12" y2="15.5"/><polyline points="2,8.5 12,15.5 22,8.5"/></svg>
+                    Stüdyo
+                </button>
                 <a class="nav-item" href="/gallery">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
                     Galeri
@@ -128,6 +132,11 @@
                         <div class="mode-card-icon">◎</div>
                         <div class="mode-card-title">Özel</div>
                         <div class="mode-card-desc">Start frame + ön/arka görseller ile @Element1 tabanlı video.</div>
+                    </div>
+                    <div class="mode-card mode-card-studio" id="card-studio">
+                        <div class="mode-card-icon">⬡</div>
+                        <div class="mode-card-title">Stüdyo</div>
+                        <div class="mode-card-desc">Element kütüphanesi ile tam kontrollü video üretimi.</div>
                     </div>
                     <div class="mode-card mode-card-soon">
                         <div class="mode-card-icon">⊞</div>
@@ -693,6 +702,81 @@
                     </div>
                 </div>
 
+                <!-- ── Stüdyo Adım 1: Element Seçimi ── -->
+                <div class="wizard-step" id="step-studio-1" style="display:none">
+                    <div class="wizard-step-title">Element Seçin</div>
+                    <div class="wizard-step-sub">Kostüm, karakter veya öğe elementi kütüphaneden seçin.</div>
+
+                    <div id="studio-no-element" style="margin-top:20px">
+                        <div class="studio-element-empty">
+                            <div class="studio-element-empty-icon">◈</div>
+                            <div class="studio-element-empty-text">Henüz element seçilmedi</div>
+                        </div>
+                        <button class="studio-pick-btn" id="studio-pick-btn">Kütüphaneden Seç</button>
+                        <div class="studio-or-row">
+                            <span class="studio-or-line"></span>
+                            <span class="studio-or-text">veya</span>
+                            <span class="studio-or-line"></span>
+                        </div>
+                        <button class="studio-create-btn" id="studio-create-btn">+ Yeni Element Oluştur</button>
+                    </div>
+
+                    <div id="studio-element-selected" style="display:none;margin-top:20px">
+                        <div class="studio-selected-card">
+                            <img id="studio-element-thumb" src="" alt="" class="studio-element-thumb">
+                            <div class="studio-element-info">
+                                <div class="studio-element-name-label" id="studio-element-name-label">—</div>
+                                <div class="studio-element-extras-label" id="studio-element-extras-label">—</div>
+                            </div>
+                            <button class="studio-change-btn" id="studio-change-btn">Değiştir</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Stüdyo Adım 2: Sahne & Çekimler ── -->
+                <div class="wizard-step" id="step-studio-2" style="display:none">
+                    <div class="wizard-step-title">Sahne & Çekimler</div>
+                    <div class="wizard-step-sub">Başlangıç karesini yükleyin ve çekimlerinizi tanımlayın.</div>
+
+                    <div class="studio-section-label" style="margin-top:14px">Başlangıç Karesi <span style="color:var(--text-muted);font-size:0.7rem">(opsiyonel — sahneyi kilitler)</span></div>
+                    <div class="upload-zone" id="studio-start-zone" style="margin-bottom:14px">
+                        <input type="file" id="studio-start-input" accept="image/*">
+                        <div class="upload-zone-inner">
+                            <div class="upload-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+                            <div class="upload-label">Başlangıç Karesi</div>
+                            <div class="upload-hint">Sahneyi belirler</div>
+                        </div>
+                        <span class="badge muted">Opsiyonel</span>
+                    </div>
+
+                    <div class="studio-section-label" style="display:flex;align-items:center;justify-content:space-between">
+                        <span>Çekimler</span>
+                        <span id="studio-total-dur-label" style="font-size:0.72rem;color:var(--text-secondary)">10s toplam</span>
+                    </div>
+                    <div id="studio-shots-container"></div>
+
+                    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+                        <button class="studio-add-shot-btn" id="studio-add-shot-btn">+ Sahne Ekle</button>
+                        <button class="studio-ai-shots-btn" id="studio-ai-shots-btn">✦ AI Çekim Öner</button>
+                    </div>
+
+                    <div style="margin-top:16px">
+                        <div class="studio-section-label">En/Boy Oranı</div>
+                        <div class="ratio-cards" id="studio-ratio-cards" style="margin-top:6px">
+                            <div class="ratio-card active" data-ratio="9:16">9:16</div>
+                            <div class="ratio-card" data-ratio="16:9">16:9</div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between">
+                        <span style="font-size:0.78rem;color:var(--text-secondary)">Ses Üret</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="studio-audio-toggle" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
             </div><!-- /wizard-body -->
 
             <div class="wizard-footer" id="wizard-footer">
@@ -727,7 +811,65 @@
         </div>
     </div>
 
-    <script src="app.js?v=20"></script>
+    <!-- ── STUDIO: Element Oluştur Modal ──────────────────────── -->
+    <div class="studio-create-overlay" id="studio-create-modal" style="display:none">
+        <div class="studio-create-panel">
+            <div class="studio-create-header">
+                <span class="studio-create-title">Yeni Element Oluştur</span>
+                <button class="wizard-close" id="studio-create-close">✕</button>
+            </div>
+            <div class="studio-create-body">
+                <div class="studio-create-uploads">
+                    <div class="upload-zone" id="create-front-zone">
+                        <input type="file" id="create-front-input" accept="image/*">
+                        <div class="upload-zone-inner">
+                            <div class="upload-label">Ön Görünüm</div>
+                            <div class="upload-hint">Zorunlu</div>
+                        </div>
+                        <span class="badge">Zorunlu</span>
+                    </div>
+                    <div class="upload-zone" id="create-angle1-zone">
+                        <input type="file" id="create-angle1-input" accept="image/*">
+                        <div class="upload-zone-inner">
+                            <div class="upload-label">Açı 2</div>
+                            <div class="upload-hint">Opsiyonel</div>
+                        </div>
+                        <span class="badge muted">Opsiyonel</span>
+                    </div>
+                    <div class="upload-zone" id="create-angle2-zone">
+                        <input type="file" id="create-angle2-input" accept="image/*">
+                        <div class="upload-zone-inner">
+                            <div class="upload-label">Açı 3</div>
+                            <div class="upload-hint">Opsiyonel</div>
+                        </div>
+                        <span class="badge muted">Opsiyonel</span>
+                    </div>
+                    <div class="upload-zone" id="create-angle3-zone">
+                        <input type="file" id="create-angle3-input" accept="image/*">
+                        <div class="upload-zone-inner">
+                            <div class="upload-label">Açı 4</div>
+                            <div class="upload-hint">Opsiyonel</div>
+                        </div>
+                        <span class="badge muted">Opsiyonel</span>
+                    </div>
+                </div>
+                <input type="text" id="create-elem-name" class="form-input" placeholder="Element ismi (örn. Elbise1)" style="margin-top:14px">
+                <select id="create-elem-type" class="form-input" style="margin-top:8px">
+                    <option value="Costumes">Kostüm</option>
+                    <option value="Characters">Karakter</option>
+                    <option value="Items">Öğe</option>
+                    <option value="Scenes">Sahne</option>
+                    <option value="Effects">Efekt</option>
+                    <option value="Others">Diğer</option>
+                </select>
+            </div>
+            <div class="studio-create-footer">
+                <button id="studio-create-save-btn" class="wizard-btn-primary" disabled>Kaydet ve Seç</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=21"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');
