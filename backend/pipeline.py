@@ -314,6 +314,7 @@ async def run_pipeline(
     generation_mode: str = "classic",
     reference_video_url: Optional[str] = None,
     start_frame_url: Optional[str] = None,
+    elements_json: Optional[str] = None,  # JSON array of {front_url, extra_urls, name}
 ):
     """Execute the full pipeline asynchronously."""
     try:
@@ -471,20 +472,34 @@ async def run_pipeline(
             _update_job(job_id, progress=15, message="Görsel hazırlanıyor...")
             _studio_negative = _BASE_NEGATIVE + _TRAIN_NEGATIVE
 
-            # Element: frontal + referans açılar
-            fal_studio_front = await _to_fal_url_compressed(front_url)
-            studio_back_url: str | None = None
-            studio_side_url: str | None = None
-            if back_url:
-                studio_back_url = await _to_fal_url_compressed(back_url)
-            if side_url:
-                studio_side_url = await _to_fal_url_compressed(side_url)
-
-            studio_ref_urls = [u for u in [studio_back_url, studio_side_url] if u]
-            studio_element = {
-                "frontal_image_url": fal_studio_front,
-                "reference_image_urls": studio_ref_urls if studio_ref_urls else [fal_studio_front],
-            }
+            # Elements: multi-element support via elements_json, fallback to single
+            if elements_json:
+                import json as _json
+                _elem_defs = _json.loads(elements_json)
+                kling_elements = []
+                for _ed in _elem_defs[:4]:  # max 4 elements
+                    _fal_front = await _to_fal_url_compressed(_ed["front_url"])
+                    _fal_extras = []
+                    for _eu in (_ed.get("extra_urls") or [])[:3]:  # type: ignore[index]
+                        _fal_extras.append(await _to_fal_url_compressed(_eu))
+                    kling_elements.append({
+                        "frontal_image_url": _fal_front,
+                        "reference_image_urls": _fal_extras if _fal_extras else [_fal_front],
+                    })
+            else:
+                fal_studio_front = await _to_fal_url_compressed(front_url)
+                studio_back_url: str | None = None
+                studio_side_url: str | None = None
+                if back_url:
+                    studio_back_url = await _to_fal_url_compressed(back_url)
+                if side_url:
+                    studio_side_url = await _to_fal_url_compressed(side_url)
+                studio_ref_urls = [u for u in [studio_back_url, studio_side_url] if u]
+                kling_elements = [{
+                    "frontal_image_url": fal_studio_front,
+                    "reference_image_urls": studio_ref_urls if studio_ref_urls else [fal_studio_front],
+                }]
+            fal_studio_front = kling_elements[0]["frontal_image_url"]
 
             # Başlangıç karesi
             fal_studio_start = await _to_fal_url(start_frame_url if start_frame_url else front_url)
@@ -523,7 +538,7 @@ async def run_pipeline(
                 duration=str(total_studio_dur),
                 aspect_ratio=aspect_ratio,
                 generate_audio=generate_audio,
-                elements=[studio_element],
+                elements=kling_elements,
                 negative_prompt=_studio_negative,
             )
 

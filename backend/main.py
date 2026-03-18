@@ -183,6 +183,7 @@ async def generate_video_endpoint(
     library_front_url: Optional[str] = Form(None),
     library_side_url: Optional[str] = Form(None),
     library_back_url: Optional[str] = Form(None),
+    elements_json: Optional[str] = Form(None),  # JSON array of {front_url, extra_urls, name}
     library_background_url: Optional[str] = Form(None),
     library_background_extra_urls: Optional[str] = Form(None),
     library_style_url: Optional[str] = Form(None),
@@ -303,6 +304,7 @@ async def generate_video_endpoint(
             generation_mode=generation_mode,
             reference_video_url=reference_video_url,
             start_frame_url=start_frame_url,
+            elements_json=elements_json or None,
         )
     )
 

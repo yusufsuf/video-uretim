@@ -705,13 +705,13 @@
                 <!-- ── Stüdyo Adım 1: Element Seçimi ── -->
                 <div class="wizard-step" id="step-studio-1" style="display:none">
                     <div class="wizard-step-title">Element Seçin</div>
-                    <div class="wizard-step-sub">Kostüm, karakter veya öğe elementi kütüphaneden seçin.</div>
+                    <div class="wizard-step-sub">Birden fazla element seçebilirsiniz (maks. 4). Her element bir @token ile referans edilir.</div>
 
-                    <div id="studio-no-element" style="margin-top:20px">
-                        <div class="studio-element-empty">
-                            <div class="studio-element-empty-icon">◈</div>
-                            <div class="studio-element-empty-text">Henüz element seçilmedi</div>
-                        </div>
+                    <!-- Seçili elementler listesi (dinamik olarak doldurulur) -->
+                    <div id="studio-elements-list" style="margin-top:16px"></div>
+
+                    <!-- Ekle butonları (4'e ulaşınca gizlenir) -->
+                    <div id="studio-add-element-btns" style="margin-top:12px">
                         <button class="studio-pick-btn" id="studio-pick-btn">Kütüphaneden Seç</button>
                         <div class="studio-or-row">
                             <span class="studio-or-line"></span>
@@ -719,17 +719,6 @@
                             <span class="studio-or-line"></span>
                         </div>
                         <button class="studio-create-btn" id="studio-create-btn">+ Yeni Element Oluştur</button>
-                    </div>
-
-                    <div id="studio-element-selected" style="display:none;margin-top:20px">
-                        <div class="studio-selected-card">
-                            <img id="studio-element-thumb" src="" alt="" class="studio-element-thumb">
-                            <div class="studio-element-info">
-                                <div class="studio-element-name-label" id="studio-element-name-label">—</div>
-                                <div class="studio-element-extras-label" id="studio-element-extras-label">—</div>
-                            </div>
-                            <button class="studio-change-btn" id="studio-change-btn">Değiştir</button>
-                        </div>
                     </div>
                 </div>
 

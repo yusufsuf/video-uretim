@@ -1580,9 +1580,11 @@ document.getElementById("card-studio")?.addEventListener("click", openStudio);
 
 // ─── Studio Mode ──────────────────────────────────────────────────
 
-let studioStep = 1;          // 1 | 2
-let studioElement = null;    // {id, name, image_url, extra_urls}
+let studioStep = 1;           // 1 | 2
+let studioElements = [];      // [{id, name, image_url, extra_urls}, ...] max 4
 let studioStartFile = null;
+
+const STUDIO_MAX_ELEMENTS = 4;
 let studioShots = [
     { description: "", duration: 5 },
     { description: "", duration: 5 },
@@ -1598,7 +1600,7 @@ function _studioTotalDur() {
 function openStudio() {
     videoMode = "studio";
     studioStep = 1;
-    studioElement = null;
+    studioElements = [];
     studioStartFile = null;
     studioShots = [{ description: "", duration: 5 }, { description: "", duration: 5 }];
     studioAspectRatio = "9:16";
@@ -1618,7 +1620,7 @@ function openStudio() {
     if (nextBtn) { nextBtn.textContent = "Devam →"; nextBtn.disabled = true; }
     if (footer)  footer.style.display = "flex";
 
-    _renderStudioElementState();
+    _renderStudioElementsState();
     _setupStudioStartZone();
     renderStudioShots();
 
@@ -1654,45 +1656,50 @@ function _studioGoToStep(step) {
         _setupStudioStartZone();
         renderStudioShots();
     } else {
-        if (nextBtn) { nextBtn.textContent = "Devam →"; nextBtn.disabled = !studioElement; }
-        _renderStudioElementState();
+        if (nextBtn) { nextBtn.textContent = "Devam →"; nextBtn.disabled = studioElements.length === 0; }
+        _renderStudioElementsState();
     }
 }
 
-function _renderStudioElementState() {
-    const noEl  = document.getElementById("studio-no-element");
-    const selEl = document.getElementById("studio-element-selected");
-    if (!noEl || !selEl) return;
+function _renderStudioElementsState() {
+    const list    = document.getElementById("studio-elements-list");
+    const addBtns = document.getElementById("studio-add-element-btns");
+    if (!list) return;
 
-    if (studioElement) {
-        noEl.style.display  = "none";
-        selEl.style.display = "block";
-        const thumb = document.getElementById("studio-element-thumb");
-        const name  = document.getElementById("studio-element-name-label");
-        const extras = document.getElementById("studio-element-extras-label");
-        if (thumb)  thumb.src = studioElement.image_url;
-        if (name)   name.textContent = studioElement.name;
-        const extraCount = (studioElement.extra_urls || []).length;
-        if (extras) extras.textContent = extraCount > 0 ? `+${extraCount} ek açı` : "Sadece ön görünüm";
-        // Show element token badge
-        let tokenBadge = document.getElementById("studio-element-token-badge");
-        if (!tokenBadge) {
-            tokenBadge = document.createElement("div");
-            tokenBadge.id = "studio-element-token-badge";
-            tokenBadge.className = "studio-element-token-badge";
-            selEl.appendChild(tokenBadge);
-        }
-        tokenBadge.textContent = `Token: @${studioElement.name}`;
+    if (studioElements.length === 0) {
+        list.innerHTML = `
+            <div class="studio-element-empty">
+                <div class="studio-element-empty-icon">◈</div>
+                <div class="studio-element-empty-text">Henüz element seçilmedi</div>
+            </div>`;
     } else {
-        noEl.style.display  = "block";
-        selEl.style.display = "none";
+        list.innerHTML = studioElements.map((el, idx) => `
+            <div class="studio-selected-card" style="margin-bottom:8px">
+                <img src="${el.image_url}" alt="${el.name}" class="studio-element-thumb">
+                <div class="studio-element-info">
+                    <div class="studio-element-name-label">${el.name}</div>
+                    <div class="studio-element-token-badge">@Element${idx + 1} → @${el.name}</div>
+                </div>
+                <button class="studio-change-btn" onclick="removeStudioElement(${idx})">✕ Çıkar</button>
+            </div>`).join("");
     }
 
-    // Re-attach pick/create/change buttons
+    if (addBtns) addBtns.style.display = studioElements.length >= STUDIO_MAX_ELEMENTS ? "none" : "block";
+
+    const nextBtn = document.getElementById("wizard-next-btn");
+    if (nextBtn && studioStep === 1) nextBtn.disabled = studioElements.length === 0;
+
+    // Re-attach pick/create buttons
     document.getElementById("studio-pick-btn")?.addEventListener("click", openStudioElementPicker);
-    document.getElementById("studio-change-btn")?.addEventListener("click", openStudioElementPicker);
     document.getElementById("studio-create-btn")?.addEventListener("click", openStudioCreateModal);
 }
+
+function removeStudioElement(idx) {
+    studioElements.splice(idx, 1);
+    _renderStudioElementsState();
+    renderStudioShots();
+}
+window.removeStudioElement = removeStudioElement;
 
 function _setupStudioStartZone() {
     const zone  = document.getElementById("studio-start-zone");
@@ -1723,8 +1730,8 @@ function renderStudioShots() {
     const addBtn = document.getElementById("studio-add-shot-btn");
     if (addBtn) addBtn.style.display = studioShots.length >= STUDIO_MAX_SHOTS ? "none" : "inline-flex";
 
-    const elToken = studioElement ? `@${studioElement.name}` : "@Element";
-    const placeholder = `${elToken} ile bu çekimi tanımlayın (örn. ${elToken} yavaşça kameraya doğru yürüyor) veya ✦ AI'ya bırakın`;
+    const elTokens = studioElements.length > 0 ? studioElements.map(e => `@${e.name}`).join(", ") : "@Element";
+    const placeholder = `${elTokens} ile bu çekimi tanımlayın (örn. ${studioElements[0] ? "@" + studioElements[0].name : "@Element"} yavaşça kameraya doğru yürüyor) veya ✦ AI'ya bırakın`;
 
     container.innerHTML = studioShots.map((sh, idx) => `
         <div class="studio-shot-card">
@@ -1826,9 +1833,12 @@ async function _fetchAndRenderStudioElements(grid) {
             el.addEventListener("click", () => {
                 const item = itemMap[el.dataset.id];
                 if (!item) return;
-                studioElement = item;
+                if (studioElements.find(e => e.id === item.id)) { alert("Bu element zaten seçili."); return; }
+                if (studioElements.length >= STUDIO_MAX_ELEMENTS) { alert("En fazla 4 element seçebilirsiniz."); return; }
+                studioElements.push(item);
                 closeLibraryPicker();
-                _renderStudioElementState();
+                _renderStudioElementsState();
+                renderStudioShots();
                 const nextBtn = document.getElementById("wizard-next-btn");
                 if (nextBtn) nextBtn.disabled = false;
             });
@@ -1918,9 +1928,10 @@ async function saveStudioElement() {
         const resp = await fetch("/library/items", { method: "POST", headers: getAuthHeaders(), body: fd });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const item = await resp.json();
-        studioElement = item;
+        if (studioElements.length < STUDIO_MAX_ELEMENTS) studioElements.push(item);
         closeStudioCreateModal();
-        _renderStudioElementState();
+        _renderStudioElementsState();
+        renderStudioShots();
         const nextBtn = document.getElementById("wizard-next-btn");
         if (nextBtn) nextBtn.disabled = false;
     } catch (err) {
@@ -1935,12 +1946,12 @@ document.getElementById("studio-add-shot-btn")?.addEventListener("click", addStu
 
 document.getElementById("studio-ai-shots-btn")?.addEventListener("click", async () => {
     const btn = document.getElementById("studio-ai-shots-btn");
-    if (!btn || !studioElement) return;
+    if (!btn || studioElements.length === 0) return;
     btn.disabled = true;
     btn.textContent = "✦ Üretiliyor...";
 
     const fd = new FormData();
-    fd.append("element_image_url", studioElement.image_url);
+    fd.append("element_image_url", studioElements[0].image_url);
     fd.append("shot_count", String(studioShots.length));
     if (studioStartFile) fd.append("start_frame", studioStartFile);
 
@@ -1967,7 +1978,7 @@ document.getElementById("studio-ai-shots-btn")?.addEventListener("click", async 
 // ── Studio Generation ────────────────────────────────────────────
 
 async function startStudioGeneration() {
-    if (!studioElement) { alert("Önce bir element seçin."); return; }
+    if (studioElements.length === 0) { alert("Önce bir element seçin."); return; }
 
     hideError();
     _hideAllSteps();
@@ -1983,12 +1994,12 @@ async function startStudioGeneration() {
     resetSteps();
     updateProgress(0, "Başlatılıyor...");
 
-    // Replace @ElementName token with @Element1 (fal.ai only supports positional tokens)
-    const elToken = `@${studioElement.name}`;
-    const resolvedShots = studioShots.map(s => ({
-        ...s,
-        description: (s.description || "").replace(new RegExp(elToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), "@Element1"),
-    }));
+    // Replace @ElementName tokens with @ElementN (fal.ai positional tokens)
+    let resolvedShots = studioShots.map(s => ({ ...s, description: s.description || "" }));
+    studioElements.forEach((el, idx) => {
+        const re = new RegExp(`@${el.name}`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+        resolvedShots = resolvedShots.map(s => ({ ...s, description: s.description.replace(re, `@Element${idx + 1}`) }));
+    });
 
     // Build shots JSON (ShotConfig format)
     const shotsJson = JSON.stringify(resolvedShots.map(s => ({
@@ -1999,10 +2010,19 @@ async function startStudioGeneration() {
         shot_size: "",
     })));
 
+    // Build elements JSON for backend (multi-element support)
+    const elementsJson = JSON.stringify(studioElements.map(el => ({
+        front_url: el.image_url,
+        extra_urls: el.extra_urls || [],
+        name: el.name,
+    })));
+
     const formData = new FormData();
     formData.append("generation_mode",   "studio");
-    formData.append("library_front_url", studioElement.image_url);
-    const extras = studioElement.extra_urls || [];
+    formData.append("elements_json",     elementsJson);
+    // Keep first element in legacy fields for backward compat
+    formData.append("library_front_url", studioElements[0].image_url);
+    const extras = studioElements[0].extra_urls || [];
     if (extras[0]) formData.append("library_side_url", extras[0]);
     if (extras[1]) formData.append("library_back_url", extras[1]);
     if (studioStartFile) formData.append("ozel_start_frame", studioStartFile);
