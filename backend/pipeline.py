@@ -120,7 +120,9 @@ _BASE_NEGATIVE = (
     "feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, "
     "floating hem, lifted skirt, hem above ground, gap between dress and floor, "
     "short dress, mini dress, midi dress, knee-length dress, calf-length dress, "
-    "cropped skirt, raised hemline, above-ankle hem, shortened dress"
+    "cropped skirt, raised hemline, above-ankle hem, shortened dress, "
+    "front slit, high slit, thigh slit, deep slit, visible knee, visible thigh, "
+    "visible shin, visible calf, exposed leg, leg gap, opened hem, split skirt"
 )
 _TRAIN_NEGATIVE = (
     ", train, trailing fabric, floor-length train, dragging hem, sweeping train, "
@@ -137,7 +139,7 @@ _DEFILE_NEGATIVE = (
 )
 
 # Always prepended to EVERY shot — enforces full-length regardless of train detection
-_HEM_LOCK = "Full-length floor-length gown, hem grazes floor."
+_HEM_LOCK = "Full-length floor-length gown, hem grazes floor, no front slit, closed skirt, feet fully covered."
 
 _TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem", "kuyruk", "uzun kuyruk"}
 
@@ -1139,6 +1141,12 @@ async def run_defile_collection_pipeline(
             )
             logger.info("[%s] Outfit %d/%d prompts: %d shots, %ds total",
                         job_id, outfit_idx + 1, n_outfits, len(multi_prompt), total_duration)
+
+            # Enforce hem/slit lock on every shot (same as single-outfit pipeline)
+            multi_prompt = [
+                {"duration": p["duration"], "prompt": f"{_HEM_LOCK} {p['prompt']}"}
+                for p in multi_prompt
+            ]
 
             # ── 3c: Kling — single multishot call per outfit ──────────────
             _update_job(job_id, progress=base_progress + int(35 / n_outfits),
