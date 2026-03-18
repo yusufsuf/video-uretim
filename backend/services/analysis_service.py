@@ -547,6 +547,7 @@ ABSOLUTE RULES (every shot, no exceptions):
 - Dress hem ALWAYS touches the ground — reinforce with "hem grazing the floor" or "gown pooling at ground"
 - NEVER frame below the hem — feet, shoes, ankles must NOT appear in any shot
 - NEVER mention feet, shoes, heels, boots, ankles, or toes
+- The skirt/gown front is COMPLETELY SEALED — NO front slit, NO center front opening, NO leg gap. Write "closed skirt, no front slit" in EVERY shot prompt without exception
 - NEVER add spectators, audience, crowd, seated guests, cameramen, photographers, or crew — the space is empty except for the model
 - NEVER add trees, flowers, plants, decorative accessories, or any elements not already in the scene
 - The background/location stays EXACTLY as it appears in the image — do not invent or add any environmental elements

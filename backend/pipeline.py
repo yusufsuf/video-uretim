@@ -139,7 +139,7 @@ _DEFILE_NEGATIVE = (
 )
 
 # Always prepended to EVERY shot — enforces full-length regardless of train detection
-_HEM_LOCK = "Full-length floor-length gown, hem grazes floor, no front slit, closed skirt, feet fully covered."
+_HEM_LOCK = "Full-length floor-length gown. Completely sealed front skirt — NO front slit, NO center front gap, NO leg gap. Hem grazes floor. Legs entirely hidden. Feet fully covered."
 
 _TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem", "kuyruk", "uzun kuyruk"}
 
@@ -1148,6 +1148,20 @@ async def run_defile_collection_pipeline(
                 for p in multi_prompt
             ]
 
+            # ── 3b-extra: Build compressed Kling elements for garment consistency ──
+            # CRITICAL: without elements, Kling has no dress reference and freely hallucinates slits
+            elem_front_c = await _to_fal_url_compressed(outfit.front_url)
+            outfit_element: dict = {"frontal_image_url": elem_front_c, "reference_image_urls": []}
+            if outfit.side_url:
+                outfit_element["reference_image_urls"].append(await _to_fal_url_compressed(outfit.side_url))
+            if outfit.back_url:
+                outfit_element["reference_image_urls"].append(await _to_fal_url_compressed(outfit.back_url))
+            if not outfit_element["reference_image_urls"]:
+                outfit_element["reference_image_urls"] = [elem_front_c]
+            kling_outfit_elements = [outfit_element]
+            logger.info("[%s] Defile outfit %d elements: frontal + %d refs",
+                        job_id, outfit_idx + 1, len(outfit_element["reference_image_urls"]))
+
             # ── 3c: Kling — single multishot call per outfit ──────────────
             _update_job(job_id, progress=base_progress + int(35 / n_outfits),
                         message=f"{outfit_name} — video üretiliyor ({outfit_idx + 1}/{n_outfits})...")
@@ -1161,6 +1175,7 @@ async def run_defile_collection_pipeline(
                 duration=str(total_duration),
                 aspect_ratio=request.aspect_ratio,
                 generate_audio=request.generate_audio,
+                elements=kling_outfit_elements,
                 negative_prompt=_DEFILE_NEGATIVE,
             )
 
