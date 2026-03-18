@@ -441,13 +441,16 @@ async def run_pipeline(
                 video_description=video_description,
                 scene_count=custom_scene_count,
                 total_duration=custom_total_duration,
+                start_frame_url=fal_ozel_start,
             )
 
-            # Inject hem lock into every shot
-            ozel_shots = [
-                {"duration": p["duration"], "prompt": (_ozel_hem_note + " " + p["prompt"])[:480]}
-                for p in ozel_shots
-            ]
+            # Inject hem lock — insert after "@Element1 " so @Element1 stays first
+            _locked: list = []
+            for _p in ozel_shots:
+                _raw = str(_p["prompt"])
+                _injected = _raw.replace("@Element1 ", "@Element1 " + _ozel_hem_note + " ", 1)
+                _locked.append({"duration": _p["duration"], "prompt": _injected[:480]})
+            ozel_shots = _locked
 
             total_ozel_dur = sum(int(p["duration"]) for p in ozel_shots)
 

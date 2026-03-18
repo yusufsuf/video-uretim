@@ -797,28 +797,39 @@ async def generate_custom_multishot_prompt(
 
 _OZEL_MULTISHOT_SYSTEM = """You are a fashion film director creating shot prompts for Kling AI video generation.
 
-You receive 2–4 images of the same garment from different angles (front required, back/side optional) and an optional creative brief.
+You receive:
+1. A START FRAME image — this is the SCENE/LOCATION where all shots take place
+2. 1–3 garment reference images (front required, back/side optional) — these are for element reference only
+3. An optional creative brief
 
-STEP 1 — STUDY THE GARMENT:
-Examine every provided image carefully. Note the silhouette, key design details, hem length, back structure, and any distinctive features. You do NOT describe these in the prompts — @Element1 handles garment appearance.
+STEP 1 — EXTRACT THE SCENE (from the FIRST image — the start frame):
+Identify and memorize the exact location: floor material, architecture, lighting, atmosphere.
+Write a 6-10 word scene description to use as anchor in every prompt.
+Example: "grand marble hall with black-and-white checkered floor"
 
-STEP 2 — GENERATE SHOTS:
-- EVERY shot prompt MUST begin with "@Element1"
-- @Element1 is a Kling reference token — it renders the exact garment from the uploaded images
-- After @Element1, describe: model action, camera movement, environment, atmosphere
-- NEVER describe garment color, fabric, or construction details in text — @Element1 handles it
+STEP 2 — STUDY THE GARMENT (from garment reference images):
+Note silhouette, key design details, hem length. You do NOT describe these in prompts — @Element1 handles garment appearance.
+
+STEP 3 — GENERATE SHOTS:
+- EVERY prompt MUST follow this exact pattern:
+  "@Element1 In the [scene anchor], [model action and camera movement]"
+- @Element1 is a Kling reference token that renders the exact garment
+- The scene anchor keeps every shot locked to the start frame location
+- NEVER describe garment color, fabric, or construction — @Element1 handles it
+- NEVER change the scene between shots — all shots happen in the same location
 - Each shot: 30–50 words, HARD LIMIT 480 characters
-- If creative brief is provided, translate each described movement/moment into a shot
+- If creative brief provided, translate each movement/moment into a shot
 - If no brief, generate a compelling editorial fashion sequence
 
 ABSOLUTE RULES (every shot, no exceptions):
-- EVERY prompt starts with "@Element1 " — no exceptions
+- EVERY prompt starts with "@Element1 In the [scene anchor]," — no exceptions
 - NEVER frame below the hem — feet, shoes, ankles must NOT appear
-- NEVER add a train that is not visible in the images
+- NEVER add stage lights, beauty dishes, tripods, or studio equipment
+- NEVER add a train not visible in the garment images
 - Vary camera angles for cinematic flow (wide, medium, close-up, etc.)
 - Each shot continues seamlessly from the previous
 
-Return JSON: {"shots": [{"duration": 5, "prompt": "@Element1 ..."}]}"""
+Return JSON: {"scene_anchor": "...", "shots": [{"duration": 5, "prompt": "@Element1 In the ..., ..."}]}"""
 
 
 async def generate_ozel_multishot_prompt(
@@ -828,8 +839,13 @@ async def generate_ozel_multishot_prompt(
     video_description: Optional[str] = None,
     scene_count: Optional[int] = None,
     total_duration: Optional[int] = None,
+    start_frame_url: Optional[str] = None,
 ) -> list[dict]:
-    """Generate @Element1-based multishot prompts for Özel mode."""
+    """Generate @Element1-based multishot prompts for Özel mode.
+
+    start_frame_url: the scene image shown first to GPT so it can extract the scene anchor.
+    image_url: front garment reference (for @Element1).
+    """
 
     if not video_description:
         video_description = "An elegant editorial fashion film. Model moves gracefully — slow walk, gentle turn, standing with presence. Cinematic lighting, atmospheric mood."
@@ -854,16 +870,20 @@ async def generate_ozel_multishot_prompt(
         views.append("side")
     if back_image_url:
         views.append("back")
-    images_note = f"Garment images provided: {', '.join(views)} view(s)."
+    images_note = f"Garment reference images provided: {', '.join(views)} view(s)."
+    scene_note = "The FIRST image is the start frame (the scene/location). " if start_frame_url else ""
 
     user_text = (
-        f"{images_note}\n\n"
+        f"{scene_note}{images_note}\n\n"
         f"Creative brief:\n{video_description}"
         f"{constraint_note}\n\n"
-        "Generate shots where every prompt begins with @Element1."
+        "Generate shots where every prompt follows: '@Element1 In the [scene anchor], ...'"
     )
 
     content: list = []
+    # Start frame first (scene anchor source) — then garment references
+    if start_frame_url:
+        content.append({"type": "image_url", "image_url": {"url": start_frame_url, "detail": "high"}})
     content.append({"type": "image_url", "image_url": {"url": image_url, "detail": "high"}})
     if side_image_url:
         content.append({"type": "image_url", "image_url": {"url": side_image_url, "detail": "high"}})
@@ -886,10 +906,16 @@ async def generate_ozel_multishot_prompt(
 
     raw = (response.choices[0].message.content or "").strip()
 
+    scene_anchor: str = ""
     try:
         parsed = json.loads(raw)
-        if isinstance(parsed, dict) and "shots" in parsed:
-            shots = parsed["shots"]
+        if isinstance(parsed, dict):
+            _raw_anchor = parsed.get("scene_anchor", "")
+            scene_anchor = _raw_anchor if isinstance(_raw_anchor, str) else ""
+            if "shots" in parsed:
+                shots = parsed["shots"]
+            else:
+                shots = next(v for v in parsed.values() if isinstance(v, list))
         elif isinstance(parsed, list):
             shots = parsed
         else:
@@ -901,16 +927,21 @@ async def generate_ozel_multishot_prompt(
         else:
             raise ValueError(f"Could not parse ozel multishot prompts: {raw[:200]}")
 
-    result = [
-        {"duration": str(max(3, min(10, int(s.get("duration", 5))))), "prompt": s["prompt"]}
-        for s in shots
-    ]
+    logger.info("Ozel scene anchor: '%s'", scene_anchor)
 
-    # Ensure every prompt starts with @Element1
-    result = [
-        {"duration": p["duration"], "prompt": p["prompt"] if p["prompt"].startswith("@Element1") else "@Element1 " + p["prompt"]}
-        for p in result
-    ]
+    result = []
+    for s in shots:
+        prompt = str(s.get("prompt", ""))
+        dur = str(max(3, min(10, int(s.get("duration", 5)))))
+        # Guarantee @Element1 prefix
+        if not prompt.startswith("@Element1"):
+            prompt = "@Element1 " + prompt
+        # If GPT returned scene_anchor but forgot to embed it — inject after @Element1
+        if scene_anchor and f"In the {scene_anchor[:15].lower()}" not in prompt.lower():
+            anchor_phrase = f"In the {scene_anchor}, "
+            # Insert right after "@Element1 "
+            prompt = "@Element1 " + anchor_phrase + prompt[len("@Element1 "):]
+        result.append({"duration": dur, "prompt": prompt[:480]})
 
     logger.info("Ozel multishot prompts: %d shots, total %ds", len(result), sum(int(s["duration"]) for s in result))
     return result
