@@ -979,7 +979,19 @@ async def generate_studio_ai_shots(
     # Build element token info for the prompt
     all_image_urls = element_image_urls or [element_image_url]
     all_names = element_names or ["@Element1"]
-    token_info = ", ".join(f"{name} (element {i+1})" for i, name in enumerate(all_names))
+
+    def _infer_type(token: str) -> str:
+        """Element isminden tipini çıkar."""
+        name = token.lstrip("@").upper()
+        if name.startswith("BBC-"):
+            return "dress/garment"
+        if name.startswith("AYAKKABI") or name.startswith("AYAKKABІ"):
+            return "shoes/footwear"
+        return "fashion element"
+
+    token_info = ", ".join(
+        f"{name} ({_infer_type(name)})" for name in all_names
+    )
 
     user_content: list = []
     if start_frame_url:
@@ -993,11 +1005,14 @@ async def generate_studio_ai_shots(
     user_content.append({
         "type": "text",
         "text": (
-            f"Available element tokens: {token_info}. "
-            f"Generate {shot_count} cinematic shot descriptions for this fashion video. "
-            f"Each description: 1-2 sentences, specific camera movement, model action, atmosphere. "
-            f"Use the @token names naturally in each description (e.g. '@2305 walks slowly towards camera'). "
-            f"Duration: 5 seconds each. Avoid generic phrases.{hint_text}\n\n"
+            f"Elements in this video: {token_info}.\n"
+            f"Generate {shot_count} cinematic shot descriptions for this fashion video.\n"
+            f"Rules:\n"
+            f"- Use @token names naturally in descriptions (e.g. '@BBC-2203 walks slowly', '@Ayakkabı-1 heel detail close-up')\n"
+            f"- For dress/garment elements: describe silhouette, movement, fabric flow, full-body or 3/4 shots\n"
+            f"- For shoes/footwear elements: include close-up heel shots, foot placement, ground texture interaction\n"
+            f"- Each description: 1-2 sentences, specific camera movement, model action\n"
+            f"- Duration: 5 seconds each. Avoid generic phrases.{hint_text}\n\n"
             f"Return JSON only: {{\"shots\": [{{\"description\": \"...\", \"duration\": 5}}, ...]}}"
         ),
     })
