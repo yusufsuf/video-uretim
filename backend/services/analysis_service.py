@@ -1001,17 +1001,32 @@ async def generate_studio_ai_shots(
     for img_url in _islice(iter(all_image_urls), 4):
         user_content.append({"type": "image_url", "image_url": _image_content(img_url, detail="high")})
 
+    # Separate hero vs supporting elements
+    hero_tokens = [n for n in all_names if _infer_type(n) == "dress/garment"]
+    support_tokens = [n for n in all_names if _infer_type(n) == "shoes/footwear"]
+    other_tokens = [n for n in all_names if n not in hero_tokens and n not in support_tokens]
+
+    hero_str = ", ".join(hero_tokens) if hero_tokens else ", ".join(all_names)
+    support_str = ", ".join(support_tokens) if support_tokens else ""
+
     hint_text = f"\n\nUser notes: {user_hint}" if user_hint else ""
+    support_rule = (
+        f"- SUPPORTING elements ({support_str}): NEVER the main focus. "
+        f"Only appear naturally and briefly — e.g. the shoe tip subtly visible at the hem as the model walks. "
+        f"Do NOT write close-up shoe shots, heel detail shots, or any shot where footwear is the subject.\n"
+    ) if support_str else ""
+
     user_content.append({
         "type": "text",
         "text": (
             f"Elements in this video: {token_info}.\n"
             f"Generate {shot_count} cinematic shot descriptions for this fashion video.\n"
-            f"Rules:\n"
-            f"- Use @token names naturally in descriptions (e.g. '@BBC-2203 walks slowly', '@Ayakkabı-1 heel detail close-up')\n"
-            f"- For dress/garment elements: describe silhouette, movement, fabric flow, full-body or 3/4 shots\n"
-            f"- For shoes/footwear elements: include close-up heel shots, foot placement, ground texture interaction\n"
-            f"- Each description: 1-2 sentences, specific camera movement, model action\n"
+            f"HIERARCHY RULES (strictly follow):\n"
+            f"- HERO elements ({hero_str}): always the main subject. "
+            f"Frame shots around the garment — silhouette, fabric movement, full-body, 3/4 angle, slow walk.\n"
+            f"{support_rule}"
+            f"- Always reference the hero @token in every shot description.\n"
+            f"- Each description: 1-2 sentences, specific camera movement, model action.\n"
             f"- Duration: 5 seconds each. Avoid generic phrases.{hint_text}\n\n"
             f"Return JSON only: {{\"shots\": [{{\"description\": \"...\", \"duration\": 5}}, ...]}}"
         ),
@@ -1025,8 +1040,10 @@ async def generate_studio_ai_shots(
                     "role": "system",
                     "content": (
                         "You are a fashion film director creating cinematic shot descriptions for Kling AI. "
-                        "Each description should be specific, visual, and describe model movement and camera angle. "
-                        "Always reference elements by their @token names as provided. "
+                        "Hero elements (dress/garment) are always the primary subject of every shot. "
+                        "Supporting elements (shoes/footwear) must NEVER be the focus — they appear only incidentally "
+                        "when naturally visible during walking, like a shoe tip peeking under the hem. "
+                        "Always reference elements by their @token names. "
                         "Never use the word 'train' or 'trailing'."
                     ),
                 },
