@@ -15,7 +15,7 @@ from services.video_service import upload_to_fal
 
 router = APIRouter(tags=["library"])
 
-ALLOWED_CATEGORIES = {"character", "background", "style"}
+ALLOWED_CATEGORIES = {"character", "background", "style", "element"}
 ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 

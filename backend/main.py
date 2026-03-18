@@ -329,6 +329,41 @@ async def refine_shot_endpoint(
     return {"description": description}
 
 
+@app.post("/api/studio/ai-shots")
+async def studio_ai_shots_endpoint(
+    request: Request,
+    _user: dict = Depends(get_current_user),
+    element_image: Optional[UploadFile] = File(None),
+    element_image_url: Optional[str] = Form(None),
+    start_frame: Optional[UploadFile] = File(None),
+    shot_count: int = Form(2),
+    user_hint: Optional[str] = Form(None),
+):
+    """Stüdyo modu için AI çekim açıklamaları üretir."""
+    from services.analysis_service import generate_studio_ai_shots
+
+    if element_image and element_image.filename:
+        elem_path = await _save_upload(element_image)
+        elem_url = _file_to_url(elem_path)
+    elif element_image_url:
+        elem_url = element_image_url
+    else:
+        raise HTTPException(status_code=400, detail="Element görseli zorunludur.")
+
+    sf_url = None
+    if start_frame and start_frame.filename:
+        sf_path = await _save_upload(start_frame)
+        sf_url = _file_to_url(sf_path)
+
+    shots = await generate_studio_ai_shots(
+        element_image_url=elem_url,
+        start_frame_url=sf_url,
+        shot_count=min(5, max(1, shot_count)),
+        user_hint=user_hint,
+    )
+    return {"shots": shots}
+
+
 @app.post("/api/defile/collection", response_model=JobResponse)
 @limiter.limit("10/hour")
 async def defile_collection_endpoint(

@@ -30,7 +30,7 @@ from models import (
     JobStatus,
     MultiScenePrompt,
 )
-from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt, generate_custom_multishot_prompt, generate_ozel_multishot_prompt
+from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt, generate_custom_multishot_prompt, generate_ozel_multishot_prompt, extract_scene_anchor
 from services.nano_banana_service import generate_background, generate_scene_frame
 from services.video_service import (
     download_file,
@@ -463,6 +463,75 @@ async def run_pipeline(
             clip_path_o = await download_file(clip_url_ozel, settings.TEMP_DIR, extension=".mp4")
             shutil.move(clip_path_o, final_path)
             logger.info("[%s] Ozel video ready: %s", job_id, final_path)
+
+        elif generation_mode == "studio":
+            # ── STUDIO MODE: kullanıcı tanımlı çekimler + elements, NB2/GPT yok ──
+            logger.info("[%s] Studio mode: user shots + @Element1 elements", job_id)
+
+            _update_job(job_id, progress=15, message="Görsel hazırlanıyor...")
+            _studio_negative = _BASE_NEGATIVE + _TRAIN_NEGATIVE
+
+            # Element: frontal + referans açılar
+            fal_studio_front = await _to_fal_url_compressed(front_url)
+            studio_back_url: str | None = None
+            studio_side_url: str | None = None
+            if back_url:
+                studio_back_url = await _to_fal_url_compressed(back_url)
+            if side_url:
+                studio_side_url = await _to_fal_url_compressed(side_url)
+
+            studio_ref_urls = [u for u in [studio_back_url, studio_side_url] if u]
+            studio_element = {
+                "frontal_image_url": fal_studio_front,
+                "reference_image_urls": studio_ref_urls if studio_ref_urls else [fal_studio_front],
+            }
+
+            # Başlangıç karesi
+            fal_studio_start = await _to_fal_url(start_frame_url if start_frame_url else front_url)
+
+            # GPT ile sahne anchor'ı çıkar
+            _update_job(job_id, progress=30, message="Sahne analiz ediliyor...")
+            scene_anchor = await extract_scene_anchor(fal_studio_start)
+            logger.info("[%s] Studio scene anchor: %s", job_id, scene_anchor)
+
+            # Kullanıcı çekimlerini @Element1 formatına dönüştür
+            if request.shots:
+                studio_shots = []
+                for shot in request.shots:
+                    desc = (shot.description or "").strip()
+                    if desc:
+                        # If user already wrote @Element1 (after frontend token replacement), don't double-prepend
+                        if desc.lower().startswith("@element1"):
+                            prompt = desc
+                        else:
+                            prompt = f"@Element1 In the {scene_anchor}, {desc}"
+                    else:
+                        prompt = f"@Element1 In the {scene_anchor}, model poses and walks elegantly showcasing the garment"
+                    studio_shots.append({"duration": shot.duration, "prompt": prompt[:480]})
+            else:
+                studio_shots = [
+                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model walks slowly towards camera showcasing the garment details"},
+                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle"},
+                ]
+
+            total_studio_dur = sum(int(p["duration"]) for p in studio_shots)
+
+            _update_job(job_id, progress=55, message="Video üretiliyor (stüdyo modu)...")
+            clip_url_studio = await generate_multishot_video(
+                start_image_url=fal_studio_start,
+                multi_prompt=studio_shots,
+                duration=str(total_studio_dur),
+                aspect_ratio=aspect_ratio,
+                generate_audio=generate_audio,
+                elements=[studio_element],
+                negative_prompt=_studio_negative,
+            )
+
+            _update_job(job_id, progress=85, message="Video indiriliyor...")
+            final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
+            clip_path_st = await download_file(clip_url_studio, settings.TEMP_DIR, extension=".mp4")
+            shutil.move(clip_path_st, final_path)
+            logger.info("[%s] Studio video ready: %s", job_id, final_path)
 
         else:
             # ── Steps 1-3: analysis + prompts + background ─────────────────

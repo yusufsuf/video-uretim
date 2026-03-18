@@ -943,6 +943,85 @@ async def generate_ozel_multishot_prompt(
     return result
 
 
+async def extract_scene_anchor(start_frame_url: str) -> str:
+    """Start frame görselinden kısa bir sahne tanımı çıkar (Stüdyo modu için)."""
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": _image_content(start_frame_url, detail="low")},
+                    {"type": "text", "text": 'Describe the location/setting of this scene in 5-8 words only. No people, no garments. Return JSON only: {"scene_anchor": "..."}'},
+                ],
+            }],
+            response_format={"type": "json_object"},
+            max_tokens=80,
+        )
+        data = json.loads(resp.choices[0].message.content or "{}")
+        anchor = data.get("scene_anchor", "")
+        return str(anchor) if anchor else "elegant fashion studio with soft ambient lighting"
+    except Exception:
+        return "elegant fashion studio with soft ambient lighting"
+
+
+async def generate_studio_ai_shots(
+    element_image_url: str,
+    start_frame_url: Optional[str] = None,
+    shot_count: int = 2,
+    user_hint: Optional[str] = None,
+) -> list[dict]:
+    """Stüdyo modu için AI çekim açıklamaları üretir."""
+    shot_count = max(1, min(5, shot_count))
+
+    user_content: list = []
+    if start_frame_url:
+        user_content.append({"type": "image_url", "image_url": _image_content(start_frame_url, detail="low")})
+    user_content.append({"type": "image_url", "image_url": _image_content(element_image_url, detail="high")})
+
+    hint_text = f"\n\nUser notes: {user_hint}" if user_hint else ""
+    user_content.append({
+        "type": "text",
+        "text": (
+            f"Generate {shot_count} cinematic shot descriptions for this fashion video. "
+            f"Each description: 1-2 sentences, specific camera movement, model action, atmosphere. "
+            f"Duration: 5 seconds each. Avoid generic phrases.{hint_text}\n\n"
+            f"Return JSON only: {{\"shots\": [{{\"description\": \"...\", \"duration\": 5}}, ...]}}"
+        ),
+    })
+
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a fashion film director creating cinematic shot descriptions for Kling AI. "
+                        "Each description should be specific, visual, and describe model movement and camera angle. "
+                        "Never use the word 'train' or 'trailing'."
+                    ),
+                },
+                {"role": "user", "content": user_content},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=600,
+            temperature=0.8,
+        )
+        data = json.loads(resp.choices[0].message.content or "{}")
+        shots = data.get("shots", [])
+        return [
+            {"description": str(s.get("description", "")), "duration": int(s.get("duration", 5))}
+            for s in shots
+        ]
+    except Exception as e:
+        logger.error("Studio AI shots error: %s", e)
+        return [
+            {"description": "Model walks confidently towards camera showcasing the garment details", "duration": 5}
+            for _ in range(shot_count)
+        ]
+
+
 async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
     """Generate cinematic shot descriptions for the multishot designer."""
     location_str = (
