@@ -531,6 +531,12 @@ async def run_pipeline(
                     {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle"},
                 ]
 
+            # Enforce hem/slit lock on every studio shot
+            _locked: list = []
+            for _s in studio_shots:
+                _locked.append({"duration": _s["duration"], "prompt": _HEM_LOCK + " " + str(_s["prompt"])})
+            studio_shots = _locked
+
             total_studio_dur = sum(int(p["duration"]) for p in studio_shots)
 
             _update_job(job_id, progress=55, message="Video üretiliyor (stüdyo modu)...")
