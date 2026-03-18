@@ -547,6 +547,9 @@ ABSOLUTE RULES (every shot, no exceptions):
 - Dress hem ALWAYS touches the ground — reinforce with "hem grazing the floor" or "gown pooling at ground"
 - NEVER frame below the hem — feet, shoes, ankles must NOT appear in any shot
 - NEVER mention feet, shoes, heels, boots, ankles, or toes
+- NEVER add spectators, audience, crowd, seated guests, cameramen, photographers, or crew — the space is empty except for the model
+- NEVER add trees, flowers, plants, decorative accessories, or any elements not already in the scene
+- The background/location stays EXACTLY as it appears in the image — do not invent or add any environmental elements
 
 Return a JSON object with a single key "shots" containing exactly N objects:
 {"shots": [

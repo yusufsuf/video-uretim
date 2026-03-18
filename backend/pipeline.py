@@ -128,6 +128,14 @@ _TRAIN_NEGATIVE = (
     "brush train, fabric trail, hem trail, skirt extension, elongated skirt back"
 )
 
+_DEFILE_NEGATIVE = (
+    _BASE_NEGATIVE + ", "
+    "spectators, audience, crowd, seated guests, cameraman, photographer, crew, "
+    "people in background, bystanders, onlookers, "
+    "trees, flowers, plants, flower arrangements, decorative props, added accessories, "
+    "extra furniture, added decor, altered background, modified scenery"
+)
+
 # Always prepended to EVERY shot — enforces full-length regardless of train detection
 _HEM_LOCK = "Full-length floor-length gown, hem grazes floor."
 
@@ -1017,16 +1025,16 @@ async def run_defile_collection_pipeline(
                         message=f"{outfit_name} — sahne kompoze ediliyor ({outfit_idx + 1}/{n_outfits})...")
 
             nb2_prompt = (
-                "Fashion runway show editorial photo: the first image is the runway scene — "
-                "preserve it exactly including architecture, lighting, floor, and audience. "
-                "Place a tall fashion model on the runway catwalk wearing the garment from the reference images (images 2 onward). "
-                "Full body visible, frontal medium-wide shot, confident runway stance. "
+                "Fashion editorial photo: the first image is the location/scene — "
+                "preserve it EXACTLY as-is: architecture, lighting, floor, walls, all structural elements unchanged. "
+                "Do NOT add spectators, audience, crowd, cameramen, photographers, trees, flowers, plants, or any props not already in the scene. "
+                "Place a tall fashion model in this space wearing the garment from the reference images (images 2 onward). "
+                "Full body visible, frontal medium-wide shot, confident stance. "
                 "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
-                "CRITICAL: the garment hem must touch and rest exactly on the runway floor — "
+                "CRITICAL: the garment hem must touch and rest exactly on the floor — "
                 "the bottom of the garment grazes the floor surface. "
-                "Shoes and feet must NOT be visible under any circumstances — "
-                "the hem completely covers and conceals the feet. "
-                "Professional fashion show photography, sharp focus, editorial quality."
+                "Shoes and feet must NOT be visible — the hem completely covers the feet. "
+                "Professional fashion photography, sharp focus, editorial quality."
             )
 
             scene_frame_url = await generate_scene_frame(
@@ -1062,6 +1070,7 @@ async def run_defile_collection_pipeline(
                 duration=str(total_duration),
                 aspect_ratio=request.aspect_ratio,
                 generate_audio=request.generate_audio,
+                negative_prompt=_DEFILE_NEGATIVE,
             )
 
             clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
