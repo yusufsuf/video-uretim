@@ -933,14 +933,9 @@ async def generate_ozel_multishot_prompt(
     for s in shots:
         prompt = str(s.get("prompt", ""))
         dur = str(max(3, min(10, int(s.get("duration", 5)))))
-        # Guarantee @Element1 prefix
+        # Guarantee @Element1 prefix (GPT system prompt mandates it, this is just a safety net)
         if not prompt.startswith("@Element1"):
             prompt = "@Element1 " + prompt
-        # If GPT returned scene_anchor but forgot to embed it — inject after @Element1
-        if scene_anchor and f"In the {scene_anchor[:15].lower()}" not in prompt.lower():
-            anchor_phrase = f"In the {scene_anchor}, "
-            # Insert right after "@Element1 "
-            prompt = "@Element1 " + anchor_phrase + prompt[len("@Element1 "):]
         result.append({"duration": dur, "prompt": prompt[:480]})
 
     logger.info("Ozel multishot prompts: %d shots, total %ds", len(result), sum(int(s["duration"]) for s in result))
