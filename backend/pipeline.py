@@ -415,16 +415,17 @@ async def run_pipeline(
             _desc_lower = (video_description or "").lower()
             _ozel_has_train = any(w in _desc_lower for w in _TRAIN_WORDS)
             _ozel_negative = _BASE_NEGATIVE if _ozel_has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
-            _ozel_hem_note = _HEM_LOCK if _ozel_has_train else f"{_HEM_LOCK} No train."
 
             # Build elements: front = frontal, back+side = reference_image_urls
             fal_ozel_front = await _to_fal_url_compressed(front_url)
-            ozel_ref_urls = []
+            ozel_back_url: str | None = None
+            ozel_side_url: str | None = None
             if back_url:
-                ozel_ref_urls.append(await _to_fal_url_compressed(back_url))
+                ozel_back_url = await _to_fal_url_compressed(back_url)
             if side_url:
-                ozel_ref_urls.append(await _to_fal_url_compressed(side_url))
+                ozel_side_url = await _to_fal_url_compressed(side_url)
 
+            ozel_ref_urls = [u for u in [ozel_back_url, ozel_side_url] if u]
             ozel_element = {
                 "frontal_image_url": fal_ozel_front,
                 "reference_image_urls": ozel_ref_urls if ozel_ref_urls else [fal_ozel_front],
@@ -436,8 +437,8 @@ async def run_pipeline(
             _update_job(job_id, progress=30, message="Sahneler planlanıyor...")
             ozel_shots = await generate_ozel_multishot_prompt(
                 image_url=fal_ozel_front,
-                back_image_url=ozel_ref_urls[0] if back_url and ozel_ref_urls else None,
-                side_image_url=ozel_ref_urls[-1] if side_url and len(ozel_ref_urls) > 1 else None,
+                back_image_url=ozel_back_url,
+                side_image_url=ozel_side_url,
                 video_description=video_description,
                 scene_count=custom_scene_count,
                 total_duration=custom_total_duration,
