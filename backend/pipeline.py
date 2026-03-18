@@ -427,7 +427,7 @@ async def run_pipeline(
 
             ozel_element = {
                 "frontal_image_url": fal_ozel_front,
-                "reference_image_urls": ozel_ref_urls,
+                "reference_image_urls": ozel_ref_urls if ozel_ref_urls else [fal_ozel_front],
             }
 
             # Start frame: use dedicated upload or fall back to front image
