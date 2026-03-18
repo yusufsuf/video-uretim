@@ -1195,6 +1195,43 @@ textarea.form-input {
     pointer-events: none;
 }
 
+.mode-subcard {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 20px 16px;
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+    text-align: center;
+}
+
+.mode-subcard:hover {
+    border-color: var(--border-accent);
+    background: var(--bg-card-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.mode-subcard-icon {
+    margin-bottom: 12px;
+    color: var(--accent-warm);
+    display: flex;
+    justify-content: center;
+}
+
+.mode-subcard-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.mode-subcard-desc {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
 .mode-card-icon {
     font-size: 1.2rem;
     margin-bottom: 12px;

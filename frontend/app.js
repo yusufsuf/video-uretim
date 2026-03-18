@@ -1048,7 +1048,40 @@ window.clearLibraryBack  = clearLibraryBack;
 window.clearLibraryBg    = clearLibraryBg;
 
 // ─── Defile Mode ─────────────────────────────────────────────────
+function _hideAllSteps() {
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
+        const el = document.getElementById(`step-${i}`);
+        if (el) el.style.display = "none";
+    }
+    ["step-ozel", "step-defile", "step-defile-choice"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = "none";
+    });
+}
+
 function openDefile() {
+    const titleEl = document.getElementById("wizard-title");
+    if (titleEl) titleEl.textContent = "Defile Modu";
+
+    const stepLabel = document.getElementById("wizard-step-label");
+    if (stepLabel) stepLabel.textContent = "";
+
+    _hideAllSteps();
+    document.getElementById("step-defile-choice").style.display = "block";
+
+    // Hide footer until sub-mode is chosen
+    const footer = document.getElementById("wizard-footer");
+    if (footer) footer.style.display = "none";
+
+    document.querySelectorAll("#step-dots .dot").forEach((d, i) => {
+        d.classList.toggle("active", i === 0);
+    });
+
+    wizardModal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+}
+
+function openDefileNB2() {
     videoMode = "defile";
     defileOutfits = [];
     defileShotConfigs = [{ duration: 5 }];
@@ -1057,42 +1090,59 @@ function openDefile() {
     defileAspectRatio = "9:16";
 
     const titleEl = document.getElementById("wizard-title");
-    if (titleEl) titleEl.textContent = "Defile Modu";
+    if (titleEl) titleEl.textContent = "Defile — Nano Banana 2";
+
+    _hideAllSteps();
+    document.getElementById("step-defile").style.display = "block";
+
+    const footer = document.getElementById("wizard-footer");
+    const backBtn = document.getElementById("wizard-back-btn");
+    const nextBtn = document.getElementById("wizard-next-btn");
+    if (backBtn) { backBtn.style.display = "inline-flex"; backBtn.textContent = "← Geri"; }
+    if (nextBtn) { nextBtn.textContent = "Defile Üret"; nextBtn.disabled = true; }
+    if (footer) footer.style.display = "flex";
+
+    renderDefileGrid();
+    renderDefileShotDesigner();
+}
+
+function openDefileElements() {
+    // Reuse the Özel form + pipeline, just label it differently
+    videoMode = "ozel";
+    ozelStartFile = null;
+    ozelFrontFile = null;
+    ozelBackFile  = null;
+    ozelSideFile  = null;
+    ozelAspectRatio = "9:16";
+
+    const titleEl = document.getElementById("wizard-title");
+    if (titleEl) titleEl.textContent = "Defile — Elements";
 
     const stepLabel = document.getElementById("wizard-step-label");
     if (stepLabel) stepLabel.textContent = "";
 
-    // Hide all steps, show defile step
-    for (let i = 1; i <= TOTAL_STEPS; i++) {
-        const el = document.getElementById(`step-${i}`);
-        if (el) el.style.display = "none";
-    }
-    const ozelStep = document.getElementById("step-ozel");
-    if (ozelStep) ozelStep.style.display = "none";
-    document.getElementById("step-defile").style.display = "block";
+    _hideAllSteps();
+    document.getElementById("step-ozel").style.display = "block";
 
-    // Update footer
-    const footer = document.getElementById("wizard-footer");
     const backBtn = document.getElementById("wizard-back-btn");
     const nextBtn = document.getElementById("wizard-next-btn");
-    if (backBtn) backBtn.style.display = "none";
-    if (nextBtn) {
-        nextBtn.textContent = "Defile Üret";
-        nextBtn.disabled = true;
-    }
+    const footer  = document.getElementById("wizard-footer");
+    if (backBtn) { backBtn.style.display = "inline-flex"; backBtn.textContent = "← Geri"; }
+    if (nextBtn) { nextBtn.textContent = "Video Üret"; nextBtn.disabled = true; }
     if (footer) footer.style.display = "flex";
 
-    // Reset dot indicators
-    document.querySelectorAll("#step-dots .dot").forEach((d, i) => {
-        d.classList.toggle("active", i === 0);
+    _setupOzelZone("ozel-start-zone",  "ozel-start-input",  f => { ozelStartFile = f; _checkOzelReady(); });
+    _setupOzelZone("ozel-front-zone",  "ozel-front-input",  f => { ozelFrontFile = f; _checkOzelReady(); });
+    _setupOzelZone("ozel-back-zone",   "ozel-back-input",   f => { ozelBackFile  = f; });
+    _setupOzelZone("ozel-side-zone",   "ozel-side-input",   f => { ozelSideFile  = f; });
+
+    document.querySelectorAll("#ozel-ratio-cards .ratio-card").forEach(card => {
+        card.addEventListener("click", () => {
+            document.querySelectorAll("#ozel-ratio-cards .ratio-card").forEach(c => c.classList.remove("active"));
+            card.classList.add("active");
+            ozelAspectRatio = card.dataset.ratio;
+        });
     });
-
-    // Render initial defile grid + shot designer
-    renderDefileGrid();
-    renderDefileShotDesigner();
-
-    wizardModal.style.display = "flex";
-    document.body.style.overflow = "hidden";
 }
 
 // ─── Özel State ──────────────────────────────────────────────────
@@ -1116,11 +1166,7 @@ function openOzel() {
     const stepLabel = document.getElementById("wizard-step-label");
     if (stepLabel) stepLabel.textContent = "";
 
-    for (let i = 1; i <= TOTAL_STEPS; i++) {
-        const el = document.getElementById(`step-${i}`);
-        if (el) el.style.display = "none";
-    }
-    document.getElementById("step-defile").style.display = "none";
+    _hideAllSteps();
     document.getElementById("step-ozel").style.display = "block";
 
     const backBtn = document.getElementById("wizard-back-btn");
@@ -1495,11 +1541,27 @@ wizardNextBtn?.addEventListener("click", () => {
 });
 
 wizardBackBtn?.addEventListener("click", () => {
+    // From defile sub-modes → back to choice screen
+    if ((videoMode === "defile" || videoMode === "ozel") &&
+        (document.getElementById("step-defile")?.style.display === "block" ||
+         document.getElementById("step-ozel")?.style.display === "block") &&
+        document.getElementById("step-defile-choice") !== null) {
+        const titleEl = document.getElementById("wizard-title");
+        if (titleEl) titleEl.textContent = "Defile Modu";
+        _hideAllSteps();
+        document.getElementById("step-defile-choice").style.display = "block";
+        const footer = document.getElementById("wizard-footer");
+        if (footer) footer.style.display = "none";
+        return;
+    }
     if (currentWizardStep > 1 && !generationStarted) {
         currentWizardStep--;
         showWizardStep(currentWizardStep);
     }
 });
+
+document.getElementById("defile-nb2-card")?.addEventListener("click", openDefileNB2);
+document.getElementById("defile-elements-card")?.addEventListener("click", openDefileElements);
 
 // ─── Upload Zone Interactions ────────────────────────────────────
 function setupUploadZone(zone, input, type) {
