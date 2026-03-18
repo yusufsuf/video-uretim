@@ -825,7 +825,8 @@ ABSOLUTE RULES (every shot, no exceptions):
 - EVERY prompt starts with "@Element1 In the [scene anchor]," — no exceptions
 - NEVER frame below the hem — feet, shoes, ankles must NOT appear
 - NEVER add stage lights, beauty dishes, tripods, or studio equipment
-- NEVER add a train not visible in the garment images
+- NEVER add a train, trailing fabric, or pooling hem — if the garment has a back slit, describe it as "back center slit, flat hem, no trailing fabric"
+- For any back-view or rear-angle shot: always include "back center slit, flat hem ends at floor, no trailing fabric, no train"
 - Vary camera angles for cinematic flow (wide, medium, close-up, etc.)
 - Each shot continues seamlessly from the previous
 
