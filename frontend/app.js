@@ -1952,6 +1952,7 @@ document.getElementById("studio-ai-shots-btn")?.addEventListener("click", async 
 
     const fd = new FormData();
     fd.append("element_image_url", studioElements[0].image_url);
+    fd.append("elements_json", JSON.stringify(studioElements.map(e => ({ name: e.name, front_url: e.image_url, extra_urls: e.extra_urls || [] }))));
     fd.append("shot_count", String(studioShots.length));
     if (studioStartFile) fd.append("start_frame", studioStartFile);
 

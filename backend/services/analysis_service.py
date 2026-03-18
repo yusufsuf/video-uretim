@@ -970,21 +970,33 @@ async def generate_studio_ai_shots(
     start_frame_url: Optional[str] = None,
     shot_count: int = 2,
     user_hint: Optional[str] = None,
+    element_names: Optional[list] = None,      # ["@2305", "@ayakkabi", ...]
+    element_image_urls: Optional[list] = None, # all element image URLs
 ) -> list[dict]:
     """Stüdyo modu için AI çekim açıklamaları üretir."""
     shot_count = max(1, min(5, shot_count))
 
+    # Build element token info for the prompt
+    all_image_urls = element_image_urls or [element_image_url]
+    all_names = element_names or ["@Element1"]
+    token_info = ", ".join(f"{name} (element {i+1})" for i, name in enumerate(all_names))
+
     user_content: list = []
     if start_frame_url:
         user_content.append({"type": "image_url", "image_url": _image_content(start_frame_url, detail="low")})
-    user_content.append({"type": "image_url", "image_url": _image_content(element_image_url, detail="high")})
+    # Add all element images (max 4)
+    from itertools import islice as _islice
+    for img_url in _islice(iter(all_image_urls), 4):
+        user_content.append({"type": "image_url", "image_url": _image_content(img_url, detail="high")})
 
     hint_text = f"\n\nUser notes: {user_hint}" if user_hint else ""
     user_content.append({
         "type": "text",
         "text": (
+            f"Available element tokens: {token_info}. "
             f"Generate {shot_count} cinematic shot descriptions for this fashion video. "
             f"Each description: 1-2 sentences, specific camera movement, model action, atmosphere. "
+            f"Use the @token names naturally in each description (e.g. '@2305 walks slowly towards camera'). "
             f"Duration: 5 seconds each. Avoid generic phrases.{hint_text}\n\n"
             f"Return JSON only: {{\"shots\": [{{\"description\": \"...\", \"duration\": 5}}, ...]}}"
         ),
@@ -999,13 +1011,14 @@ async def generate_studio_ai_shots(
                     "content": (
                         "You are a fashion film director creating cinematic shot descriptions for Kling AI. "
                         "Each description should be specific, visual, and describe model movement and camera angle. "
+                        "Always reference elements by their @token names as provided. "
                         "Never use the word 'train' or 'trailing'."
                     ),
                 },
                 {"role": "user", "content": user_content},
             ],
             response_format={"type": "json_object"},
-            max_tokens=600,
+            max_tokens=700,
             temperature=0.8,
         )
         data = json.loads(resp.choices[0].message.content or "{}")

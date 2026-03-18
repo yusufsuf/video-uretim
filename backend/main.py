@@ -337,20 +337,38 @@ async def studio_ai_shots_endpoint(
     _user: dict = Depends(get_current_user),
     element_image: Optional[UploadFile] = File(None),
     element_image_url: Optional[str] = Form(None),
+    elements_json: Optional[str] = Form(None),  # JSON array of {name, front_url, extra_urls}
     start_frame: Optional[UploadFile] = File(None),
     shot_count: int = Form(2),
     user_hint: Optional[str] = Form(None),
 ):
     """Stüdyo modu için AI çekim açıklamaları üretir."""
+    import json as _json
     from services.analysis_service import generate_studio_ai_shots
 
-    if element_image and element_image.filename:
-        elem_path = await _save_upload(element_image)
-        elem_url = _file_to_url(elem_path)
-    elif element_image_url:
-        elem_url = element_image_url
-    else:
-        raise HTTPException(status_code=400, detail="Element görseli zorunludur.")
+    # Parse elements if provided (multi-element)
+    elem_names: list = []
+    elem_image_urls: list = []
+    if elements_json:
+        try:
+            _elems = _json.loads(elements_json)
+            for _e in _elems:
+                elem_names.append(f"@{_e.get('name', 'Element')}")
+                elem_image_urls.append(_e.get("front_url", ""))
+        except Exception:
+            pass
+
+    # Fallback to single element
+    if not elem_image_urls:
+        if element_image and element_image.filename:
+            elem_path = await _save_upload(element_image)
+            elem_image_urls = [_file_to_url(elem_path)]
+        elif element_image_url:
+            elem_image_urls = [element_image_url]
+        else:
+            raise HTTPException(status_code=400, detail="Element görseli zorunludur.")
+        if not elem_names:
+            elem_names = ["@Element1"]
 
     sf_url = None
     if start_frame and start_frame.filename:
@@ -358,10 +376,12 @@ async def studio_ai_shots_endpoint(
         sf_url = _file_to_url(sf_path)
 
     shots = await generate_studio_ai_shots(
-        element_image_url=elem_url,
+        element_image_url=elem_image_urls[0],
         start_frame_url=sf_url,
         shot_count=min(5, max(1, shot_count)),
         user_hint=user_hint,
+        element_names=elem_names,
+        element_image_urls=elem_image_urls,
     )
     return {"shots": shots}
 
