@@ -1,12 +1,15 @@
 """Library service — per-user visual reference library stored in Supabase."""
 
 import asyncio
+import logging
 import uuid
 from functools import lru_cache
 from typing import Optional
 
 from fastapi import HTTPException
 from supabase import create_client, Client
+
+logger = logging.getLogger(__name__)
 
 from config import settings
 
@@ -86,8 +89,15 @@ async def add_item(
             "extra_storage_paths": extra_storage_paths,
         }).execute()
 
-    res = await asyncio.to_thread(_insert)  # type: ignore[arg-type]
-    return (res.data or [{}])[0]
+    try:
+        res = await asyncio.to_thread(_insert)  # type: ignore[arg-type]
+    except Exception as exc:
+        logger.error("library_service add_item INSERT failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"DB insert failed: {exc}")
+    if not res.data:
+        logger.error("library_service add_item INSERT returned no data: %s", res)
+        raise HTTPException(status_code=500, detail="DB insert returned no data")
+    return res.data[0]
 
 
 async def delete_item(user_id: str, item_id: str) -> None:
