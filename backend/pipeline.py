@@ -142,10 +142,13 @@ _DEFILE_NEGATIVE = (
 
 # Always prepended to EVERY shot — enforces full-length regardless of train detection
 _HEM_LOCK = (
-    "Full-length floor-length gown. Completely sealed skirt from ALL angles — "
-    "NO front slit, NO side slit, NO back slit visible, NO center front gap, NO leg gap. "
-    "Skirt fabric stays fully closed during all movement. "
-    "Hem grazes floor. Legs entirely hidden at all times. Feet fully covered."
+    "Full-length floor-length mermaid gown. Completely sealed skirt from ALL angles — "
+    "NO front slit, NO side slit, NO back slit visible, NO center front gap, NO leg gap, NO step gap, NO fabric parting. "
+    "Skirt is a single sealed tube of fabric — does NOT open at any point during movement. "
+    "Hem grazes floor. Legs entirely hidden at all times. Feet fully covered. "
+    "Locomotion: model advances with tiny concealed micro-steps completely hidden under the sealed hem — "
+    "legs and feet remain completely invisible throughout. "
+    "The dress exterior moves as a smooth closed column of fabric swaying slightly — it never parts or opens."
 )
 
 _TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem", "kuyruk", "uzun kuyruk"}
@@ -542,12 +545,12 @@ async def run_pipeline(
                         else:
                             prompt = f"@Element1 In the {scene_anchor}, {desc}"
                     else:
-                        prompt = f"@Element1 In the {scene_anchor}, model poses and walks elegantly showcasing the garment"
+                        prompt = f"@Element1 In the {scene_anchor}, model walks elegantly with tiny concealed steps, sealed skirt moves as one piece, showcasing the garment"
                     studio_shots.append({"duration": shot.duration, "prompt": prompt[:480]})
             else:
                 studio_shots = [
-                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model walks slowly towards camera showcasing the garment details"},
-                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle"},
+                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model walks slowly towards camera with tiny concealed steps, sealed skirt moves as one closed column, showcasing the garment details"},
+                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt fabric remains sealed and closed throughout"},
                 ]
 
             # Enforce hem/slit lock + garment-specific constraint on every studio shot
