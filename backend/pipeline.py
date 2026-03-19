@@ -140,15 +140,11 @@ _DEFILE_NEGATIVE = (
     "extra furniture, added decor, altered background, modified scenery"
 )
 
-# Always prepended to EVERY shot — enforces full-length regardless of train detection
+# Appended AFTER the shot description — kept short so @Element1 + shot desc fit in 512 chars
 _HEM_LOCK = (
-    "Full-length floor-length mermaid gown. Completely sealed skirt from ALL angles — "
-    "NO front slit, NO side slit, NO back slit visible, NO center front gap, NO leg gap, NO step gap, NO fabric parting. "
-    "Skirt is a single sealed tube of fabric — does NOT open at any point during movement. "
-    "Hem grazes floor. Legs entirely hidden at all times. Feet fully covered. "
-    "Locomotion: model advances with tiny concealed micro-steps completely hidden under the sealed hem — "
-    "legs and feet remain completely invisible throughout. "
-    "The dress exterior moves as a smooth closed column of fabric swaying slightly — it never parts or opens."
+    "Sealed floor-length gown. NO slit anywhere — NO front slit, NO side slit, NO leg gap, NO fabric parting. "
+    "Skirt stays completely closed during all movement. "
+    "Legs and feet entirely hidden. Tiny concealed steps under sealed hem."
 )
 
 _TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem", "kuyruk", "uzun kuyruk"}
@@ -556,9 +552,12 @@ async def run_pipeline(
             # Enforce hem/slit lock + garment-specific constraint on every studio shot
             _gc = str(garment_constraint) if garment_constraint else ""
             _constraint_prefix = _HEM_LOCK + (" " + _gc if _gc else "")
+            # @Element1 + shot description FIRST, constraints AFTER — ensures @Element1 token
+            # is never cut off by Kling's 512-char prompt limit
             _locked: list = []
             for _s in studio_shots:
-                _locked.append({"duration": _s["duration"], "prompt": _constraint_prefix + " " + str(_s["prompt"])})
+                _combined = (str(_s["prompt"]) + " " + _constraint_prefix)[:512]
+                _locked.append({"duration": _s["duration"], "prompt": _combined})
             studio_shots = _locked
 
             total_studio_dur = sum(int(p["duration"]) for p in studio_shots)
@@ -1172,9 +1171,9 @@ async def run_defile_collection_pipeline(
             logger.info("[%s] Outfit %d/%d prompts: %d shots, %ds total",
                         job_id, outfit_idx + 1, n_outfits, len(multi_prompt), total_duration)
 
-            # Enforce hem/slit lock on every shot (same as single-outfit pipeline)
+            # Shot prompt FIRST, HEM_LOCK after — keeps prompt within 512-char limit
             multi_prompt = [
-                {"duration": p["duration"], "prompt": f"{_HEM_LOCK} {p['prompt']}"}
+                {"duration": p["duration"], "prompt": (p["prompt"] + " " + _HEM_LOCK)[:512]}
                 for p in multi_prompt
             ]
 
