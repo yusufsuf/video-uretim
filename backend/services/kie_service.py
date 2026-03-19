@@ -59,9 +59,20 @@ async def generate_kie_video(
         resp.raise_for_status()
         data = resp.json()
 
-    task_id: str = data["data"]["taskId"]
-    logger.info("Kie.ai task created: %s", task_id)
+    logger.info("Kie.ai createTask full response: %s", data)
 
+    task_data = data.get("data") or {}
+    task_id: str = (
+        task_data.get("taskId")
+        or task_data.get("task_id")
+        or task_data.get("id")
+        or data.get("taskId")
+        or data.get("task_id")
+    )
+    if not task_id:
+        raise RuntimeError(f"Kie.ai createTask: no taskId in response: {data}")
+
+    logger.info("Kie.ai task created: %s", task_id)
     return await _poll_task(task_id)
 
 
