@@ -30,7 +30,7 @@ from models import (
     JobStatus,
     MultiScenePrompt,
 )
-from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt, generate_custom_multishot_prompt, generate_ozel_multishot_prompt, extract_scene_anchor
+from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt, generate_custom_multishot_prompt, generate_ozel_multishot_prompt, extract_scene_anchor, analyse_garment_slits
 from services.nano_banana_service import generate_background, generate_scene_frame
 from services.video_service import (
     download_file,
@@ -538,9 +538,21 @@ async def run_pipeline(
             fal_studio_start = await _to_fal_url(start_frame_url if start_frame_url else front_url)
 
             # GPT ile sahne anchor'ı çıkar
-            _update_job(job_id, progress=30, message="Sahne analiz ediliyor...")
+            _update_job(job_id, progress=25, message="Sahne analiz ediliyor...")
             scene_anchor = await extract_scene_anchor(fal_studio_start)
             logger.info("[%s] Studio scene anchor: %s", job_id, scene_anchor)
+
+            # GPT-4o ile elbise yırtmaç/kuyruk analizi — prompt kısıtı üretir
+            _update_job(job_id, progress=35, message="Elbise detayları analiz ediliyor...")
+            _studio_ref_urls = [
+                e for e in kling_elements[0].get("reference_image_urls", [])
+                if e != kling_elements[0].get("frontal_image_url")
+            ]
+            garment_constraint = await analyse_garment_slits(
+                frontal_url=kling_elements[0]["frontal_image_url"],
+                reference_urls=_studio_ref_urls if _studio_ref_urls else None,
+            )
+            logger.info("[%s] Garment constraint: %s", job_id, garment_constraint)
 
             # Kullanıcı çekimlerini @Element1 formatına dönüştür
             if request.shots:
@@ -562,10 +574,12 @@ async def run_pipeline(
                     {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt closed"},
                 ]
 
-            # Enforce hem/slit lock on every studio shot
+            # Enforce hem/slit lock + garment-specific constraint on every studio shot
+            _gc = str(garment_constraint) if garment_constraint else ""
+            _constraint_prefix = _HEM_LOCK + (" " + _gc if _gc else "")
             _locked: list = []
             for _s in studio_shots:
-                _locked.append({"duration": _s["duration"], "prompt": _HEM_LOCK + " " + str(_s["prompt"])})
+                _locked.append({"duration": _s["duration"], "prompt": _constraint_prefix + " " + str(_s["prompt"])})
             studio_shots = _locked
 
             total_studio_dur = sum(int(p["duration"]) for p in studio_shots)

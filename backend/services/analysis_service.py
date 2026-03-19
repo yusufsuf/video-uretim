@@ -1108,3 +1108,50 @@ async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
         descriptions.append("")
     return descriptions[: len(request.shots)]
 
+
+async def analyse_garment_slits(
+    frontal_url: str,
+    reference_urls: Optional[list[str]] = None,
+) -> str:
+    """Analyse element images with GPT-4o Vision and return a precise slit/train constraint
+    string ready to be injected into Kling shot prompts.
+
+    Example return value:
+        "Garment has a small back-center slit only. NO front slit. NO side slit. NO train."
+    """
+    image_blocks: list[dict] = []
+
+    # frontal image — label it
+    image_blocks.append({"type": "text", "text": "FRONT VIEW:"})
+    image_blocks.append({"type": "image_url", "image_url": _image_content(frontal_url, detail="high")})
+
+    _refs: list[str] = list(reference_urls or [])
+    for label, ref_url in zip(("BACK VIEW", "SIDE VIEW", "EXTRA VIEW"), _refs):
+        image_blocks.append({"type": "text", "text": f"{label}:"})
+        image_blocks.append({"type": "image_url", "image_url": _image_content(ref_url, detail="high")})
+
+    image_blocks.append({"type": "text", "text": (
+        "Examine these garment reference images carefully. "
+        "Answer ONLY about: (1) front slit, (2) side slit, (3) back slit, (4) train/trailing fabric. "
+        "For each: state whether it EXISTS or DOES NOT EXIST, and if it exists describe its size/location precisely. "
+        "Then write a single compact constraint sentence (max 40 words) starting with 'Garment:' "
+        "that an AI video generator must follow exactly when animating this garment from any angle. "
+        'Return JSON only: {"constraint": "..."}'
+    )})
+
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": image_blocks}],
+            response_format={"type": "json_object"},
+            max_tokens=200,
+            temperature=0,
+        )
+        data = json.loads(resp.choices[0].message.content or "{}")
+        constraint = str(data.get("constraint", "")).strip()
+        logger.info("Garment slit analysis: %s", constraint)
+        return constraint if constraint else ""
+    except Exception as e:
+        logger.warning("analyse_garment_slits failed: %s", e)
+        return ""
+
