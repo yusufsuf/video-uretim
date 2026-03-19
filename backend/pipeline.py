@@ -1404,11 +1404,12 @@ async def run_kie_studio_pipeline(
                         "showcasing the garment"
                     )
                 # No need for _HEM_LOCK_SHORT in prompt — constraint is in element description
-                kie_shots.append({"duration": shot.duration, "prompt": prompt[:512]})  # type: ignore[index]
+                # kie.ai limit: 500 chars per prompt (not 512 like fal.ai)
+                kie_shots.append({"duration": shot.duration, "prompt": prompt[:500]})  # type: ignore[index]
         else:
             kie_shots = [
-                {"duration": 5, "prompt": f"{_elem_token} In the {scene_anchor}, model walks slowly toward camera with tiny concealed steps, sealed skirt moves as one column, showcasing the garment details"},
-                {"duration": 5, "prompt": f"{_elem_token} In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt remains completely closed throughout"},
+                {"duration": 5, "prompt": f"{_elem_token} In the {scene_anchor}, model walks slowly toward camera with tiny concealed steps, sealed skirt moves as one column, showcasing the garment details"[:500]},  # type: ignore[index]
+                {"duration": 5, "prompt": f"{_elem_token} In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt remains completely closed throughout"[:500]},  # type: ignore[index]
             ]
 
         # ── 6. Generate video ─────────────────────────────────────────────────
