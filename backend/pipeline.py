@@ -140,6 +140,30 @@ _DEFILE_NEGATIVE = (
     "extra furniture, added decor, altered background, modified scenery"
 )
 
+import re as _re
+
+_WALK_REPLACEMENTS = [
+    (r'\bwalks toward\b', 'glides toward'),
+    (r'\bwalks towards\b', 'glides towards'),
+    (r'\bwalks forward\b', 'glides forward'),
+    (r'\bwalks down\b', 'glides down'),
+    (r'\bwalks along\b', 'glides along'),
+    (r'\bwalks through\b', 'moves through'),
+    (r'\bwalks\b', 'glides'),
+    (r'\bwalking\b', 'gliding'),
+    (r'\bstrides\b', 'glides'),
+    (r'\bstriding\b', 'gliding'),
+    (r'\bsteps forward\b', 'glides forward'),
+    (r'\bstepping\b', 'gliding'),
+]
+
+def _sanitize_studio_prompt(text: str) -> str:
+    """Replace walking/striding verbs with gliding to prevent Kling from opening the skirt."""
+    for pattern, replacement in _WALK_REPLACEMENTS:
+        text = _re.sub(pattern, replacement, text, flags=_re.IGNORECASE)
+    return text
+
+
 # Always prepended to EVERY shot — enforces full-length regardless of train detection
 _HEM_LOCK = (
     "Full-length floor-length gown. Completely sealed skirt from ALL angles — "
@@ -522,7 +546,7 @@ async def run_pipeline(
             if request.shots:
                 studio_shots = []
                 for shot in request.shots:
-                    desc = (shot.description or "").strip()
+                    desc = _sanitize_studio_prompt((shot.description or "").strip())
                     if desc:
                         # If user already wrote @Element1 (after frontend token replacement), don't double-prepend
                         if desc.lower().startswith("@element1"):
