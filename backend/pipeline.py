@@ -508,6 +508,8 @@ async def run_pipeline(
                     "reference_image_urls": studio_ref_urls if studio_ref_urls else [fal_studio_front],
                 }]
             fal_studio_front = kling_elements[0]["frontal_image_url"]
+            # Token prefix for all active elements: "@Element1", "@Element1 @Element2", etc.
+            _element_prefix = " ".join(f"@Element{i+1}" for i in range(len(kling_elements)))
 
             # Başlangıç karesi
             fal_studio_start = await _to_fal_url(start_frame_url if start_frame_url else front_url)
@@ -529,24 +531,23 @@ async def run_pipeline(
             )
             logger.info("[%s] Garment constraint: %s", job_id, garment_constraint)
 
-            # Kullanıcı çekimlerini @Element1 formatına dönüştür
+            # Kullanıcı çekimlerini @Element tokenlarına dönüştür (1..N elementi için)
             if request.shots:
                 studio_shots = []
                 for shot in request.shots:
                     desc = (shot.description or "").strip()
                     if desc:
-                        # If user already wrote @Element1 (after frontend token replacement), don't double-prepend
-                        if desc.lower().startswith("@element1"):
-                            prompt = desc
-                        else:
-                            prompt = f"@Element1 In the {scene_anchor}, {desc}"
+                        # Strip any existing @ElementN tokens at start, then prepend full prefix
+                        import re as _re
+                        desc_stripped = _re.sub(r'^(@[Ee]lement\d+\s*)+', '', desc).strip()
+                        prompt = f"{_element_prefix} In the {scene_anchor}, {desc_stripped}"
                     else:
-                        prompt = f"@Element1 In the {scene_anchor}, model walks elegantly with tiny concealed steps, sealed skirt moves as one piece, showcasing the garment"
+                        prompt = f"{_element_prefix} In the {scene_anchor}, model walks elegantly with tiny concealed steps, sealed skirt moves as one piece, showcasing the garment"
                     studio_shots.append({"duration": shot.duration, "prompt": prompt[:480]})
             else:
                 studio_shots = [
-                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model walks slowly towards camera with tiny concealed steps, sealed skirt moves as one closed column, showcasing the garment details"},
-                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt fabric remains sealed and closed throughout"},
+                    {"duration": 5, "prompt": f"{_element_prefix} In the {scene_anchor}, model walks slowly towards camera with tiny concealed steps, sealed skirt moves as one closed column, showcasing the garment details"},
+                    {"duration": 5, "prompt": f"{_element_prefix} In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt fabric remains sealed and closed throughout"},
                 ]
 
             # Enforce hem/slit lock + garment-specific constraint on every studio shot
