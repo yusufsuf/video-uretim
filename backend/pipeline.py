@@ -140,30 +140,6 @@ _DEFILE_NEGATIVE = (
     "extra furniture, added decor, altered background, modified scenery"
 )
 
-import re as _re
-
-_WALK_REPLACEMENTS = [
-    (r'\bwalks toward\b', 'glides toward'),
-    (r'\bwalks towards\b', 'glides towards'),
-    (r'\bwalks forward\b', 'glides forward'),
-    (r'\bwalks down\b', 'glides down'),
-    (r'\bwalks along\b', 'glides along'),
-    (r'\bwalks through\b', 'moves through'),
-    (r'\bwalks\b', 'glides'),
-    (r'\bwalking\b', 'gliding'),
-    (r'\bstrides\b', 'glides'),
-    (r'\bstriding\b', 'gliding'),
-    (r'\bsteps forward\b', 'glides forward'),
-    (r'\bstepping\b', 'gliding'),
-]
-
-def _sanitize_studio_prompt(text: str) -> str:
-    """Replace walking/striding verbs with gliding to prevent Kling from opening the skirt."""
-    for pattern, replacement in _WALK_REPLACEMENTS:
-        text = _re.sub(pattern, replacement, text, flags=_re.IGNORECASE)
-    return text
-
-
 # Always prepended to EVERY shot — enforces full-length regardless of train detection
 _HEM_LOCK = (
     "Full-length floor-length gown. Completely sealed skirt from ALL angles — "
@@ -558,7 +534,7 @@ async def run_pipeline(
             if request.shots:
                 studio_shots = []
                 for shot in request.shots:
-                    desc = _sanitize_studio_prompt((shot.description or "").strip())
+                    desc = (shot.description or "").strip()
                     if desc:
                         # If user already wrote @Element1 (after frontend token replacement), don't double-prepend
                         if desc.lower().startswith("@element1"):
@@ -566,12 +542,12 @@ async def run_pipeline(
                         else:
                             prompt = f"@Element1 In the {scene_anchor}, {desc}"
                     else:
-                        prompt = f"@Element1 In the {scene_anchor}, model poses elegantly and glides forward showcasing the garment"
+                        prompt = f"@Element1 In the {scene_anchor}, model poses and walks elegantly showcasing the garment"
                     studio_shots.append({"duration": shot.duration, "prompt": prompt[:480]})
             else:
                 studio_shots = [
-                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model glides slowly towards camera showcasing the garment details, skirt sealed"},
-                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt closed"},
+                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model walks slowly towards camera showcasing the garment details"},
+                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle"},
                 ]
 
             # Enforce hem/slit lock + garment-specific constraint on every studio shot
