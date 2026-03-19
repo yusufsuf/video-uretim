@@ -1109,6 +1109,48 @@ async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
     return descriptions[: len(request.shots)]
 
 
+async def translate_studio_shot_description(
+    user_description: str,
+    scene_anchor: str,
+) -> str:
+    """Translate/refine the user's free-form shot description (any language) into a
+    clean, Kling-optimised English video prompt.
+
+    Returns only the motion/camera description — the @ElementN prefix and scene
+    anchor wrapper are added by the pipeline caller.
+    Max ~120 words, no Turkish, no @ElementN tokens.
+    """
+    system = (
+        "You are a Kling AI video prompt specialist for fashion films. "
+        "Convert the user's description into a precise English video generation prompt. "
+        "Focus on: model movement, walking direction, camera angle, shot framing, body language, pace. "
+        "The setting/location is already handled separately — do NOT include location details. "
+        "Do NOT include @Element tokens. Do NOT include garment constraint text. "
+        "Output only the motion/camera description, maximum 120 words, plain text."
+    )
+    user_msg = (
+        f"Scene context: {scene_anchor}\n"
+        f"User request: {user_description}\n\n"
+        "Write the Kling video prompt for this shot."
+    )
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_msg},
+            ],
+            max_tokens=160,
+            temperature=0.3,
+        )
+        translated = (resp.choices[0].message.content or "").strip()
+        logger.info("Studio shot translated: %s → %s", user_description[:60], translated[:80])  # type: ignore[index]
+        return translated if translated else user_description
+    except Exception as e:
+        logger.warning("translate_studio_shot_description failed (%s) — using raw description", e)
+        return user_description
+
+
 async def analyse_garment_slits(
     frontal_url: str,
     reference_urls: Optional[list[str]] = None,

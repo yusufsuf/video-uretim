@@ -30,7 +30,7 @@ from models import (
     JobStatus,
     MultiScenePrompt,
 )
-from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt, generate_custom_multishot_prompt, generate_ozel_multishot_prompt, extract_scene_anchor, analyse_garment_slits
+from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt, generate_custom_multishot_prompt, generate_ozel_multishot_prompt, extract_scene_anchor, analyse_garment_slits, translate_studio_shot_description
 from services.nano_banana_service import generate_background, generate_scene_frame
 from services.video_service import (
     download_file,
@@ -532,15 +532,20 @@ async def run_pipeline(
             logger.info("[%s] Garment constraint: %s", job_id, garment_constraint)
 
             # Kullanıcı çekimlerini @Element tokenlarına dönüştür (1..N elementi için)
+            # GPT-4o-mini ile kullanıcının açıklamasını Kling-optimized İngilizce prompt'a çevir
             if request.shots:
+                import re as _re
                 studio_shots = []
                 for shot in request.shots:
                     desc = (shot.description or "").strip()
                     if desc:
-                        # Strip any existing @ElementN tokens at start, then prepend full prefix
-                        import re as _re
+                        # Strip any existing @ElementN tokens, then GPT-translate the description
                         desc_stripped = _re.sub(r'^(@[Ee]lement\d+\s*)+', '', desc).strip()
-                        prompt = f"{_element_prefix} In the {scene_anchor}, {desc_stripped}"
+                        translated = await translate_studio_shot_description(
+                            user_description=desc_stripped,
+                            scene_anchor=scene_anchor,
+                        )
+                        prompt = f"{_element_prefix} {translated}"
                     else:
                         prompt = f"{_element_prefix} In the {scene_anchor}, model walks elegantly with tiny concealed steps, sealed skirt moves as one piece, showcasing the garment"
                     studio_shots.append({"duration": shot.duration, "prompt": prompt[:480]})
