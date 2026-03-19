@@ -121,8 +121,10 @@ _BASE_NEGATIVE = (
     "floating hem, lifted skirt, hem above ground, gap between dress and floor, "
     "short dress, mini dress, midi dress, knee-length dress, calf-length dress, "
     "cropped skirt, raised hemline, above-ankle hem, shortened dress, "
-    "front slit, high slit, thigh slit, deep slit, visible knee, visible thigh, "
-    "visible shin, visible calf, exposed leg, leg gap, opened hem, split skirt"
+    "front slit, side slit, back slit visible, high slit, thigh slit, deep slit, "
+    "visible knee, visible thigh, visible shin, visible calf, exposed leg, leg gap, "
+    "opened hem, split skirt, parted skirt, walking slit, step gap, slit while walking, "
+    "skirt opening during movement, fabric parting while walking"
 )
 _TRAIN_NEGATIVE = (
     ", train, trailing fabric, floor-length train, dragging hem, sweeping train, "
@@ -139,7 +141,12 @@ _DEFILE_NEGATIVE = (
 )
 
 # Always prepended to EVERY shot — enforces full-length regardless of train detection
-_HEM_LOCK = "Full-length floor-length gown. Completely sealed front skirt — NO front slit, NO center front gap, NO leg gap. Hem grazes floor. Legs entirely hidden. Feet fully covered."
+_HEM_LOCK = (
+    "Full-length floor-length gown. Completely sealed skirt from ALL angles — "
+    "NO front slit, NO side slit, NO back slit visible, NO center front gap, NO leg gap. "
+    "Skirt fabric stays fully closed during all movement. "
+    "Hem grazes floor. Legs entirely hidden at all times. Feet fully covered."
+)
 
 _TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem", "kuyruk", "uzun kuyruk"}
 
@@ -523,12 +530,12 @@ async def run_pipeline(
                         else:
                             prompt = f"@Element1 In the {scene_anchor}, {desc}"
                     else:
-                        prompt = f"@Element1 In the {scene_anchor}, model poses and walks elegantly showcasing the garment"
+                        prompt = f"@Element1 In the {scene_anchor}, model poses elegantly and glides forward showcasing the garment"
                     studio_shots.append({"duration": shot.duration, "prompt": prompt[:480]})
             else:
                 studio_shots = [
-                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model walks slowly towards camera showcasing the garment details"},
-                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle"},
+                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model glides slowly towards camera showcasing the garment details, skirt sealed"},
+                    {"duration": 5, "prompt": f"@Element1 In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt closed"},
                 ]
 
             # Enforce hem/slit lock on every studio shot
