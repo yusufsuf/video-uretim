@@ -140,12 +140,16 @@ _DEFILE_NEGATIVE = (
     "extra furniture, added decor, altered background, modified scenery"
 )
 
-# Appended AFTER the shot description — kept short so @Element1 + shot desc fit in 512 chars
+# Full HEM_LOCK used in classic/multishot modes (no strict 512-char constraint)
 _HEM_LOCK = (
     "Sealed floor-length gown. NO slit anywhere — NO front slit, NO side slit, NO leg gap, NO fabric parting. "
     "Skirt stays completely closed during all movement. "
     "Legs and feet entirely hidden. Tiny concealed steps under sealed hem."
 )
+
+# Short HEM_LOCK injected into studio mode prompts BETWEEN @ElementN prefix and shot description.
+# Must stay under ~100 chars so shot description still has ~300+ chars of space in the 512-char limit.
+_HEM_LOCK_SHORT = "NO slit anywhere. NO front slit. Sealed floor-length gown. Skirt fully closed. Legs hidden."
 
 _TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem", "kuyruk", "uzun kuyruk"}
 
@@ -555,15 +559,25 @@ async def run_pipeline(
                     {"duration": 5, "prompt": f"{_element_prefix} In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt fabric remains sealed and closed throughout"},
                 ]
 
-            # Enforce hem/slit lock + garment-specific constraint on every studio shot
+            # Enforce hem/slit lock + garment-specific constraint on every studio shot.
+            # INJECT between @ElementN prefix and shot description so the constraint is
+            # never truncated. Old approach (append after 480-char desc then cut to 512)
+            # left only ~32 chars of _HEM_LOCK — "NO front slit" never reached the model.
             _gc = str(garment_constraint) if garment_constraint else ""
-            _constraint_prefix = _HEM_LOCK + (" " + _gc if _gc else "")
-            # @Element1 + shot description FIRST, constraints AFTER — ensures @Element1 token
-            # is never cut off by Kling's 512-char prompt limit
+            _gc_short = _gc[:80] if _gc else ""  # type: ignore[index]  # cap garment analysis so slit lock always fits
+            _slit_infix = _HEM_LOCK_SHORT + (" " + _gc_short if _gc_short else "")  # ≤ 172 chars
             _locked: list = []
             for _s in studio_shots:
-                _combined = (str(_s["prompt"]) + " " + _constraint_prefix)[:512]
-                _locked.append({"duration": _s["duration"], "prompt": _combined})
+                desc = str(_s["prompt"])
+                # desc = "@Element1 [@Element2 ...] <shot description>"
+                _after_elem = desc[len(_element_prefix):].strip()  # type: ignore[index]
+                _prefix_with_lock = f"{_element_prefix} {_slit_infix}"
+                _remaining = 512 - len(_prefix_with_lock) - 1
+                if _remaining > 10:
+                    _combined = f"{_prefix_with_lock} {_after_elem[:_remaining]}"  # type: ignore[index]
+                else:
+                    _combined = _prefix_with_lock[:512]  # type: ignore[index]
+                _locked.append({"duration": _s["duration"], "prompt": _combined[:512]})  # type: ignore[index]
             studio_shots = _locked
 
             total_studio_dur = sum(int(p["duration"]) for p in studio_shots)
