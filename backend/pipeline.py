@@ -1191,9 +1191,13 @@ async def run_defile_collection_pipeline(
             logger.info("[%s] Outfit %d/%d prompts: %d shots, %ds total",
                         job_id, outfit_idx + 1, n_outfits, len(multi_prompt), total_duration)
 
-            # Shot prompt FIRST, HEM_LOCK after — keeps prompt within 512-char limit
+            # Front-load hem/slit constraint so it's never truncated at Kling's 512-char limit.
+            # Old approach (append _HEM_LOCK after ~480-char prompt) left only ~32 chars of
+            # constraint — "NO front slit" was silently cut off. Fix: prepend _HEM_LOCK_SHORT,
+            # then fill remaining space with the shot description.
+            _defile_rem = 512 - len(_HEM_LOCK_SHORT) - 1
             multi_prompt = [
-                {"duration": p["duration"], "prompt": (p["prompt"] + " " + _HEM_LOCK)[:512]}
+                {"duration": p["duration"], "prompt": (_HEM_LOCK_SHORT + " " + str(p["prompt"])[:_defile_rem])[:512]}  # type: ignore[index]
                 for p in multi_prompt
             ]
 
