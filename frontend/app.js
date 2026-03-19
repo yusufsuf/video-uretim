@@ -2056,9 +2056,16 @@ async function startStudioGeneration() {
 async function startKieGeneration() {
     if (!studioElements.length) { showError("En az bir element seçin."); return; }
 
+    currentWizardStep = TOTAL_STEPS;
+    showWizardStep(TOTAL_STEPS);
+    resultSec.classList.remove("active");
+    progressSec.classList.add("active");
     generationStarted = true;
     wizardFooter.style.display = "none";
-    showProgress("Kie.ai stüdyo başlatılıyor...", 0);
+    step4Title.textContent = "Kie.ai ile Üretiliyor...";
+    step4Sub.textContent = `Stüdyo modu: ${studioShots.length} çekim, ${_studioTotalDur()}s toplam. Lütfen bekleyin.`;
+    resetSteps();
+    updateProgress(0, "Kie.ai başlatılıyor...");
 
     const shotsJson = JSON.stringify(studioShots.map(sh => ({
         description: sh.description || "",
@@ -2089,9 +2096,10 @@ async function startKieGeneration() {
         currentJobId = job.job_id;
         startPolling();
     } catch (err) {
+        progressSec.classList.remove("active");
         showError(err.message);
         generationStarted = false;
-        wizardFooter.style.display = "flex";
+        _studioGoToStep(2);
         document.getElementById("kie-generate-btn").disabled = false;
         wizardNextBtn.textContent = "Tekrar Dene";
         wizardNextBtn.disabled = false;
