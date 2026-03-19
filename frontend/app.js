@@ -1577,6 +1577,7 @@ document.getElementById("defile-nb2-card")?.addEventListener("click", openDefile
 document.getElementById("defile-elements-card")?.addEventListener("click", openDefileElements);
 document.getElementById("nav-studio")?.addEventListener("click", openStudio);
 document.getElementById("card-studio")?.addEventListener("click", openStudio);
+document.getElementById("kie-generate-btn")?.addEventListener("click", startKieGeneration);
 
 // ─── Studio Mode ──────────────────────────────────────────────────
 
@@ -1651,12 +1652,15 @@ function _studioGoToStep(step) {
     if (footer) footer.style.display = "flex";
     if (backBtn) backBtn.style.display = step === 1 ? "none" : "inline-flex";
 
+    const kieBtn = document.getElementById("kie-generate-btn");
     if (step === 2) {
         if (nextBtn) { nextBtn.textContent = "Video Üret"; nextBtn.disabled = false; }
+        if (kieBtn) { kieBtn.style.display = "inline-flex"; kieBtn.disabled = false; }
         _setupStudioStartZone();
         renderStudioShots();
     } else {
         if (nextBtn) { nextBtn.textContent = "Devam →"; nextBtn.disabled = studioElements.length === 0; }
+        if (kieBtn) kieBtn.style.display = "none";
         _renderStudioElementsState();
     }
 }
@@ -2043,6 +2047,52 @@ async function startStudioGeneration() {
         showError(err.message);
         generationStarted = false;
         wizardFooter.style.display = "flex";
+        wizardNextBtn.textContent = "Tekrar Dene";
+        wizardNextBtn.disabled = false;
+    }
+}
+
+// ─── Kie.ai Studio Generation ────────────────────────────────────
+async function startKieGeneration() {
+    if (!studioElements.length) { showError("En az bir element seçin."); return; }
+
+    generationStarted = true;
+    wizardFooter.style.display = "none";
+    showProgress("Kie.ai stüdyo başlatılıyor...", 0);
+
+    const shotsJson = JSON.stringify(studioShots.map(sh => ({
+        description: sh.description || "",
+        duration: sh.duration,
+        camera_angle: "",
+        shot_size: "",
+    })));
+
+    const elementsJson = JSON.stringify(studioElements.map(el => ({
+        front_url: el.image_url,
+        extra_urls: el.extra_urls || [],
+        name: el.name,
+    })));
+
+    const formData = new FormData();
+    formData.append("elements_json", elementsJson);
+    formData.append("shots", shotsJson);
+    formData.append("aspect_ratio", studioAspectRatio);
+    formData.append("generate_audio", document.getElementById("studio-audio-toggle")?.checked ? "true" : "false");
+    if (studioStartFile) formData.append("ozel_start_frame", studioStartFile);
+    // Dummy front_image required by multipart form
+    formData.append("front_image", new Blob([], { type: "image/jpeg" }), "placeholder.jpg");
+
+    try {
+        const resp = await fetch(`${API_BASE}/api/kie/studio`, { method: "POST", body: formData, headers: getAuthHeaders() });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const job = await resp.json();
+        currentJobId = job.job_id;
+        startPolling();
+    } catch (err) {
+        showError(err.message);
+        generationStarted = false;
+        wizardFooter.style.display = "flex";
+        document.getElementById("kie-generate-btn").disabled = false;
         wizardNextBtn.textContent = "Tekrar Dene";
         wizardNextBtn.disabled = false;
     }

@@ -1292,3 +1292,180 @@ async def run_defile_collection_pipeline(
             status=JobStatus.FAILED,
             message=_tr_error(exc),
         )
+
+
+# ── Kie.ai Studio Pipeline ────────────────────────────────────────────────────
+
+# Element description injected into kie.ai's native `description` field.
+# Unlike fal.ai, kie.ai exposes this field — the constraint travels with the
+# element itself, completely independent of the 512-char prompt limit.
+_KIE_ELEMENT_DESC = (
+    "floor-length fashion gown. NO slit anywhere — NO front slit, NO side slit, "
+    "NO leg gap, NO fabric parting. Skirt fully sealed and closed at all times. "
+    "Legs and feet completely hidden under hem."
+)
+
+
+async def run_kie_studio_pipeline(
+    job_id: str,
+    elements_json: str,                   # JSON: [{front_url, extra_urls, name}, ...]
+    shots_list: list,                     # [ShotConfig, ...]
+    aspect_ratio: str = "9:16",
+    generate_audio: bool = False,
+    start_frame_url: str | None = None,
+) -> None:
+    """Studio pipeline using kie.ai instead of fal.ai.
+
+    Key differences from fal.ai studio mode:
+    - Element format: {name, description, element_input_urls} — no frontal/reference split
+    - Token syntax in prompts: @element_garment (custom name, NOT @Element1)
+    - Constraint goes in element `description` field — independent of 512-char prompt limit
+    - No negative_prompt support (kie.ai doesn't expose it)
+    """
+    from services.kie_service import generate_kie_video  # type: ignore[import]
+
+    try:
+        import json as _json
+        import re as _re
+
+        _update_job(job_id, status=JobStatus.GENERATING_VIDEO, progress=10,
+                    message="Kie stüdyo: elementler hazırlanıyor...")
+
+        # ── 1. Build kie.ai elements ──────────────────────────────────────────
+        _elem_defs = _json.loads(elements_json)
+        kie_elements: list = []
+        element_names: list[str] = []
+
+        for i, _ed in enumerate(_elem_defs[:4]):
+            elem_name = f"element_garment{i + 1}" if len(_elem_defs) > 1 else "element_garment"
+            element_names.append(elem_name)
+
+            # Collect all image URLs for this element (front + extras), max 4
+            all_urls = [_ed["front_url"]] + (_ed.get("extra_urls") or [])
+            all_urls = all_urls[:4]  # type: ignore[index]
+
+            # Re-upload to fal CDN so kie.ai can fetch them reliably
+            kie_input_urls: list = []
+            for img_url in all_urls:
+                kie_input_urls.append(await _to_fal_url_compressed(img_url))
+
+            kie_elements.append({
+                "name": elem_name,
+                "description": _KIE_ELEMENT_DESC,
+                "element_input_urls": kie_input_urls,
+            })
+            logger.info("[%s] Kie element '%s': %d images", job_id, elem_name, len(kie_input_urls))
+
+        # Token prefix for prompts: "@element_garment" or "@element_garment1 @element_garment2"
+        _elem_token = " ".join(f"@{n}" for n in element_names)
+
+        # ── 2. Start frame ────────────────────────────────────────────────────
+        _update_job(job_id, progress=25, message="Kie stüdyo: sahne analiz ediliyor...")
+        _start_url = start_frame_url or str(_elem_defs[0]["front_url"])  # type: ignore[index]
+        fal_start = await _to_fal_url(_start_url)
+
+        # ── 3. GPT: extract scene anchor ─────────────────────────────────────
+        scene_anchor = await extract_scene_anchor(fal_start)
+        logger.info("[%s] Kie scene anchor: %s", job_id, scene_anchor)
+
+        # ── 4. GPT: analyse garment slits ─────────────────────────────────────
+        _update_job(job_id, progress=35, message="Kie stüdyo: elbise analiz ediliyor...")
+        _ref_urls = kie_elements[0]["element_input_urls"][1:]
+        garment_constraint = await analyse_garment_slits(
+            frontal_url=kie_elements[0]["element_input_urls"][0],
+            reference_urls=_ref_urls if _ref_urls else None,
+        )
+        logger.info("[%s] Kie garment constraint: %s", job_id, garment_constraint)
+
+        # Append GPT constraint to element description (still independent of prompt limit)
+        if garment_constraint:
+            _gc = str(garment_constraint)[:200]  # type: ignore[index]
+            for el in kie_elements:
+                el["description"] = el["description"] + " " + _gc
+
+        # ── 5. Build shot prompts ─────────────────────────────────────────────
+        _update_job(job_id, progress=45, message="Kie stüdyo: çekimler hazırlanıyor...")
+
+        kie_shots: list = []
+        if shots_list:
+            for shot in shots_list:
+                desc = (shot.description or "").strip()
+                if desc:
+                    desc_stripped = _re.sub(r'^(@[Ee]lement\d*\w*\s*)+', '', desc).strip()
+                    translated = await translate_studio_shot_description(
+                        user_description=desc_stripped,
+                        scene_anchor=scene_anchor,
+                    )
+                    prompt = f"{_elem_token} {translated}"
+                else:
+                    prompt = (
+                        f"{_elem_token} In the {scene_anchor}, model walks elegantly "
+                        "with tiny concealed steps, sealed skirt moves as one piece, "
+                        "showcasing the garment"
+                    )
+                # No need for _HEM_LOCK_SHORT in prompt — constraint is in element description
+                kie_shots.append({"duration": shot.duration, "prompt": prompt[:512]})  # type: ignore[index]
+        else:
+            kie_shots = [
+                {"duration": 5, "prompt": f"{_elem_token} In the {scene_anchor}, model walks slowly toward camera with tiny concealed steps, sealed skirt moves as one column, showcasing the garment details"},
+                {"duration": 5, "prompt": f"{_elem_token} In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt remains completely closed throughout"},
+            ]
+
+        # ── 6. Generate video ─────────────────────────────────────────────────
+        _update_job(job_id, progress=55, message="Kie.ai: video üretiliyor...")
+        logger.info("[%s] Kie: %d shots, start=%s", job_id, len(kie_shots), fal_start[:60])  # type: ignore[index]
+
+        video_url = await generate_kie_video(
+            start_image_url=fal_start,
+            multi_prompt=kie_shots,
+            kling_elements=kie_elements,
+            aspect_ratio=aspect_ratio,
+            generate_audio=generate_audio,
+        )
+        logger.info("[%s] Kie video URL: %s", job_id, video_url[:80])
+
+        # ── 7. Download + save ────────────────────────────────────────────────
+        _update_job(job_id, progress=85, message="Video indiriliyor...")
+        final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
+        clip_path = await download_file(video_url, settings.TEMP_DIR, extension=".mp4")
+        shutil.move(clip_path, final_path)
+        logger.info("[%s] Kie video saved: %s", job_id, final_path)
+
+        # ── 8. Upload to Supabase ─────────────────────────────────────────────
+        result_url = None
+        try:
+            _update_job(job_id, progress=96, message="Video yükleniyor...")
+            db = _get_supabase()
+            filename = os.path.basename(final_path)
+            with open(final_path, "rb") as f:
+                db.storage.from_("videos").upload(
+                    path=filename,
+                    file=f.read(),
+                    file_options={"content-type": "video/mp4"},
+                )
+            result_url = db.storage.from_("videos").get_public_url(filename)
+            logger.info("[%s] Kie video uploaded to Supabase: %s", job_id, result_url)
+        except Exception as upload_err:
+            logger.warning("[%s] Supabase upload failed, using local URL: %s", job_id, upload_err)
+            relative = final_path.replace("\\", "/")
+            result_url = f"/outputs/{relative.split('/outputs/')[-1]}"
+
+        _update_job(
+            job_id,
+            status=JobStatus.COMPLETED,
+            progress=100,
+            message="Kie.ai video başarıyla üretildi!",
+            result_url=result_url,
+        )
+        logger.info("[%s] Kie studio pipeline complete", job_id)
+
+        from services.telegram_service import notify_video_ready  # type: ignore[import]
+        await notify_video_ready(result_url or "", job_id, mode="kie_studio")
+
+    except Exception as exc:
+        logger.exception("[%s] Kie studio pipeline failed", job_id)
+        _update_job(
+            job_id,
+            status=JobStatus.FAILED,
+            message=_tr_error(exc),
+        )
