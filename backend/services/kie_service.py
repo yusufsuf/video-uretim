@@ -85,59 +85,54 @@ async def _poll_task(task_id: str) -> str:
         await asyncio.sleep(_POLL_INTERVAL)
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(
-                f"{KIE_BASE}/jobs/getTaskDetail/{task_id}",
+                f"{KIE_BASE}/jobs/recordInfo",
+                params={"taskId": task_id},
                 headers=headers,
             )
-            logger.info("Kie.ai poll status: %s, url: %s", resp.status_code, resp.url)
             resp.raise_for_status()
             data = resp.json()
-        logger.info("Kie.ai poll response: %s", data)
 
         task_data = data.get("data") or {}
-        status: str = (task_data.get("status") or "").lower()
-        logger.info("Kie.ai task %s [%d/%d]: %s", task_id, i + 1, attempts, status)
+        state: str = (task_data.get("state") or "").lower()
+        logger.info("Kie.ai task %s [%d/%d]: state=%s", task_id, i + 1, attempts, state)
 
-        if status in ("succeed", "success", "completed", "finished"):
+        if state == "success":
             video_url = _extract_video_url(task_data)
             if video_url:
-                logger.info("Kie.ai task %s done: %s", task_id, video_url[:80])
+                logger.info("Kie.ai task %s done: %s", task_id, str(video_url)[:80])  # type: ignore[index]
                 return video_url
-            # Log full response for debugging unknown response shapes
-            logger.error("Kie.ai task complete but no video URL found. Full response: %s", data)
+            logger.error("Kie.ai task complete but no video URL. Full response: %s", data)
             raise RuntimeError(f"Kie.ai task completed but no video URL in response: {data}")
 
-        if status in ("failed", "error", "cancelled"):
+        if state == "fail":
             logger.error("Kie.ai task %s failed: %s", task_id, data)
-            raise RuntimeError(f"Kie.ai task failed (status={status}): {task_data.get('message', '')}")
+            raise RuntimeError(f"Kie.ai task failed: {task_data.get('failMsg', '')}")
 
     raise RuntimeError(f"Kie.ai task {task_id} timed out after {_MAX_WAIT}s")
 
 
 def _extract_video_url(task_data: dict) -> str | None:
-    """Try known response shapes to find the video URL."""
-    # Shape 1: task_data.output.video_url
-    output = task_data.get("output") or {}
-    if isinstance(output, dict):
-        for key in ("video_url", "url", "video"):
-            val = output.get(key)
-            if isinstance(val, str) and val.startswith("http"):
-                return val
-            if isinstance(val, dict):
-                inner = val.get("url") or val.get("video_url")
-                if isinstance(inner, str) and inner.startswith("http"):
-                    return inner
+    """Extract video URL from kie.ai task response.
 
-    # Shape 2: task_data.result.video_url
-    result = task_data.get("result") or {}
-    if isinstance(result, dict):
-        for key in ("video_url", "url"):
-            val = result.get(key)
-            if isinstance(val, str) and val.startswith("http"):
-                return val
+    kie.ai returns: resultJson = '{"resultUrls":["https://...mp4"]}'
+    """
+    import json as _json
 
-    # Shape 3: task_data.videos[0]
-    videos = task_data.get("videos") or []
-    if videos and isinstance(videos[0], dict):
-        return videos[0].get("url") or videos[0].get("video_url")
+    # Primary: resultJson string → parse → resultUrls[0]
+    result_json_str = task_data.get("resultJson")
+    if result_json_str and isinstance(result_json_str, str):
+        try:
+            parsed = _json.loads(result_json_str)
+            urls = parsed.get("resultUrls") or []
+            if urls and isinstance(urls[0], str) and urls[0].startswith("http"):
+                return urls[0]
+        except Exception:
+            pass
+
+    # Fallback: direct url fields
+    for key in ("video_url", "url", "videoUrl"):
+        val = task_data.get(key)
+        if isinstance(val, str) and val.startswith("http"):
+            return val
 
     return None
