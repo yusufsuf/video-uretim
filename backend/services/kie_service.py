@@ -85,12 +85,13 @@ async def _poll_task(task_id: str) -> str:
         await asyncio.sleep(_POLL_INTERVAL)
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(
-                f"{KIE_BASE}/jobs/getTaskDetail",
-                params={"taskId": task_id},
+                f"{KIE_BASE}/jobs/getTaskDetail/{task_id}",
                 headers=headers,
             )
+            logger.info("Kie.ai poll status: %s, url: %s", resp.status_code, resp.url)
             resp.raise_for_status()
             data = resp.json()
+        logger.info("Kie.ai poll response: %s", data)
 
         task_data = data.get("data") or {}
         status: str = (task_data.get("status") or "").lower()
