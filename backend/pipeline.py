@@ -1382,20 +1382,20 @@ async def run_kie_studio_pipeline(
                         user_description=desc_stripped,
                         scene_anchor=scene_anchor,
                     )
-                    prompt = f"{_elem_token} {translated}"
+                    # kie.ai: token goes at END of prompt (not beginning)
+                    prompt = f"{translated}{_elem_token}"
                 else:
                     prompt = (
-                        f"{_elem_token} In the {scene_anchor}, model walks elegantly "
+                        f"In the {scene_anchor}, model walks elegantly "
                         "with tiny concealed steps, sealed skirt moves as one piece, "
-                        "showcasing the garment"
+                        f"showcasing the garment{_elem_token}"
                     )
-                # No need for _HEM_LOCK_SHORT in prompt — constraint is in element description
-                # kie.ai limit: 500 chars per prompt (not 512 like fal.ai)
+                # kie.ai limit: 500 chars per prompt
                 kie_shots.append({"duration": shot.duration, "prompt": prompt[:500]})  # type: ignore[index]
         else:
             kie_shots = [
-                {"duration": 5, "prompt": f"{_elem_token} In the {scene_anchor}, model walks slowly toward camera with tiny concealed steps, sealed skirt moves as one column, showcasing the garment details"[:500]},  # type: ignore[index]
-                {"duration": 5, "prompt": f"{_elem_token} In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt remains completely closed throughout"[:500]},  # type: ignore[index]
+                {"duration": 5, "prompt": f"In the {scene_anchor}, model walks slowly toward camera with tiny concealed steps, sealed skirt moves as one column, showcasing the garment details{_elem_token}"[:500]},  # type: ignore[index]
+                {"duration": 5, "prompt": f"In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt remains completely closed throughout{_elem_token}"[:500]},  # type: ignore[index]
             ]
 
         # ── 6. Generate video ─────────────────────────────────────────────────
