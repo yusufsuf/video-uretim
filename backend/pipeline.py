@@ -1332,32 +1332,31 @@ async def run_kie_studio_pipeline(
                     message="Kie stüdyo: elementler hazırlanıyor...")
 
         # ── 1. Build kie.ai elements ──────────────────────────────────────────
+        # kie.ai: use ONE element with all images merged (max 4).
+        # Multiple elements + multiple @tokens per shot causes 500 errors.
         _elem_defs = _json.loads(elements_json)
-        kie_elements: list = []
-        element_names: list[str] = []
+        _elem_token = "@element_garment"
 
-        for i, _ed in enumerate(_elem_defs[:4]):
-            elem_name = f"element_garment{i + 1}" if len(_elem_defs) > 1 else "element_garment"
-            element_names.append(elem_name)
+        # Collect all image URLs across all selected elements, max 4 total
+        _all_img_urls: list = []
+        for _ed in _elem_defs:
+            _all_img_urls.append(_ed["front_url"])
+            for _eu in (_ed.get("extra_urls") or []):
+                _all_img_urls.append(_eu)
+        _all_img_urls = _all_img_urls[:4]  # type: ignore[index]
 
-            # Collect all image URLs for this element (front + extras), max 4
-            all_urls = [_ed["front_url"]] + (_ed.get("extra_urls") or [])
-            all_urls = all_urls[:4]  # type: ignore[index]
+        kie_input_urls: list = []
+        for img_url in _all_img_urls:
+            kie_input_urls.append(await _to_fal_url_compressed(img_url))
 
-            # Re-upload to fal CDN so kie.ai can fetch them reliably
-            kie_input_urls: list = []
-            for img_url in all_urls:
-                kie_input_urls.append(await _to_fal_url_compressed(img_url))
-
-            kie_elements.append({
-                "name": elem_name,
-                "description": _KIE_ELEMENT_DESC,
-                "element_input_urls": kie_input_urls,
-            })
-            logger.info("[%s] Kie element '%s': %d images", job_id, elem_name, len(kie_input_urls))
-
-        # Token prefix for prompts: "@element_garment" or "@element_garment1 @element_garment2"
-        _elem_token = " ".join(f"@{n}" for n in element_names)
+        # Short description — kie.ai has an implicit length limit (long descriptions cause 500)
+        _kie_desc_short = "floor-length gown, NO slit, sealed skirt, legs hidden"
+        kie_elements: list = [{
+            "name": "element_garment",
+            "description": _kie_desc_short,
+            "element_input_urls": kie_input_urls,
+        }]
+        logger.info("[%s] Kie single element: %d images", job_id, len(kie_input_urls))
 
         # ── 2. Start frame ────────────────────────────────────────────────────
         _update_job(job_id, progress=25, message="Kie stüdyo: sahne analiz ediliyor...")
@@ -1368,23 +1367,10 @@ async def run_kie_studio_pipeline(
         scene_anchor = await extract_scene_anchor(fal_start)
         logger.info("[%s] Kie scene anchor: %s", job_id, scene_anchor)
 
-        # ── 4. GPT: analyse garment slits ─────────────────────────────────────
-        _update_job(job_id, progress=35, message="Kie stüdyo: elbise analiz ediliyor...")
-        _ref_urls = kie_elements[0]["element_input_urls"][1:]
-        garment_constraint = await analyse_garment_slits(
-            frontal_url=kie_elements[0]["element_input_urls"][0],
-            reference_urls=_ref_urls if _ref_urls else None,
-        )
-        logger.info("[%s] Kie garment constraint: %s", job_id, garment_constraint)
-
-        # Append GPT constraint to element description (still independent of prompt limit)
-        if garment_constraint:
-            _gc = str(garment_constraint)[:200]  # type: ignore[index]
-            for el in kie_elements:
-                el["description"] = el["description"] + " " + _gc
+        # ── 4. GPT: analyse garment slits (skipped — constraint already in description) ───
+        _update_job(job_id, progress=40, message="Kie stüdyo: çekimler hazırlanıyor...")
 
         # ── 5. Build shot prompts ─────────────────────────────────────────────
-        _update_job(job_id, progress=45, message="Kie stüdyo: çekimler hazırlanıyor...")
 
         kie_shots: list = []
         if shots_list:
