@@ -58,9 +58,12 @@ async def generate_multishot_video(
                     len(normalized), total_duration, aspect_ratio, generate_audio)
         arguments: dict = {
             "start_image_url": start_image_url,
+            "prompt": "",
             "multi_prompt": normalized,
+            "shot_type": "customize",
             "duration": str(total_duration),
             "aspect_ratio": aspect_ratio,
+            "cfg_scale": 0.7,
             "generate_audio": generate_audio,
             "negative_prompt": negative_prompt,
         }
@@ -77,6 +80,7 @@ async def generate_multishot_video(
             "prompt": prompt,
             "duration": shot_duration,
             "aspect_ratio": aspect_ratio,
+            "cfg_scale": 0.7,
             "generate_audio": generate_audio,
             "negative_prompt": negative_prompt,
         }
