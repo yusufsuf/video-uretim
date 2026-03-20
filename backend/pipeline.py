@@ -1349,6 +1349,11 @@ async def run_kie_studio_pipeline(
         for img_url in _all_img_urls:
             kie_input_urls.append(await _to_fal_url_compressed(img_url))
 
+        # kie.ai requires 2-4 image URLs per element — pad with duplicate if only 1
+        if len(kie_input_urls) == 1:
+            kie_input_urls.append(kie_input_urls[0])
+            logger.info("[%s] Kie: padded element to 2 images (kie.ai requires min 2)", job_id)
+
         # Short description — kie.ai has an implicit length limit (long descriptions cause 500)
         _kie_desc_short = "floor-length gown, NO slit, sealed skirt, legs hidden"
         kie_elements: list = [{
