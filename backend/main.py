@@ -25,7 +25,7 @@ from config import settings
 from dependencies import get_current_user
 from limiter import limiter
 from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, LocationPreset, RefineShotRequest, ShotConfig, SuggestShotsRequest
-from pipeline import jobs, run_pipeline, run_defile_collection_pipeline, run_kie_studio_pipeline, _load_history
+from pipeline import jobs, run_pipeline, run_defile_collection_pipeline, _load_history
 from services.analysis_service import refine_shot_description, suggest_shot_descriptions
 from pydantic import BaseModel
 
@@ -457,51 +457,6 @@ async def register_page():
 async def order_page():
     return FileResponse(os.path.join(_get_frontend_dir(), "order-preview.html"), media_type="text/html")
 
-
-# ─── Kie.ai Studio endpoint ────────────────────────────────────────
-@app.post("/api/kie/studio", response_model=JobResponse)
-@limiter.limit("10/hour")
-async def kie_studio_endpoint(
-    request: Request,
-    _user: dict = Depends(get_current_user),
-    elements_json: str = Form(...),
-    shots: Optional[str] = Form(None),
-    aspect_ratio: str = Form("9:16"),
-    generate_audio: str = Form("false"),
-    library_front_url: Optional[str] = Form(None),
-    library_side_url: Optional[str] = Form(None),
-    library_back_url: Optional[str] = Form(None),
-    ozel_start_frame: Optional[UploadFile] = File(None),
-    front_image: Optional[UploadFile] = File(None),  # dummy, required by multipart
-):
-    """Start a Kie.ai studio video generation job."""
-    shots_list = None
-    if shots:
-        try:
-            raw = json.loads(shots)
-            shots_list = [ShotConfig(**s) for s in raw]
-        except Exception:
-            shots_list = None
-
-    start_frame_url = None
-    if ozel_start_frame and ozel_start_frame.size:
-        sf_path = await _save_upload(ozel_start_frame)
-        start_frame_url = _file_to_url(sf_path)
-
-    job_id = uuid.uuid4().hex
-    jobs[job_id] = JobResponse(job_id=job_id, status=JobStatus.PENDING, progress=0, message="Kie stüdyo başlatılıyor...")
-
-    asyncio.create_task(
-        run_kie_studio_pipeline(
-            job_id=job_id,
-            elements_json=elements_json,
-            shots_list=shots_list or [],
-            aspect_ratio=aspect_ratio,
-            generate_audio=generate_audio.lower() == "true",
-            start_frame_url=start_frame_url,
-        )
-    )
-    return jobs[job_id]
 
 
 # ─── Order code endpoints ───────────────────────────────────────────
