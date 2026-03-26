@@ -615,7 +615,25 @@ async def run_pipeline(
                     for i, s in enumerate(studio_shots)
                 ],
             )
+            # Build debug payload mirroring the actual API call body
+            _neg_str: str = _studio_negative  # type: ignore[assignment]
+            _neg_preview = (_neg_str[:300] + "…") if len(_neg_str) > 300 else _neg_str
+            _debug_payload = {
+                "start_image_url": fal_studio_start,
+                "multi_prompt": [
+                    {"prompt": s["prompt"], "duration": s["duration"]}
+                    for s in studio_shots
+                ],
+                "shot_type": "customize",
+                "duration": str(total_studio_dur),
+                "aspect_ratio": aspect_ratio,
+                "generate_audio": generate_audio,
+                "negative_prompt": _neg_preview,
+                "elements": kling_elements,
+                "provider": provider,
+            }
             _update_job(job_id, scene_prompt=_studio_scene_prompt,
+                        debug_payload=_debug_payload,
                         progress=55, message="Video üretiliyor (stüdyo modu)...")
             logger.info("[%s] Studio shots to send:\n%s", job_id,
                         "\n".join(f"  [{i+1}] ({s['duration']}s) {s['prompt']}" for i, s in enumerate(studio_shots)))

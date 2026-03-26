@@ -165,3 +165,4 @@ class JobResponse(BaseModel):
     result_url: Optional[str] = None
     analysis: Optional[DressAnalysisResult] = None
     scene_prompt: Optional[MultiScenePrompt] = None
+    debug_payload: Optional[dict] = None  # actual request body sent to video API

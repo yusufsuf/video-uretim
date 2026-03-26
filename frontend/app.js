@@ -180,6 +180,7 @@ let watermarkFile = null;
 let currentJobId   = null;
 let pollInterval   = null;
 let lastGenerationInputs = null; // captured at generation start, shown after result
+let lastDebugPayload    = null; // actual API body, returned from backend after generation
 let currentWizardStep = 1;
 const TOTAL_STEPS = 3;
 let generationStarted = false;
@@ -2261,8 +2262,9 @@ async function pollStatus() {
         updateProgress(job.progress, job.message);
         updateStepsTimeline(job.status);
 
-        if (job.analysis)     showAnalysis(job.analysis);
-        if (job.scene_prompt) showPrompt(job.scene_prompt);
+        if (job.analysis)      showAnalysis(job.analysis);
+        if (job.scene_prompt)  showPrompt(job.scene_prompt);
+        if (job.debug_payload) lastDebugPayload = job.debug_payload;
 
         if (job.status === "completed") {
             clearInterval(pollInterval);
@@ -2385,6 +2387,20 @@ function _showInputSummary() {
         .map(([k, v]) => `<div class="analysis-item"><div class="label">${labelMap[k] || k}</div><div class="value">${v}</div></div>`)
         .join("");
 
+    // Show raw API payload if available
+    let payloadEl = document.getElementById("input-summary-payload");
+    if (!payloadEl) {
+        payloadEl = document.createElement("div");
+        payloadEl.id = "input-summary-payload";
+        payloadEl.style.cssText = "margin-top:12px";
+        body.appendChild(payloadEl);
+    }
+    if (lastDebugPayload) {
+        payloadEl.innerHTML = `<div style="font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent-warm);margin-bottom:6px">API Payload</div><pre class="debug-payload-pre">${JSON.stringify(lastDebugPayload, null, 2)}</pre>`;
+    } else {
+        payloadEl.innerHTML = "";
+    }
+
     panel.classList.add("active");
 
     // Toggle collapse behaviour
@@ -2411,6 +2427,7 @@ newBtn?.addEventListener("click", () => {
     document.getElementById("input-summary-body")?.classList.remove("open");
     document.getElementById("input-summary-toggle")?.classList.remove("open");
     lastGenerationInputs = null;
+    lastDebugPayload     = null;
     analysisPanel.classList.remove("active");
     promptPanel.classList.remove("active");
     removeFile("front");
