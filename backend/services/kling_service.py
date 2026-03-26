@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 _BASE_URL = "https://api-singapore.klingai.com"
 _POLL_INTERVAL = 10   # seconds between status checks
 _POLL_TIMEOUT  = 600  # max wait: 10 minutes
+_ELEM_INTERVAL = 5    # seconds between element creation polls
+_ELEM_TIMEOUT  = 300  # max wait for element: 5 minutes
 
 
 def _make_jwt() -> str:
@@ -44,12 +46,92 @@ def _headers() -> dict:
     }
 
 
+# ─── Element API ────────────────────────────────────────────────────────────
+
+async def create_element(
+    frontal_image_url: str,
+    reference_image_urls: List[str],
+    name: str = "garment",
+    description: str = "fashion garment",
+) -> int:
+    """Create a Kling element from images. Returns element_id (int).
+
+    Kling requires at least one frontal image plus 1–3 reference images
+    that differ from the front. If no extra references are provided, the
+    frontal image is duplicated as a reference (API still accepts it).
+    """
+    refer_imgs = (reference_image_urls[:3]  # type: ignore[index]
+                  if reference_image_urls else [frontal_image_url])
+
+    body = {
+        "element_name": name[:20],  # type: ignore[index]
+        "element_description": description[:100],  # type: ignore[index]
+        "reference_type": "image_refer",
+        "element_image_list": {
+            "frontal_image": frontal_image_url,
+            "refer_images": [{"image_url": u} for u in refer_imgs],
+        },
+        "tag_list": [{"tag_id": "o_105"}],  # Costume
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{_BASE_URL}/v1/general/advanced-custom-elements",
+            json=body,
+            headers=_headers(),
+        )
+        if resp.status_code != 200:
+            _err = resp.text; raise RuntimeError(f"Kling element creation HTTP {resp.status_code}: {_err[:300]}")
+        data = resp.json()
+        if data.get("code") != 0:
+            raise RuntimeError(f"Kling element error {data.get('code')}: {data.get('message')}")
+        task_id: str = data["data"]["task_id"]
+
+    logger.info("Kling element task created: %s (name=%s)", task_id, name[:20])
+    return await _poll_element(task_id)
+
+
+async def _poll_element(task_id: str) -> int:
+    """Poll element creation task until complete. Returns element_id."""
+    elapsed = 0
+    while elapsed < _ELEM_TIMEOUT:
+        await asyncio.sleep(_ELEM_INTERVAL)
+        elapsed += _ELEM_INTERVAL
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                f"{_BASE_URL}/v1/general/advanced-custom-elements/{task_id}",
+                headers=_headers(),
+            )
+            if resp.status_code != 200:
+                logger.warning("Element poll HTTP %s: %s", resp.status_code, resp.text[:200]  # type: ignore[index])
+                continue
+            data = resp.json()
+
+        status = data["data"]["task_status"]
+        logger.debug("Element task %s status: %s (elapsed %ds)", task_id, status, elapsed)
+
+        if status == "succeed":
+            element_id: int = data["data"]["task_result"]["elements"][0]["element_id"]
+            logger.info("Kling element ready: id=%d (task=%s)", element_id, task_id)
+            return element_id
+
+        if status == "failed":
+            msg = data["data"].get("task_status_msg", "unknown error")
+            raise RuntimeError(f"Kling element task {task_id} failed: {msg}")
+
+    raise TimeoutError(f"Kling element task {task_id} timed out after {_ELEM_TIMEOUT}s")
+
+
+# ─── Video API ───────────────────────────────────────────────────────────────
+
 async def generate_multishot_video(
     start_image_url: str,
     multi_prompt: List[dict],
     duration: str = "10",
     aspect_ratio: str = "9:16",
     generate_audio: bool = False,
+    element_list: Optional[List[dict]] = None,  # [{"element_id": int}, ...]
     negative_prompt: str = (
         "blur, distort, low quality, deformed hands, deformed face, "
         "changed outfit, different dress, altered silhouette, different fabric, "
@@ -60,12 +142,7 @@ async def generate_multishot_video(
         "cropped skirt, raised hemline, above-ankle hem, shortened dress"
     ),
 ) -> str:
-    """Generate a video via Kling Direct API.
-
-    Matches the signature of video_service.generate_multishot_video so it can
-    be used as a drop-in replacement (elements param intentionally omitted —
-    element_id support will be added in a follow-up after testing).
-    """
+    """Generate a video via Kling Direct API."""
     if not settings.KLING_ACCESS_KEY or not settings.KLING_SECRET_KEY:
         raise RuntimeError("KLING_ACCESS_KEY / KLING_SECRET_KEY not configured")
 
@@ -93,9 +170,13 @@ async def generate_multishot_video(
         "mode": "pro",
     }
 
+    if element_list:
+        body["element_list"] = element_list
+        logger.info("Kling Direct: using element_list=%s", element_list)
+
     logger.info(
-        "Kling Direct: %d shots, total=%ss, aspect=%s, audio=%s",
-        len(shots), total_dur, aspect_ratio, generate_audio,
+        "Kling Direct: %d shots, total=%ss, aspect=%s, audio=%s, elements=%d",
+        len(shots), total_dur, aspect_ratio, generate_audio, len(element_list or []),
     )
     for s in shots:
         logger.info("  Shot [%d] (%ss): %s", s["index"], s["duration"], s["prompt"])
@@ -107,7 +188,7 @@ async def generate_multishot_video(
             headers=_headers(),
         )
         if resp.status_code != 200:
-            raise RuntimeError(f"Kling API HTTP {resp.status_code}: {resp.text[:300]}")
+            _err = resp.text; raise RuntimeError(f"Kling API HTTP {resp.status_code}: {_err[:300]}")
         data = resp.json()
         if data.get("code") != 0:
             raise RuntimeError(f"Kling API error {data.get('code')}: {data.get('message')}")
@@ -130,7 +211,7 @@ async def _poll_task(task_id: str) -> str:
                 headers=_headers(),
             )
             if resp.status_code != 200:
-                logger.warning("Kling poll HTTP %s: %s", resp.status_code, resp.text[:200])
+                logger.warning("Kling poll HTTP %s: %s", resp.status_code, resp.text[:200]  # type: ignore[index])
                 continue
             data = resp.json()
 

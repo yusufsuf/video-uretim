@@ -337,14 +337,42 @@ async def run_pipeline(
     async def _gen_video(**kwargs) -> str:
         """Route to Kling Direct or fal.ai based on provider param."""
         if provider == "kling":
-            from services.kling_service import generate_multishot_video as _kling_gen
-            # Strip @ElementN tokens — no element_id support in test mode
+            from services.kling_service import (  # type: ignore[import]
+                generate_multishot_video as _kling_gen,
+                create_element as _kling_create_elem,
+            )
+            import asyncio as _aio
+
+            # Pop fal.ai-style elements list and create real Kling elements
+            fal_elements = kwargs.pop("elements", []) or []
+            element_list = []
+            if fal_elements:
+                logger.info("[%s] Creating %d Kling element(s)...", job_id, len(fal_elements))
+                coros = [
+                    _kling_create_elem(
+                        frontal_image_url=e["frontal_image_url"],
+                        reference_image_urls=e.get("reference_image_urls", []),
+                        name=f"garment{i + 1}",
+                        description=f"fashion garment {i + 1}",
+                    )
+                    for i, e in enumerate(fal_elements) if i < 3  # Kling max 3 elements
+                ]
+                element_ids = await _aio.gather(*coros)
+                element_list = [{"element_id": int(eid)} for eid in element_ids]
+                logger.info("[%s] Kling elements ready: %s", job_id, element_ids)
+
+            # Replace @ElementN → <<<element_N>>> (Kling native token format)
             if "multi_prompt" in kwargs:
                 kwargs["multi_prompt"] = [
-                    {**s, "prompt": _re_elem.sub(r"@Element\d+\s*", "", s["prompt"]).strip()}
+                    {**s, "prompt": _re_elem.sub(
+                        r"@Element(\d+)",
+                        lambda m: f"<<<element_{m.group(1)}>>>",
+                        s["prompt"],
+                    ).strip()}
                     for s in kwargs["multi_prompt"]
                 ]
-            kwargs.pop("elements", None)
+
+            kwargs["element_list"] = element_list if element_list else None
             return await _kling_gen(**kwargs)
         return await generate_multishot_video(**kwargs)
 
