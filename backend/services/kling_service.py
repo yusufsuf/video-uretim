@@ -104,7 +104,7 @@ async def _poll_element(task_id: str) -> int:
                 headers=_headers(),
             )
             if resp.status_code != 200:
-                logger.warning("Element poll HTTP %s: %s", resp.status_code, resp.text[:200]  # type: ignore[index])
+                _warn = resp.text; logger.warning("Element poll HTTP %s: %s", resp.status_code, _warn[:200])
                 continue
             data = resp.json()
 
@@ -211,7 +211,7 @@ async def _poll_task(task_id: str) -> str:
                 headers=_headers(),
             )
             if resp.status_code != 200:
-                logger.warning("Kling poll HTTP %s: %s", resp.status_code, resp.text[:200]  # type: ignore[index])
+                _warn = resp.text; logger.warning("Kling poll HTTP %s: %s", resp.status_code, _warn[:200])
                 continue
             data = resp.json()
 
