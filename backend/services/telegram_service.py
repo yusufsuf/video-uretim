@@ -21,7 +21,7 @@ async def notify_video_ready(
         return
 
     token = settings.TELEGRAM_BOT_TOKEN
-    chat_id = settings.TELEGRAM_CHAT_ID
+    chat_ids = [cid.strip() for cid in settings.TELEGRAM_CHAT_ID.split(",") if cid.strip()]
 
     mode_label = f" · {mode}" if mode else ""
     extra_label = f"\n{extra}" if extra else ""
@@ -29,35 +29,35 @@ async def notify_video_ready(
 
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            # Try sendVideo first (shows inline preview)
-            if result_url.startswith("http"):
-                resp = await client.post(
-                    _TG_BASE.format(token=token, method="sendVideo"),
+            for chat_id in chat_ids:
+                # Try sendVideo first (shows inline preview)
+                if result_url.startswith("http"):
+                    resp = await client.post(
+                        _TG_BASE.format(token=token, method="sendVideo"),
+                        data={
+                            "chat_id": chat_id,
+                            "video": result_url,
+                            "caption": caption,
+                            "parse_mode": "Markdown",
+                            "supports_streaming": "true",
+                        },
+                    )
+                    if resp.status_code == 200 and resp.json().get("ok"):
+                        logger.info("[%s] Telegram video notification sent to %s", job_id, chat_id)
+                        continue
+                    logger.debug("[%s] sendVideo failed for %s (%s), falling back to sendMessage", job_id, chat_id, resp.text[:120])
+
+                # Fallback: plain message with link
+                await client.post(
+                    _TG_BASE.format(token=token, method="sendMessage"),
                     data={
                         "chat_id": chat_id,
-                        "video": result_url,
-                        "caption": caption,
+                        "text": f"{caption}\n[Videoyu aç]({result_url})",
                         "parse_mode": "Markdown",
-                        "supports_streaming": "true",
+                        "disable_web_page_preview": "false",
                     },
                 )
-                if resp.status_code == 200 and resp.json().get("ok"):
-                    logger.info("[%s] Telegram video notification sent", job_id)
-                    return
-                # sendVideo failed (URL not directly streamable) — fall back to message
-                logger.debug("[%s] sendVideo failed (%s), falling back to sendMessage", job_id, resp.text[:120])
-
-            # Fallback: plain message with link
-            await client.post(
-                _TG_BASE.format(token=token, method="sendMessage"),
-                data={
-                    "chat_id": chat_id,
-                    "text": f"{caption}\n[Videoyu aç]({result_url})",
-                    "parse_mode": "Markdown",
-                    "disable_web_page_preview": "false",
-                },
-            )
-            logger.info("[%s] Telegram message notification sent", job_id)
+                logger.info("[%s] Telegram message notification sent to %s", job_id, chat_id)
 
     except Exception as exc:
         logger.warning("[%s] Telegram notification failed: %s", job_id, exc)
