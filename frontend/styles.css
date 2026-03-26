@@ -894,6 +894,56 @@ textarea.form-input {
     display: block;
 }
 
+/* ── Input Summary Panel ───────────────────────────────────────── */
+.input-summary-panel {
+    display: none;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.input-summary-panel.active {
+    display: block;
+}
+
+.input-summary-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: var(--bg-card);
+    border: none;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: left;
+}
+
+.input-summary-toggle:hover {
+    color: var(--text-primary);
+}
+
+.input-summary-toggle .chevron {
+    margin-left: auto;
+    transition: transform 0.2s;
+}
+
+.input-summary-toggle.open .chevron {
+    transform: rotate(180deg);
+}
+
+.input-summary-body {
+    display: none;
+    padding: 12px;
+    background: var(--bg-secondary);
+}
+
+.input-summary-body.open {
+    display: block;
+}
+
 .result-video-wrapper {
     width: 100%;
     max-width: 500px;

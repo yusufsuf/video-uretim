@@ -179,6 +179,7 @@ let videoFile  = null;
 let watermarkFile = null;
 let currentJobId   = null;
 let pollInterval   = null;
+let lastGenerationInputs = null; // captured at generation start, shown after result
 let currentWizardStep = 1;
 const TOTAL_STEPS = 3;
 let generationStarted = false;
@@ -1988,6 +1989,7 @@ async function startStudioGeneration() {
     showWizardStep(TOTAL_STEPS);
 
     resultSec.classList.remove("active");
+    document.getElementById("input-summary-panel")?.classList.remove("active");
     progressSec.classList.add("active");
     generationStarted = true;
     wizardFooter.style.display = "none";
@@ -1995,6 +1997,18 @@ async function startStudioGeneration() {
     step4Sub.textContent = `Stüdyo modu: ${studioShots.length} çekim, ${_studioTotalDur()}s toplam. Lütfen bekleyin.`;
     resetSteps();
     updateProgress(0, "Başlatılıyor...");
+
+    // Capture inputs for post-generation summary
+    const providerVal = document.getElementById("studio-provider-select")?.value || "fal";
+    lastGenerationInputs = {
+        mod: "Stüdyo",
+        provider: providerVal === "kling" ? "Kling Direct" : "fal.ai",
+        elementler: studioElements.map(e => e.name).join(", ") || "—",
+        aspect: studioAspectRatio || "9:16",
+        cekimSayisi: studioShots.length,
+        toplamSure: _studioTotalDur() + "s",
+        ses: (document.getElementById("studio-audio-toggle")?.checked ? "Açık" : "Kapalı"),
+    };
 
     // Replace @ElementName tokens with @ElementN (fal.ai positional tokens)
     let resolvedShots = studioShots.map(s => ({ ...s, description: s.description || "" }));
@@ -2151,6 +2165,7 @@ setupUploadZone(videoZone,  videoInput,  "video");
 async function startGeneration() {
     hideError();
     resultSec.classList.remove("active");
+    document.getElementById("input-summary-panel")?.classList.remove("active");
     progressSec.classList.add("active");
     generationStarted = true;
     wizardFooter.style.display = "none";
@@ -2158,6 +2173,19 @@ async function startGeneration() {
     step4Sub.textContent = "Bu işlem 1–3 dakika sürebilir, lütfen bekleyin.";
     resetSteps();
     updateProgress(0, "Başlatılıyor...");
+
+    // Capture inputs for post-generation summary
+    const moodVal = document.getElementById("mood-select")?.value || document.getElementById("mood-input")?.value || "";
+    lastGenerationInputs = {
+        mod: "Klasik",
+        provider: "fal.ai",
+        lokasyon: selectedLocation || "—",
+        aspect: selectedAspectRatio || "9:16",
+        cekimSayisi: shots.length,
+        toplamSure: getTotalDuration() + "s",
+        ses: (audioToggle?.checked ? "Açık" : "Kapalı"),
+        ...(moodVal ? { mood: moodVal } : {}),
+    };
 
     const formData = new FormData();
     if (frontFile)          formData.append("front_image",            frontFile);
@@ -2329,7 +2357,41 @@ function showResult(url) {
         a.click();
     };
 
+    // Show input summary panel
+    _showInputSummary();
+
     loadRecentVideos();
+}
+
+function _showInputSummary() {
+    const panel  = document.getElementById("input-summary-panel");
+    const grid   = document.getElementById("input-summary-grid");
+    const toggle = document.getElementById("input-summary-toggle");
+    const body   = document.getElementById("input-summary-body");
+    if (!panel || !grid || !lastGenerationInputs) return;
+
+    const labelMap = {
+        mod:        "Mod",
+        provider:   "Motor",
+        lokasyon:   "Lokasyon",
+        elementler: "Elementler",
+        aspect:     "Oran",
+        cekimSayisi:"Çekim",
+        toplamSure: "Süre",
+        ses:        "Ses",
+        mood:       "Mood",
+    };
+    grid.innerHTML = Object.entries(lastGenerationInputs)
+        .map(([k, v]) => `<div class="analysis-item"><div class="label">${labelMap[k] || k}</div><div class="value">${v}</div></div>`)
+        .join("");
+
+    panel.classList.add("active");
+
+    // Toggle collapse behaviour
+    toggle.onclick = () => {
+        const isOpen = body.classList.toggle("open");
+        toggle.classList.toggle("open", isOpen);
+    };
 }
 
 // ─── WhatsApp Share ──────────────────────────────────────────────
@@ -2345,6 +2407,10 @@ document.getElementById("whatsapp-btn")?.addEventListener("click", () => {
 newBtn?.addEventListener("click", () => {
     resultSec.classList.remove("active");
     progressSec.classList.remove("active");
+    document.getElementById("input-summary-panel")?.classList.remove("active");
+    document.getElementById("input-summary-body")?.classList.remove("open");
+    document.getElementById("input-summary-toggle")?.classList.remove("open");
+    lastGenerationInputs = null;
     analysisPanel.classList.remove("active");
     promptPanel.classList.remove("active");
     removeFile("front");
