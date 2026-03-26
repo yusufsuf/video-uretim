@@ -29,6 +29,7 @@ from models import (
     JobResponse,
     JobStatus,
     MultiScenePrompt,
+    SingleScenePrompt,
 )
 from services.analysis_service import analyse_dress, generate_multi_scene_prompt, generate_defile_multishot_prompt, generate_custom_multishot_prompt, generate_ozel_multishot_prompt, extract_scene_anchor, analyse_garment_slits, translate_studio_shot_description
 from services.nano_banana_service import generate_background, generate_scene_frame
@@ -600,7 +601,25 @@ async def run_pipeline(
 
             total_studio_dur = sum(int(p["duration"]) for p in studio_shots)
 
-            _update_job(job_id, progress=55, message="Video üretiliyor (stüdyo modu)...")
+            # Save shot prompts to job so frontend can display them
+            _studio_scene_prompt = MultiScenePrompt(
+                background_image_prompt="",
+                total_duration=total_studio_dur,
+                scene_count=len(studio_shots),
+                scenes=[
+                    SingleScenePrompt(
+                        scene_number=i + 1,
+                        duration=str(s["duration"]),
+                        prompt=s["prompt"],
+                    )
+                    for i, s in enumerate(studio_shots)
+                ],
+            )
+            _update_job(job_id, scene_prompt=_studio_scene_prompt,
+                        progress=55, message="Video üretiliyor (stüdyo modu)...")
+            logger.info("[%s] Studio shots to send:\n%s", job_id,
+                        "\n".join(f"  [{i+1}] ({s['duration']}s) {s['prompt']}" for i, s in enumerate(studio_shots)))
+
             clip_url_studio = await _gen_video(
                 start_image_url=fal_studio_start,
                 multi_prompt=studio_shots,

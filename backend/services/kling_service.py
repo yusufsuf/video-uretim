@@ -97,6 +97,8 @@ async def generate_multishot_video(
         "Kling Direct: %d shots, total=%ss, aspect=%s, audio=%s",
         len(shots), total_dur, aspect_ratio, generate_audio,
     )
+    for s in shots:
+        logger.info("  Shot [%d] (%ss): %s", s["index"], s["duration"], s["prompt"])
 
     async with httpx.AsyncClient(timeout=30) as client:
         resp = await client.post(
