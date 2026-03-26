@@ -49,11 +49,12 @@ async def generate_multishot_video(
     Returns:
         URL of the generated video.
     """
-    # Kling hard limit: 512 chars per prompt — truncate silently as safety net
+    # Kling hard limit: 512 chars per prompt — use 500 as safe ceiling to avoid off-by-one
     # Multishot mode: more than one prompt segment → use multi_prompt API
+    _PROMPT_LIMIT = 500
     if multi_prompt and len(multi_prompt) > 1:
         total_duration = sum(int(s.get("duration", 5)) for s in multi_prompt)
-        normalized = [{"prompt": (lambda p: p if len(p) <= 512 else p[:512])(s.get("prompt", "")), "duration": str(s.get("duration", 5))} for s in multi_prompt]
+        normalized = [{"prompt": s.get("prompt", "")[:_PROMPT_LIMIT], "duration": str(s.get("duration", 5))} for s in multi_prompt]
         logger.info("Starting Kling 3.0 Pro MULTISHOT via fal.ai – %d shots, total=%ds, aspect=%s, audio=%s",
                     len(normalized), total_duration, aspect_ratio, generate_audio)
         arguments: dict = {
@@ -71,7 +72,7 @@ async def generate_multishot_video(
         # Single shot — use simple prompt
         shot = multi_prompt[0] if multi_prompt else {}
         _p = shot.get("prompt", "")
-        prompt = _p if len(_p) <= 512 else _p[:512]
+        prompt = _p[:_PROMPT_LIMIT]
         shot_duration = str(shot.get("duration", duration))
         logger.info("Starting Kling 3.0 Pro via fal.ai – duration=%ss, aspect=%s, audio=%s",
                     shot_duration, aspect_ratio, generate_audio)
