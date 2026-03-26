@@ -10,6 +10,10 @@ class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     FAL_KEY: str = os.getenv("FAL_KEY", "")
 
+    # Kling Direct API
+    KLING_ACCESS_KEY: str = os.getenv("KLING_ACCESS_KEY", "")
+    KLING_SECRET_KEY: str = os.getenv("KLING_SECRET_KEY", "")
+
     # Public base URL (set to your Coolify domain in production)
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
 

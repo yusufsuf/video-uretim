@@ -327,8 +327,26 @@ async def run_pipeline(
     reference_video_url: Optional[str] = None,
     start_frame_url: Optional[str] = None,
     elements_json: Optional[str] = None,  # JSON array of {front_url, extra_urls, name}
+    provider: str = "fal",  # "fal" = fal.ai proxy | "kling" = Kling Direct API
 ):
     """Execute the full pipeline asynchronously."""
+
+    import re as _re_elem
+
+    async def _gen_video(**kwargs) -> str:
+        """Route to Kling Direct or fal.ai based on provider param."""
+        if provider == "kling":
+            from services.kling_service import generate_multishot_video as _kling_gen
+            # Strip @ElementN tokens — no element_id support in test mode
+            if "multi_prompt" in kwargs:
+                kwargs["multi_prompt"] = [
+                    {**s, "prompt": _re_elem.sub(r"@Element\d+\s*", "", s["prompt"]).strip()}
+                    for s in kwargs["multi_prompt"]
+                ]
+            kwargs.pop("elements", None)
+            return await _kling_gen(**kwargs)
+        return await generate_multishot_video(**kwargs)
+
     try:
         # Clamp values
         duration = max(3, min(15, duration))
@@ -403,7 +421,7 @@ async def run_pipeline(
                 fal_start_url = await _to_fal_url(fal_front_url)
 
                 total_custom_dur = sum(int(p["duration"]) for p in multi_prompt_custom)
-                clip_url_custom = await generate_multishot_video(
+                clip_url_custom = await _gen_video(
                     start_image_url=fal_start_url,
                     multi_prompt=multi_prompt_custom,
                     duration=str(total_custom_dur),
@@ -461,7 +479,7 @@ async def run_pipeline(
             total_ozel_dur = sum(int(p["duration"]) for p in ozel_shots)
 
             _update_job(job_id, progress=55, message="Video üretiliyor (özel mod)...")
-            clip_url_ozel = await generate_multishot_video(
+            clip_url_ozel = await _gen_video(
                 start_image_url=fal_ozel_start,
                 multi_prompt=ozel_shots,
                 duration=str(total_ozel_dur),
@@ -583,7 +601,7 @@ async def run_pipeline(
             total_studio_dur = sum(int(p["duration"]) for p in studio_shots)
 
             _update_job(job_id, progress=55, message="Video üretiliyor (stüdyo modu)...")
-            clip_url_studio = await generate_multishot_video(
+            clip_url_studio = await _gen_video(
                 start_image_url=fal_studio_start,
                 multi_prompt=studio_shots,
                 duration=str(total_studio_dur),
@@ -726,7 +744,7 @@ async def run_pipeline(
                 elif no_train_note:
                     multi_prompt = [{"duration": p["duration"], "prompt": f"{no_train_note}. {p['prompt']}"} for p in multi_prompt]
                 total_ms_duration = sum(int(p["duration"]) for p in multi_prompt)
-                clip_url = await generate_multishot_video(
+                clip_url = await _gen_video(
                     start_image_url=scene_frame_url,
                     multi_prompt=multi_prompt,
                     duration=str(total_ms_duration),
@@ -797,7 +815,7 @@ async def run_pipeline(
                         locked_prompt = f"{no_train_note}. {scene.prompt}"
                     else:
                         locked_prompt = scene.prompt
-                    clip_url = await generate_multishot_video(
+                    clip_url = await _gen_video(
                         start_image_url=scene_frame_url,
                         multi_prompt=[{"duration": scene.duration, "prompt": locked_prompt}],
                         duration=str(shot_duration),

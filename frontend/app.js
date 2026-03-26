@@ -2031,6 +2031,7 @@ async function startStudioGeneration() {
     formData.append("shots",          shotsJson);
     formData.append("aspect_ratio",   studioAspectRatio);
     formData.append("generate_audio", document.getElementById("studio-audio-toggle")?.checked ? "true" : "false");
+    formData.append("provider", document.getElementById("studio-provider-select")?.value || "fal");
     // Required dummy front_image field (pipeline uses library_front_url when provided)
     formData.append("front_image", new Blob([], { type: "image/jpeg" }), "placeholder.jpg");
 
