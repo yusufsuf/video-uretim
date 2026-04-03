@@ -145,6 +145,7 @@ class DefileCollectionRequest(BaseModel):
     runway_background_extra_urls: Optional[List[str]] = None
     aspect_ratio: str = "9:16"
     generate_audio: bool = True
+    provider: str = "fal"  # "fal" = fal.ai | "kling" = Kling Direct
 
 
 class JobStatus(str, Enum):

@@ -1462,6 +1462,7 @@ document.querySelectorAll("#defile-ratio-cards .ratio-card").forEach(card => {
 async function startDefileCollection() {
     hideError();
     resultSec.classList.remove("active");
+    document.getElementById("input-summary-panel")?.classList.remove("active");
     progressSec.classList.add("active");
     generationStarted = true;
     wizardFooter.style.display = "none";
@@ -1474,6 +1475,7 @@ async function startDefileCollection() {
     document.getElementById("step-defile").style.display = "none";
     document.getElementById("step-3").style.display = "block";
 
+    const defileProvider = document.getElementById("defile-provider-select")?.value || "fal";
     const payload = {
         outfits: defileOutfits,
         shot_configs: defileShotConfigs,
@@ -1481,6 +1483,18 @@ async function startDefileCollection() {
         runway_background_extra_urls: defileBgExtraUrls.length > 0 ? defileBgExtraUrls : null,
         aspect_ratio: defileAspectRatio,
         generate_audio: document.getElementById("defile-audio-toggle")?.checked ?? true,
+        provider: defileProvider,
+    };
+
+    // Capture inputs for post-generation summary
+    lastGenerationInputs = {
+        mod: "Defile",
+        provider: defileProvider === "kling" ? "Kling Direct" : "fal.ai",
+        kiyafetSayisi: defileOutfits.length,
+        cekimSayisi: defileShotConfigs.length,
+        toplamSure: _defileTotalDuration() + "s",
+        aspect: defileAspectRatio,
+        ses: (document.getElementById("defile-audio-toggle")?.checked ? "Açık" : "Kapalı"),
     };
 
     try {
@@ -2373,15 +2387,16 @@ function _showInputSummary() {
     if (!panel || !grid || !lastGenerationInputs) return;
 
     const labelMap = {
-        mod:        "Mod",
-        provider:   "Motor",
-        lokasyon:   "Lokasyon",
-        elementler: "Elementler",
-        aspect:     "Oran",
-        cekimSayisi:"Çekim",
-        toplamSure: "Süre",
-        ses:        "Ses",
-        mood:       "Mood",
+        mod:           "Mod",
+        provider:      "Motor",
+        lokasyon:      "Lokasyon",
+        elementler:    "Elementler",
+        kiyafetSayisi: "Kıyafet",
+        aspect:        "Oran",
+        cekimSayisi:   "Çekim",
+        toplamSure:    "Süre",
+        ses:           "Ses",
+        mood:          "Mood",
     };
     grid.innerHTML = Object.entries(lastGenerationInputs)
         .map(([k, v]) => `<div class="analysis-item"><div class="label">${labelMap[k] || k}</div><div class="value">${v}</div></div>`)

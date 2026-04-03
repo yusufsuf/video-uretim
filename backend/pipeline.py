@@ -1298,22 +1298,56 @@ async def run_defile_collection_pipeline(
             logger.info("[%s] Defile outfit %d elements: frontal + %d refs",
                         job_id, outfit_idx + 1, len(outfit_element["reference_image_urls"]))
 
-            # ── 3c: Kling — single multishot call per outfit ──────────────
+            # ── 3c: Video generation — single multishot call per outfit ─────
             _update_job(job_id, progress=base_progress + int(35 / n_outfits),
                         message=f"{outfit_name} — video üretiliyor ({outfit_idx + 1}/{n_outfits})...")
 
-            # Re-upload scene frame so Kling can download it reliably
+            # Re-upload scene frame so video API can download it reliably
             scene_frame_url = await _to_fal_url(scene_frame_url)
 
-            clip_url = await generate_multishot_video(
-                start_image_url=scene_frame_url,
-                multi_prompt=multi_prompt,
-                duration=str(total_duration),
-                aspect_ratio=request.aspect_ratio,
-                generate_audio=request.generate_audio,
-                elements=kling_outfit_elements,
-                negative_prompt=_DEFILE_NEGATIVE,
-            )
+            _defile_provider = getattr(request, "provider", "fal")
+
+            if _defile_provider == "kling":
+                from services.kling_service import (  # type: ignore[import]
+                    generate_multishot_video as _kling_gen,
+                    create_element as _kling_create_elem,
+                )
+                # Create Kling element from outfit images
+                logger.info("[%s] Defile outfit %d: creating Kling element...", job_id, outfit_idx + 1)
+                _kling_eid = await _kling_create_elem(
+                    frontal_image_url=outfit_element["frontal_image_url"],
+                    reference_image_urls=outfit_element["reference_image_urls"],
+                    name=f"defile{outfit_idx + 1}",
+                    description=f"defile outfit {outfit_idx + 1}",
+                )
+                _kling_elem_list = [{"element_id": int(_kling_eid)}]
+                logger.info("[%s] Defile outfit %d: Kling element_id=%d", job_id, outfit_idx + 1, _kling_eid)
+
+                # Prepend <<<element_1>>> to each prompt for Kling native token format
+                _kling_prompts = [
+                    {"duration": p["duration"], "prompt": f"<<<element_1>>> {p['prompt']}"}
+                    for p in multi_prompt
+                ]
+
+                clip_url = await _kling_gen(
+                    start_image_url=scene_frame_url,
+                    multi_prompt=_kling_prompts,
+                    duration=str(total_duration),
+                    aspect_ratio=request.aspect_ratio,
+                    generate_audio=request.generate_audio,
+                    element_list=_kling_elem_list,
+                    negative_prompt=_DEFILE_NEGATIVE,
+                )
+            else:
+                clip_url = await generate_multishot_video(
+                    start_image_url=scene_frame_url,
+                    multi_prompt=multi_prompt,
+                    duration=str(total_duration),
+                    aspect_ratio=request.aspect_ratio,
+                    generate_audio=request.generate_audio,
+                    elements=kling_outfit_elements,
+                    negative_prompt=_DEFILE_NEGATIVE,
+                )
 
             clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
             clip_paths.append(clip_path)
