@@ -1062,25 +1062,10 @@ function _hideAllSteps() {
 }
 
 function openDefile() {
-    const titleEl = document.getElementById("wizard-title");
-    if (titleEl) titleEl.textContent = "Defile Modu";
-
-    const stepLabel = document.getElementById("wizard-step-label");
-    if (stepLabel) stepLabel.textContent = "";
-
-    _hideAllSteps();
-    document.getElementById("step-defile-choice").style.display = "block";
-
-    // Hide footer until sub-mode is chosen
-    const footer = document.getElementById("wizard-footer");
-    if (footer) footer.style.display = "none";
-
-    document.querySelectorAll("#step-dots .dot").forEach((d, i) => {
-        d.classList.toggle("active", i === 0);
-    });
-
     wizardModal.style.display = "flex";
     document.body.style.overflow = "hidden";
+    // Skip choice screen — go directly to NB2 defile
+    openDefileNB2();
 }
 
 function openDefileNB2() {
@@ -1322,8 +1307,19 @@ function openDefileOutfitPicker() {
     const grid    = document.getElementById("lib-picker-grid");
     const closeBtn = document.getElementById("lib-picker-close");
 
-    title.textContent = "Kıyafet Seç";
-    tabs.innerHTML = `<button class="lib-picker-tab active" data-cat="character">Elbiseler</button>`;
+    title.textContent = "Kıyafet / Element Seç";
+    tabs.innerHTML = `
+        <button class="lib-picker-tab active" data-cat="character">Elbiseler</button>
+        <button class="lib-picker-tab" data-cat="element">Elementler</button>
+    `;
+    tabs.querySelectorAll(".lib-picker-tab").forEach(btn => {
+        btn.addEventListener("click", () => {
+            tabs.querySelectorAll(".lib-picker-tab").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            _libPickerActiveTab = btn.dataset.cat;
+            _fetchAndRenderDefileOutfitLibrary(grid, btn.dataset.cat);
+        });
+    });
 
     modal.style.display = "flex";
     document.body.style.overflow = "hidden";
@@ -1564,17 +1560,10 @@ wizardBackBtn?.addEventListener("click", () => {
         _studioGoToStep(1);
         return;
     }
-    // Defile sub-modes → choice screen
-    if ((videoMode === "defile" || videoMode === "ozel") &&
-        (document.getElementById("step-defile")?.style.display === "block" ||
-         document.getElementById("step-ozel")?.style.display === "block") &&
-        document.getElementById("step-defile-choice") !== null) {
-        const titleEl = document.getElementById("wizard-title");
-        if (titleEl) titleEl.textContent = "Defile Modu";
-        _hideAllSteps();
-        document.getElementById("step-defile-choice").style.display = "block";
-        const footer = document.getElementById("wizard-footer");
-        if (footer) footer.style.display = "none";
+    // Defile → close wizard
+    if (videoMode === "defile" &&
+        document.getElementById("step-defile")?.style.display === "block") {
+        closeWizard();
         return;
     }
     if (currentWizardStep > 1 && !generationStarted) {
@@ -1584,7 +1573,6 @@ wizardBackBtn?.addEventListener("click", () => {
 });
 
 document.getElementById("defile-nb2-card")?.addEventListener("click", openDefileNB2);
-document.getElementById("defile-elements-card")?.addEventListener("click", openDefileElements);
 document.getElementById("nav-studio")?.addEventListener("click", openStudio);
 document.getElementById("card-studio")?.addEventListener("click", openStudio);
 
