@@ -1322,14 +1322,17 @@ function openDefileOutfitPicker() {
     const grid    = document.getElementById("lib-picker-grid");
     const closeBtn = document.getElementById("lib-picker-close");
 
-    title.textContent = "Kıyafet Seç";
-    tabs.innerHTML = `<button class="lib-picker-tab active" data-cat="character">Elbiseler</button>`;
+    title.textContent = "Kıyafet / Element Seç";
+    tabs.innerHTML = `
+        <button class="lib-picker-tab active" data-cat="character">Elbiseler</button>
+        <button class="lib-picker-tab" data-cat="element">Elementler</button>
+    `;
     tabs.querySelectorAll(".lib-picker-tab").forEach(btn => {
         btn.addEventListener("click", () => {
             tabs.querySelectorAll(".lib-picker-tab").forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
             _libPickerActiveTab = btn.dataset.cat;
-            _fetchAndRenderLibrary(_libPickerActiveTab, grid);
+            _fetchAndRenderDefileOutfitLibrary(grid, btn.dataset.cat);
         });
     });
 
@@ -1346,17 +1349,18 @@ function openDefileOutfitPicker() {
         }
     };
 
-    _fetchAndRenderDefileOutfitLibrary(grid);
+    _fetchAndRenderDefileOutfitLibrary(grid, "character");
 }
 
-async function _fetchAndRenderDefileOutfitLibrary(grid) {
+async function _fetchAndRenderDefileOutfitLibrary(grid, category = "character") {
     grid.innerHTML = `<div class="lib-picker-loading">Yükleniyor...</div>`;
+    const catLabel = category === "element" ? "element" : "elbise";
     try {
-        const resp = await fetch("/library/items?category=character", { headers: getAuthHeaders() });
+        const resp = await fetch(`/library/items?category=${category}`, { headers: getAuthHeaders() });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const items = await resp.json();
         if (!items.length) {
-            grid.innerHTML = `<div class="lib-picker-empty">Kütüphanede elbise yok.<br><a href="/library" target="_blank">Kütüphaneye git →</a></div>`;
+            grid.innerHTML = `<div class="lib-picker-empty">Kütüphanede ${catLabel} yok.<br><a href="/library" target="_blank">Kütüphaneye git →</a></div>`;
             return;
         }
 
@@ -1386,12 +1390,13 @@ async function _fetchAndRenderDefileOutfitLibrary(grid) {
                     el.classList.remove("defile-picker-selected");
                     el.querySelector(".defile-picker-check")?.remove();
                 } else {
-                    // Add
+                    // Add — include all extra_urls for Kling element creation + NB2
                     const extras = item.extra_urls || [];
                     defileOutfits.push({
                         front_url: item.image_url,
                         side_url: extras[0] || null,
                         back_url: extras[1] || null,
+                        extra_urls: extras,
                         name: item.name,
                     });
                     el.classList.add("defile-picker-selected");

@@ -1233,8 +1233,14 @@ async def run_defile_collection_pipeline(
             # Background for this outfit (cycle pool)
             bg_for_outfit = fal_bg_pool[outfit_idx % len(fal_bg_pool)]
 
-            # Garment refs: front + side (best frontal overview for NB2)
-            garment_refs = [fal_front] + ([fal_side] if fal_side else [])
+            # Garment refs: ALL angles for NB2 (front + side + back + extras)
+            garment_refs = [fal_front]
+            if fal_side: garment_refs.append(fal_side)
+            if fal_back: garment_refs.append(fal_back)
+            # Also include extra_urls from element library items
+            for _extra_u in (outfit.extra_urls or []):
+                if _extra_u and _extra_u not in garment_refs:
+                    garment_refs.append(await _to_fal_url(_extra_u))
 
             # ── 3a: NB2 — compose establishing scene frame ────────────────
             _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
@@ -1287,16 +1293,21 @@ async def run_defile_collection_pipeline(
             # ── 3b-extra: Build compressed Kling elements for garment consistency ──
             # CRITICAL: without elements, Kling has no dress reference and freely hallucinates slits
             elem_front_c = await _to_fal_url_compressed(outfit.front_url)
-            outfit_element: dict = {"frontal_image_url": elem_front_c, "reference_image_urls": []}
+            _elem_refs: list = []
             if outfit.side_url:
-                outfit_element["reference_image_urls"].append(await _to_fal_url_compressed(outfit.side_url))
+                _elem_refs.append(await _to_fal_url_compressed(outfit.side_url))
             if outfit.back_url:
-                outfit_element["reference_image_urls"].append(await _to_fal_url_compressed(outfit.back_url))
-            if not outfit_element["reference_image_urls"]:
-                outfit_element["reference_image_urls"] = [elem_front_c]
+                _elem_refs.append(await _to_fal_url_compressed(outfit.back_url))
+            # Include extra_urls from element library (up to 3 total refs for Kling)
+            for _eu in (outfit.extra_urls or []):
+                if _eu and len(_elem_refs) < 3:
+                    _elem_refs.append(await _to_fal_url_compressed(_eu))
+            if not _elem_refs:
+                _elem_refs = [elem_front_c]
+            outfit_element: dict = {"frontal_image_url": elem_front_c, "reference_image_urls": _elem_refs}
             kling_outfit_elements = [outfit_element]
             logger.info("[%s] Defile outfit %d elements: frontal + %d refs",
-                        job_id, outfit_idx + 1, len(outfit_element["reference_image_urls"]))
+                        job_id, outfit_idx + 1, len(_elem_refs))
 
             # ── 3c: Video generation — single multishot call per outfit ─────
             _update_job(job_id, progress=base_progress + int(35 / n_outfits),

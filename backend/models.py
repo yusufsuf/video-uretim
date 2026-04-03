@@ -126,6 +126,7 @@ class DefileOutfit(BaseModel):
     front_url: str
     side_url: Optional[str] = None
     back_url: Optional[str] = None
+    extra_urls: Optional[List[str]] = None  # all extra angle URLs from element library
     name: Optional[str] = None
 
 
