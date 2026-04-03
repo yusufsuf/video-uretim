@@ -1322,19 +1322,8 @@ function openDefileOutfitPicker() {
     const grid    = document.getElementById("lib-picker-grid");
     const closeBtn = document.getElementById("lib-picker-close");
 
-    title.textContent = "Kıyafet / Element Seç";
-    tabs.innerHTML = `
-        <button class="lib-picker-tab active" data-cat="character">Elbiseler</button>
-        <button class="lib-picker-tab" data-cat="element">Elementler</button>
-    `;
-    tabs.querySelectorAll(".lib-picker-tab").forEach(btn => {
-        btn.addEventListener("click", () => {
-            tabs.querySelectorAll(".lib-picker-tab").forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-            _libPickerActiveTab = btn.dataset.cat;
-            _fetchAndRenderDefileOutfitLibrary(grid, btn.dataset.cat);
-        });
-    });
+    title.textContent = "Kıyafet Seç";
+    tabs.innerHTML = `<button class="lib-picker-tab active" data-cat="character">Elbiseler</button>`;
 
     modal.style.display = "flex";
     document.body.style.overflow = "hidden";
