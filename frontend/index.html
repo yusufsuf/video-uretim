@@ -132,20 +132,10 @@
                         <div class="mode-card-title">Defile Modu</div>
                         <div class="mode-card-desc">Birden fazla elbiseyi sırayla birleştir.</div>
                     </div>
-                    <div class="mode-card" id="card-ozel">
-                        <div class="mode-card-icon">◎</div>
-                        <div class="mode-card-title">Özel</div>
-                        <div class="mode-card-desc">Start frame + ön/arka görseller ile @Element1 tabanlı video.</div>
-                    </div>
                     <div class="mode-card mode-card-studio" id="card-studio">
                         <div class="mode-card-icon">⬡</div>
                         <div class="mode-card-title">Stüdyo</div>
                         <div class="mode-card-desc">Element kütüphanesi ile tam kontrollü video üretimi.</div>
-                    </div>
-                    <div class="mode-card mode-card-soon">
-                        <div class="mode-card-icon">⊞</div>
-                        <div class="mode-card-title">Toplu İşlem <span class="soon-badge">Yakında</span></div>
-                        <div class="mode-card-desc">Birden fazla elbise kuyruğa al.</div>
                     </div>
                 </div>
 
@@ -268,108 +258,6 @@
                 </div>
 
                 <!-- Defile: Koleksiyon Seçimi -->
-                <!-- Adım Özel: @Element1 tabanlı video -->
-                <div class="wizard-step" id="step-ozel" style="display:none">
-                    <div class="wizard-step-title">Özel Video</div>
-                    <div class="wizard-step-sub">Start frame + ön/arka görseller yükleyin. Her sahnede @Element1 kullanılır.</div>
-
-                    <!-- Başlangıç Karesi -->
-                    <div style="margin-top:16px">
-                        <div class="form-label" style="margin-bottom:6px">Başlangıç Karesi <span style="color:var(--accent-red);font-size:0.7rem">zorunlu</span></div>
-                        <div class="upload-zone" id="ozel-start-zone">
-                            <input type="file" id="ozel-start-input" accept="image/*">
-                            <div class="upload-zone-inner">
-                                <div class="upload-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
-                                <div class="upload-label">Başlangıç Karesi</div>
-                                <div class="upload-hint">Videonun ilk karesi olacak görsel</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Ön / Arka / Yan -->
-                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px">
-                        <div>
-                            <div class="form-label" style="margin-bottom:4px;font-size:0.7rem">Ön Görsel <span style="color:var(--accent-red)">*</span></div>
-                            <div class="upload-zone upload-zone-sm" id="ozel-front-zone">
-                                <input type="file" id="ozel-front-input" accept="image/*">
-                                <div class="upload-zone-inner">
-                                    <div class="upload-label" style="font-size:0.72rem">Ön</div>
-                                    <div class="upload-hint" style="font-size:0.65rem">frontal_image_url</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="form-label" style="margin-bottom:4px;font-size:0.7rem">Arka Görsel</div>
-                            <div class="upload-zone upload-zone-sm" id="ozel-back-zone">
-                                <input type="file" id="ozel-back-input" accept="image/*">
-                                <div class="upload-zone-inner">
-                                    <div class="upload-label" style="font-size:0.72rem">Arka</div>
-                                    <div class="upload-hint" style="font-size:0.65rem">reference_image_urls</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="form-label" style="margin-bottom:4px;font-size:0.7rem">Yan Görsel</div>
-                            <div class="upload-zone upload-zone-sm" id="ozel-side-zone">
-                                <input type="file" id="ozel-side-input" accept="image/*">
-                                <div class="upload-zone-inner">
-                                    <div class="upload-label" style="font-size:0.72rem">Yan</div>
-                                    <div class="upload-hint" style="font-size:0.65rem">reference_image_urls</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Prompt -->
-                    <div style="margin-top:14px">
-                        <label class="form-label" style="margin-bottom:6px">
-                            Video Tarifi <span style="font-weight:400;color:var(--text-muted);font-size:0.7rem">(isteğe bağlı)</span>
-                        </label>
-                        <textarea id="ozel-prompt-input" rows="4"
-                            placeholder="Boş bırakırsanız yapay zeka otomatik senaryo yazar.&#10;Yönlendirme ekleyebilirsiniz: sahne, kamera, model hareketi..."
-                            style="width:100%;font-family:inherit;font-size:0.75rem;padding:12px;
-                                   background:var(--bg-secondary);border:1px solid var(--border-subtle);
-                                   border-radius:10px;color:var(--text-primary);resize:vertical;
-                                   box-sizing:border-box;outline:none;transition:border-color 0.15s"
-                            onfocus="this.style.borderColor='var(--border-focus)'"
-                            onblur="this.style.borderColor='var(--border-subtle)'"></textarea>
-                    </div>
-
-                    <!-- Sahne + Süre -->
-                    <div style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap">
-                        <div>
-                            <div class="form-label" style="margin-bottom:4px">Sahne Sayısı</div>
-                            <input type="number" id="ozel-scene-count" min="1" max="10" value="3"
-                                style="width:80px;padding:7px 10px;background:var(--bg-secondary);border:1px solid var(--border-subtle);
-                                       border-radius:8px;color:var(--text-primary);font-family:inherit;font-size:0.78rem;outline:none">
-                        </div>
-                        <div>
-                            <div class="form-label" style="margin-bottom:4px">Toplam Süre (sn)</div>
-                            <input type="number" id="ozel-total-duration" min="3" max="120" value="15"
-                                style="width:90px;padding:7px 10px;background:var(--bg-secondary);border:1px solid var(--border-subtle);
-                                       border-radius:8px;color:var(--text-primary);font-family:inherit;font-size:0.78rem;outline:none">
-                        </div>
-                    </div>
-
-                    <!-- Format + Audio -->
-                    <div style="display:flex;gap:12px;margin-top:14px;align-items:flex-end;flex-wrap:wrap">
-                        <div>
-                            <div class="form-label" style="margin-bottom:6px">Format</div>
-                            <div class="ratio-cards" id="ozel-ratio-cards">
-                                <div class="ratio-card active" data-ratio="9:16"><div class="ratio-preview ratio-916"></div><span>Dikey</span></div>
-                                <div class="ratio-card" data-ratio="16:9"><div class="ratio-preview ratio-169"></div><span>Yatay</span></div>
-                                <div class="ratio-card" data-ratio="1:1"><div class="ratio-preview ratio-11"></div><span>Kare</span></div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="form-label" style="margin-bottom:6px">Ses</div>
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="ozel-audio-toggle" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- Defile: Sub-mode seçim ekranı -->
                 <!-- step-defile-choice removed — openDefile() goes directly to NB2 defile -->
@@ -476,77 +364,7 @@
                     <div class="wizard-step-title">Video Tasarımı</div>
                     <div class="wizard-step-sub">Her sahne için kamera hareketi ve süre belirleyin.</div>
 
-                    <!-- Üretim Modu -->
-                    <div style="display:flex;gap:6px;margin-top:14px;margin-bottom:2px;padding:4px;background:var(--bg-secondary);border-radius:10px;width:fit-content">
-                        <button id="mode-btn-classic" onclick="setGenerationMode('classic')"
-                            style="padding:6px 16px;border-radius:7px;border:none;font-family:inherit;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;background:#fff;color:#0a0a0a;box-shadow:0 1px 4px rgba(0,0,0,0.15)">
-                            Klasik
-                        </button>
-                        <button id="mode-btn-multishot" onclick="setGenerationMode('multishot')"
-                            style="padding:6px 16px;border-radius:7px;border:none;font-family:inherit;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;background:transparent;color:var(--text-secondary)">
-                            Multishot
-                        </button>
-                        <button id="mode-btn-custom" onclick="setGenerationMode('custom')"
-                            style="padding:6px 16px;border-radius:7px;border:none;font-family:inherit;font-size:0.78rem;font-weight:600;cursor:pointer;transition:all 0.15s;background:transparent;color:var(--text-secondary)">
-                            Özel
-                        </button>
-                    </div>
-                    <div id="mode-desc" style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:6px;margin-top:4px">Her sahne ayrı ayrı üretilip birleştirilir.</div>
 
-                    <!-- Custom prompt area (Özel mod) -->
-                    <div id="custom-prompt-area" style="display:none;margin-top:10px;margin-bottom:4px">
-                        <label class="form-label" style="margin-bottom:6px">
-                            Video Promptu <span style="font-weight:400;color:var(--text-muted);font-size:0.7rem">(isteğe bağlı)</span>
-                        </label>
-                        <textarea id="custom-prompt-input" rows="9"
-                            placeholder="Boş bırakırsanız yapay zeka yüklediğiniz görselden otomatik senaryo yazar.&#10;&#10;İsterseniz yönlendirme yazabilirsiniz:&#10;(sahne, kamera, elbise, model, ortam talimatları)..."
-                            style="width:100%;font-family:inherit;font-size:0.75rem;padding:12px;
-                                   background:var(--bg-secondary);border:1px solid var(--border-subtle);
-                                   border-radius:8px;color:var(--text-primary);resize:vertical;line-height:1.6"
-                            oninput="onCustomPromptInput()"></textarea>
-                        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:8px">
-                            Yüklediğiniz fotoğraf doğrudan başlangıç karesi olarak kullanılır — NB2 ve elbise analizi adımları atlanır.
-                        </div>
-
-                        <!-- Optional scene/duration override -->
-                        <div style="margin-top:14px">
-                            <button type="button" id="custom-scene-toggle"
-                                onclick="toggleCustomSceneOptions()"
-                                style="display:flex;align-items:center;gap:7px;background:none;border:1px solid var(--border-subtle);
-                                       border-radius:7px;padding:6px 12px;cursor:pointer;color:var(--text-secondary);
-                                       font-family:inherit;font-size:0.72rem;font-weight:600;transition:all 0.15s">
-                                <span id="custom-scene-toggle-icon" style="font-size:1rem;line-height:1">＋</span>
-                                Sahne sayısı ve süre belirle <span style="font-weight:400;opacity:.7">(isteğe bağlı)</span>
-                            </button>
-                            <div id="custom-scene-options" style="display:none;margin-top:10px;
-                                background:var(--bg-secondary);border:1px solid var(--border-subtle);
-                                border-radius:8px;padding:12px 14px;">
-                                <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
-                                    <div style="flex:1;min-width:100px">
-                                        <label style="display:block;font-size:0.7rem;color:var(--text-secondary);margin-bottom:5px;font-weight:600">
-                                            Sahne Sayısı
-                                        </label>
-                                        <input type="number" id="custom-scene-count" min="1" max="10" value="3"
-                                            style="width:100%;padding:7px 10px;background:var(--bg-primary);
-                                                   border:1px solid var(--border-subtle);border-radius:6px;
-                                                   color:var(--text-primary);font-family:inherit;font-size:0.82rem">
-                                    </div>
-                                    <div style="flex:1;min-width:100px">
-                                        <label style="display:block;font-size:0.7rem;color:var(--text-secondary);margin-bottom:5px;font-weight:600">
-                                            Toplam Süre (sn)
-                                        </label>
-                                        <input type="number" id="custom-total-duration" min="3" max="60" value="15"
-                                            style="width:100%;padding:7px 10px;background:var(--bg-primary);
-                                                   border:1px solid var(--border-subtle);border-radius:6px;
-                                                   color:var(--text-primary);font-family:inherit;font-size:0.82rem">
-                                    </div>
-                                </div>
-                                <div style="font-size:0.67rem;color:var(--text-muted);margin-top:8px">
-                                    Belirtilmezse yapay zeka otomatik karar verir.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
                     <!-- JSON Load -->
                     <div style="margin-top:4px;margin-bottom:2px">
