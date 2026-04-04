@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antigravity — Workflow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=15">
+    <style>
+        /* ── Workflow-specific styles ───────────────────────── */
+        .wf-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 32px 20px;
+        }
+
+        .wf-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 32px;
+        }
+
+        .wf-title {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .wf-back {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .wf-back:hover {
+            color: var(--text-primary);
+        }
+
+        /* ── Step Cards ── */
+        .wf-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .wf-step {
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            background: var(--bg-card);
+            overflow: hidden;
+            transition: border-color var(--transition-fast);
+        }
+
+        .wf-step.active {
+            border-color: var(--accent);
+        }
+
+        .wf-step.completed {
+            border-color: var(--accent-success);
+        }
+
+        .wf-step-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            cursor: default;
+        }
+
+        .wf-step-number {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            font-weight: 700;
+            background: var(--bg-secondary);
+            color: var(--text-muted);
+            flex-shrink: 0;
+        }
+
+        .wf-step.active .wf-step-number {
+            background: var(--accent);
+            color: var(--btn-text);
+        }
+
+        .wf-step.completed .wf-step-number {
+            background: var(--accent-success);
+            color: #fff;
+        }
+
+        .wf-step-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .wf-step-status {
+            margin-left: auto;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+        }
+
+        .wf-step.active .wf-step-status {
+            color: var(--accent);
+        }
+
+        .wf-step.completed .wf-step-status {
+            color: var(--accent-success);
+        }
+
+        .wf-step-body {
+            display: none;
+            padding: 0 20px 20px;
+        }
+
+        .wf-step.active .wf-step-body {
+            display: block;
+        }
+
+        /* ── Form Elements ── */
+        .wf-field {
+            margin-bottom: 14px;
+        }
+
+        .wf-label {
+            display: block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .wf-select,
+        .wf-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--input-border);
+            border-radius: var(--radius-sm);
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 0.8rem;
+        }
+
+        .wf-textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--input-border);
+            border-radius: var(--radius-sm);
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 0.78rem;
+            line-height: 1.6;
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .wf-btn {
+            padding: 9px 22px;
+            border: none;
+            border-radius: var(--radius-md);
+            font-family: var(--font-body);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .wf-btn-primary {
+            background: var(--gradient-btn);
+            color: var(--btn-text);
+        }
+
+        .wf-btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .wf-btn-primary:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .wf-btn-secondary {
+            background: var(--btn-secondary-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--btn-secondary-border);
+        }
+
+        .wf-btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        /* ── Outfit Grid ── */
+        .wf-outfit-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .wf-outfit-card {
+            position: relative;
+            aspect-ratio: 3/4;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: border-color var(--transition-fast);
+        }
+
+        .wf-outfit-card.selected {
+            border-color: var(--accent);
+        }
+
+        .wf-outfit-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .wf-outfit-card .wf-outfit-name {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 4px 6px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            font-size: 0.6rem;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ── Scenario Preview ── */
+        .wf-scenario-card {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            margin-bottom: 8px;
+        }
+
+        .wf-scenario-card .wf-shot-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--accent-warm);
+            margin-bottom: 4px;
+        }
+
+        .wf-scenario-card .wf-shot-prompt {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .wf-scenario-edit {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid var(--input-border);
+            border-radius: var(--radius-sm);
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 0.72rem;
+            line-height: 1.6;
+            resize: vertical;
+            min-height: 60px;
+            margin-top: 6px;
+            display: none;
+        }
+
+        .wf-scenario-card.editing .wf-shot-prompt {
+            display: none;
+        }
+
+        .wf-scenario-card.editing .wf-scenario-edit {
+            display: block;
+        }
+
+        /* ── Scene Frame Preview ── */
+        .wf-scene-preview {
+            max-width: 320px;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+
+        .wf-scene-preview img {
+            width: 100%;
+            display: block;
+        }
+
+        /* ── Progress / Result ── */
+        .wf-progress {
+            margin-top: 12px;
+        }
+
+        .wf-progress-bar-bg {
+            height: 6px;
+            border-radius: 3px;
+            background: var(--bg-secondary);
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .wf-progress-bar {
+            height: 100%;
+            background: var(--gradient-btn);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .wf-progress-text {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .wf-result-video {
+            max-width: 400px;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            background: #000;
+            margin-bottom: 14px;
+        }
+
+        .wf-result-video video {
+            width: 100%;
+            display: block;
+        }
+
+        /* ── Loading Spinner ── */
+        .wf-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border-subtle);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: wf-spin 0.6s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes wf-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── Shot config row ── */
+        .wf-shot-configs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .wf-shot-config {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: var(--bg-secondary);
+            border-radius: var(--radius-sm);
+            font-size: 0.72rem;
+        }
+
+        .wf-shot-config input {
+            width: 40px;
+            padding: 3px 6px;
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            background: var(--input-bg);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            font-size: 0.72rem;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <script>
+        (function () {
+            if (!localStorage.getItem('auth_token')) {
+                window.location.replace('/login');
+            }
+        })();
+    </script>
+
+    <div class="wf-container">
+
+        <div class="wf-header">
+            <div class="wf-title">Workflow</div>
+            <a href="/" class="wf-back">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                Ana Sayfaya Dön
+            </a>
+        </div>
+
+        <div class="wf-steps">
+
+            <!-- Step 1: Kıyafet Seçimi -->
+            <div class="wf-step active" id="wf-step-1">
+                <div class="wf-step-header">
+                    <div class="wf-step-number">1</div>
+                    <div class="wf-step-title">Kıyafet Seç</div>
+                    <div class="wf-step-status">Aktif</div>
+                </div>
+                <div class="wf-step-body">
+                    <div class="wf-outfit-grid" id="wf-outfit-grid"></div>
+                    <div id="wf-outfit-empty" style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px">Yükleniyor...</div>
+
+                    <div class="wf-field">
+                        <label class="wf-label">Sahne Sayısı ve Süreleri</label>
+                        <div class="wf-shot-configs" id="wf-shot-configs"></div>
+                        <button class="wf-btn wf-btn-secondary" style="font-size:0.7rem;padding:5px 12px" onclick="wfAddShot()">+ Sahne Ekle</button>
+                    </div>
+
+                    <div style="display:flex;gap:14px;flex-wrap:wrap">
+                        <div class="wf-field" style="flex:1;min-width:120px">
+                            <label class="wf-label">Video Motoru</label>
+                            <select class="wf-select" id="wf-provider">
+                                <option value="fal">fal.ai</option>
+                                <option value="kling" selected>Kling Direct</option>
+                            </select>
+                        </div>
+                        <div class="wf-field" style="flex:1;min-width:120px">
+                            <label class="wf-label">Oran</label>
+                            <select class="wf-select" id="wf-aspect">
+                                <option value="9:16" selected>Dikey (9:16)</option>
+                                <option value="16:9">Yatay (16:9)</option>
+                                <option value="1:1">Kare (1:1)</option>
+                            </select>
+                        </div>
+                        <div class="wf-field" style="flex:1;min-width:120px">
+                            <label class="wf-label">Ses</label>
+                            <select class="wf-select" id="wf-audio">
+                                <option value="false" selected>Kapalı</option>
+                                <option value="true">Açık</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="wf-field">
+                        <label class="wf-label">Arka Plan (opsiyonel)</label>
+                        <div id="wf-bg-preview" style="display:none;margin-bottom:8px">
+                            <img id="wf-bg-img" style="width:80px;border-radius:6px">
+                            <button onclick="wfClearBg()" style="font-size:0.65rem;color:var(--accent-error);background:none;border:none;cursor:pointer;margin-left:8px">Kaldır</button>
+                        </div>
+                        <button class="wf-btn wf-btn-secondary" style="font-size:0.72rem;padding:6px 14px" id="wf-bg-pick-btn">Kütüphaneden Seç</button>
+                    </div>
+
+                    <div class="wf-field">
+                        <label class="wf-label">Yönetmen Notu (opsiyonel)</label>
+                        <textarea class="wf-textarea" id="wf-director-note" placeholder="Örn: Model yavaş yürüsün, kamera sabit kalsın..."></textarea>
+                    </div>
+
+                    <div class="wf-btn-row">
+                        <button class="wf-btn wf-btn-primary" id="wf-btn-scenario" disabled>Senaryo Üret</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Senaryo Onayı -->
+            <div class="wf-step" id="wf-step-2">
+                <div class="wf-step-header">
+                    <div class="wf-step-number">2</div>
+                    <div class="wf-step-title">Senaryo Onayı</div>
+                    <div class="wf-step-status">Bekliyor</div>
+                </div>
+                <div class="wf-step-body">
+                    <div id="wf-scenario-list"></div>
+                    <div class="wf-btn-row">
+                        <button class="wf-btn wf-btn-secondary" onclick="wfEditScenario()">Düzenle</button>
+                        <button class="wf-btn wf-btn-secondary" onclick="wfRegenerateScenario()">Yeniden Üret</button>
+                        <button class="wf-btn wf-btn-primary" id="wf-btn-approve-scenario">Onayla ve Devam Et</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Sahne Karesi Onayı -->
+            <div class="wf-step" id="wf-step-3">
+                <div class="wf-step-header">
+                    <div class="wf-step-number">3</div>
+                    <div class="wf-step-title">Sahne Karesi Onayı</div>
+                    <div class="wf-step-status">Bekliyor</div>
+                </div>
+                <div class="wf-step-body">
+                    <div class="wf-scene-preview" id="wf-scene-preview">
+                        <img id="wf-scene-img" src="" alt="Sahne karesi">
+                    </div>
+                    <div class="wf-btn-row">
+                        <button class="wf-btn wf-btn-secondary" onclick="wfRegenerateScene()">Yeniden Üret</button>
+                        <button class="wf-btn wf-btn-primary" id="wf-btn-approve-scene">Onayla ve Video Üret</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4: Video Üretimi -->
+            <div class="wf-step" id="wf-step-4">
+                <div class="wf-step-header">
+                    <div class="wf-step-number">4</div>
+                    <div class="wf-step-title">Video Üretimi</div>
+                    <div class="wf-step-status">Bekliyor</div>
+                </div>
+                <div class="wf-step-body">
+                    <div class="wf-progress" id="wf-progress">
+                        <div class="wf-progress-bar-bg">
+                            <div class="wf-progress-bar" id="wf-progress-bar" style="width:0%"></div>
+                        </div>
+                        <div class="wf-progress-text" id="wf-progress-text">Başlatılıyor...</div>
+                    </div>
+                    <div id="wf-result" style="display:none">
+                        <div class="wf-result-video">
+                            <video id="wf-result-video" controls playsinline></video>
+                        </div>
+                        <div class="wf-btn-row">
+                            <button class="wf-btn wf-btn-primary" id="wf-download-btn">İndir</button>
+                            <button class="wf-btn wf-btn-secondary" onclick="location.reload()">Yeni Workflow</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="workflow.js"></script>
+</body>
+
+</html>

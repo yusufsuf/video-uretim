@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from routes.auth_router import router as auth_router
 from routes.admin_router import router as admin_router
 from routes.library_router import router as library_router
+from routes.workflow_router import router as workflow_router
 from services.order_service import save_order, lookup_order
 
 # ─── Logging ───────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/auth")
 app.include_router(admin_router, prefix="/admin")
 app.include_router(library_router, prefix="/library")
+app.include_router(workflow_router, prefix="/api/workflow")
 
 # Serve generated outputs
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
@@ -443,6 +445,11 @@ async def library_page():
 @app.get("/defile")
 async def defile_page():
     return FileResponse(os.path.join(_get_frontend_dir(), "index.html"), media_type="text/html")
+
+
+@app.get("/workflow")
+async def workflow_page():
+    return FileResponse(os.path.join(_get_frontend_dir(), "workflow.html"), media_type="text/html")
 
 
 @app.get("/login")
