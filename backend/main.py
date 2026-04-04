@@ -432,6 +432,17 @@ async def get_gallery(_user: dict = Depends(get_current_user)):
     return {"items": history}
 
 
+@app.post("/api/upload-temp")
+async def upload_temp_file(
+    file: UploadFile = File(...),
+    _user: dict = Depends(get_current_user),
+):
+    """Upload a temporary file and return its public URL."""
+    path = await _save_upload(file)
+    url = _file_to_url(path)
+    return {"url": url}
+
+
 @app.get("/gallery")
 async def gallery_page():
     return FileResponse(os.path.join(_get_frontend_dir(), "gallery.html"), media_type="text/html")

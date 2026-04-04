@@ -201,6 +201,8 @@ let defileShotConfigs = [{ duration: 5 }]; // global shot list [{duration}]
 let defileBgUrl = null;
 let defileBgExtraUrls = [];
 let defileAspectRatio = "9:16";
+let defileStartFrameFile = null;
+let defileStartFrameUrl = null;
 
 // ── Defile Shot Designer ─────────────────────────────────────────────
 const DEFILE_MAX_TOTAL = 15;
@@ -1005,6 +1007,8 @@ function openDefileNB2() {
     defileBgUrl = null;
     defileBgExtraUrls = [];
     defileAspectRatio = "9:16";
+    defileStartFrameFile = null;
+    defileStartFrameUrl = null;
 
     const titleEl = document.getElementById("wizard-title");
     if (titleEl) titleEl.textContent = "Defile — Nano Banana 2";
@@ -1018,6 +1022,9 @@ function openDefileNB2() {
     if (backBtn) { backBtn.style.display = "inline-flex"; backBtn.textContent = "← Geri"; }
     if (nextBtn) { nextBtn.textContent = "Defile Üret"; nextBtn.disabled = true; }
     if (footer) footer.style.display = "flex";
+
+    // Start frame upload
+    _setupDefileStartFrame();
 
     renderDefileGrid();
     renderDefileShotDesigner();
@@ -1065,6 +1072,43 @@ function clearDefileBg() {
     defileBgExtraUrls = [];
     const preview = document.getElementById("defile-bg-preview");
     if (preview) preview.style.display = "none";
+}
+
+function _setupDefileStartFrame() {
+    const zone = document.getElementById("defile-start-frame-zone");
+    const input = document.getElementById("defile-start-frame-input");
+    if (!zone || !input) return;
+    // Clone to remove old listeners
+    const newZone = zone.cloneNode(true);
+    zone.parentNode.replaceChild(newZone, zone);
+    const newInput = newZone.querySelector("#defile-start-frame-input");
+    newZone.addEventListener("click", () => newInput?.click());
+    newInput?.addEventListener("change", () => {
+        const f = newInput.files?.[0];
+        if (!f) return;
+        defileStartFrameFile = f;
+        defileStartFrameUrl = URL.createObjectURL(f);
+        const preview = document.getElementById("defile-start-frame-preview");
+        const img = document.getElementById("defile-start-frame-img");
+        const nameEl = document.getElementById("defile-start-frame-name");
+        if (img) img.src = defileStartFrameUrl;
+        if (nameEl) nameEl.textContent = f.name;
+        if (preview) preview.style.display = "block";
+        newZone.style.display = "none";
+    });
+    // Reset UI
+    const preview = document.getElementById("defile-start-frame-preview");
+    if (preview) preview.style.display = "none";
+    newZone.style.display = "";
+}
+
+function clearDefileStartFrame() {
+    defileStartFrameFile = null;
+    defileStartFrameUrl = null;
+    const preview = document.getElementById("defile-start-frame-preview");
+    const zone = document.getElementById("defile-start-frame-zone");
+    if (preview) preview.style.display = "none";
+    if (zone) zone.style.display = "";
 }
 
 // Defile library picker — multi-select outfit
@@ -1240,11 +1284,30 @@ async function startDefileCollection() {
     document.getElementById("step-3").style.display = "block";
 
     const defileProvider = document.getElementById("defile-provider-select")?.value || "fal";
+
+    // Upload start frame if provided
+    let startFrameUploadUrl = null;
+    if (defileStartFrameFile) {
+        try {
+            updateProgress(5, "Başlangıç karesi yükleniyor...");
+            const sfFormData = new FormData();
+            sfFormData.append("file", defileStartFrameFile);
+            const sfResp = await fetch(`${API_BASE}/api/upload-temp`, { method: "POST", body: sfFormData, headers: getAuthHeaders() });
+            if (sfResp.ok) {
+                const sfData = await sfResp.json();
+                startFrameUploadUrl = sfData.url;
+            }
+        } catch (e) {
+            console.warn("Start frame upload failed, continuing with NB2:", e);
+        }
+    }
+
     const payload = {
         outfits: defileOutfits,
         shot_configs: defileShotConfigs,
         runway_background_url: defileBgUrl || null,
         runway_background_extra_urls: defileBgExtraUrls.length > 0 ? defileBgExtraUrls : null,
+        start_frame_url: startFrameUploadUrl,
         aspect_ratio: defileAspectRatio,
         generate_audio: document.getElementById("defile-audio-toggle")?.checked ?? true,
         provider: defileProvider,
@@ -1252,7 +1315,7 @@ async function startDefileCollection() {
 
     // Capture inputs for post-generation summary
     lastGenerationInputs = {
-        mod: "Defile",
+        mod: startFrameUploadUrl ? "Defile (Direkt)" : "Defile (NB2)",
         provider: defileProvider === "kling" ? "Kling Direct" : "fal.ai",
         kiyafetSayisi: defileOutfits.length,
         cekimSayisi: defileShotConfigs.length,
@@ -1285,6 +1348,7 @@ window.updateDefileShotDuration  = updateDefileShotDuration;
 window.addDefileShot             = addDefileShot;
 window.removeDefileShot          = removeDefileShot;
 window.clearDefileBg             = clearDefileBg;
+window.clearDefileStartFrame     = clearDefileStartFrame;
 window.confirmDefileOutfits      = confirmDefileOutfits;
 
 // ─── Wizard Events ──────────────────────────────────────────────────
@@ -2205,6 +2269,8 @@ newBtn?.addEventListener("click", () => {
     defileOutfits = [];
     defileShotConfigs = [{ duration: 5 }];
     defileBgUrl = null;
+    defileStartFrameFile = null;
+    defileStartFrameUrl = null;
     step4Title.textContent = "Video Üretmeye Hazır";
     step4Sub.textContent = "Ayarlarınız kaydedildi. Üretimi başlatın.";
     currentWizardStep = 1;

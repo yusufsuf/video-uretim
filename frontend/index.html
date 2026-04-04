@@ -310,6 +310,26 @@
                         </div>
                     </div>
 
+                    <div class="wizard-section-divider" style="margin-top:16px">Opsiyonel Başlangıç Karesi</div>
+                    <div style="font-size:0.68rem;color:var(--text-muted);margin-bottom:8px">
+                        Eklerseniz NB2 sahne kompozisyonu atlanır, bu görsel doğrudan video başlangıç karesi olarak kullanılır.
+                    </div>
+                    <div class="upload-zone" id="defile-start-frame-zone" style="min-height:80px">
+                        <input type="file" id="defile-start-frame-input" accept="image/*" style="display:none">
+                        <div class="upload-zone-inner">
+                            <div class="upload-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg></div>
+                            <div class="upload-label">Başlangıç Karesi</div>
+                            <div class="upload-hint">Fotoğraf yükle (opsiyonel)</div>
+                        </div>
+                    </div>
+                    <div id="defile-start-frame-preview" style="display:none;margin-top:8px">
+                        <div style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border-subtle)">
+                            <img id="defile-start-frame-img" src="" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px">
+                            <span id="defile-start-frame-name" style="font-size:0.75rem;color:var(--text-primary);flex:1"></span>
+                            <button onclick="clearDefileStartFrame()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.8rem">✕</button>
+                        </div>
+                    </div>
+
                     <div class="wizard-section-divider" style="margin-top:16px">Opsiyonel Arka Plan</div>
                     <button class="lib-pick-btn" id="defile-bg-btn">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>

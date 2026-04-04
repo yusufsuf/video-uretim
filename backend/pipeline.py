@@ -1242,31 +1242,40 @@ async def run_defile_collection_pipeline(
                 if _extra_u and _extra_u not in garment_refs:
                     garment_refs.append(await _to_fal_url(_extra_u))
 
-            # ── 3a: NB2 — compose establishing scene frame ────────────────
-            _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
-                        progress=base_progress,
-                        message=f"{outfit_name} — sahne kompoze ediliyor ({outfit_idx + 1}/{n_outfits})...")
+            # ── 3a: Scene frame — use provided start frame or NB2 compose ──
+            if request.start_frame_url:
+                # User provided a start frame — skip NB2 composition
+                scene_frame_url = request.start_frame_url
+                logger.info("[%s] Outfit %d/%d: using provided start frame (NB2 skipped): %s",
+                            job_id, outfit_idx + 1, n_outfits, scene_frame_url[:80])
+                _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
+                            progress=base_progress,
+                            message=f"{outfit_name} — başlangıç karesi kullanılıyor ({outfit_idx + 1}/{n_outfits})...")
+            else:
+                _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
+                            progress=base_progress,
+                            message=f"{outfit_name} — sahne kompoze ediliyor ({outfit_idx + 1}/{n_outfits})...")
 
-            nb2_prompt = (
-                "Fashion editorial photo: the first image is the location/scene — "
-                "preserve it EXACTLY as-is: architecture, lighting, floor, walls, all structural elements unchanged. "
-                "Do NOT add spectators, audience, crowd, cameramen, photographers, trees, flowers, plants, or any props not already in the scene. "
-                "Place a tall fashion model in this space wearing the garment from the reference images (images 2 onward). "
-                "Full body visible, frontal medium-wide shot, confident stance. "
-                "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
-                "CRITICAL: the garment hem must touch and rest exactly on the floor — "
-                "the bottom of the garment grazes the floor surface. "
-                "Shoes and feet must NOT be visible — the hem completely covers the feet. "
-                "Professional fashion photography, sharp focus, editorial quality."
-            )
+                nb2_prompt = (
+                    "Fashion editorial photo: the first image is the location/scene — "
+                    "preserve it EXACTLY as-is: architecture, lighting, floor, walls, all structural elements unchanged. "
+                    "Do NOT add spectators, audience, crowd, cameramen, photographers, trees, flowers, plants, or any props not already in the scene. "
+                    "Place a tall fashion model in this space wearing the garment from the reference images (images 2 onward). "
+                    "Full body visible, frontal medium-wide shot, confident stance. "
+                    "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
+                    "CRITICAL: the garment hem must touch and rest exactly on the floor — "
+                    "the bottom of the garment grazes the floor surface. "
+                    "Shoes and feet must NOT be visible — the hem completely covers the feet. "
+                    "Professional fashion photography, sharp focus, editorial quality."
+                )
 
-            scene_frame_url = await generate_scene_frame(
-                image_urls=[bg_for_outfit] + garment_refs,
-                prompt=nb2_prompt,
-                aspect_ratio=request.aspect_ratio,
-            )
-            logger.info("[%s] Outfit %d/%d scene frame: %s",
-                        job_id, outfit_idx + 1, n_outfits, scene_frame_url[:80])
+                scene_frame_url = await generate_scene_frame(
+                    image_urls=[bg_for_outfit] + garment_refs,
+                    prompt=nb2_prompt,
+                    aspect_ratio=request.aspect_ratio,
+                )
+                logger.info("[%s] Outfit %d/%d scene frame: %s",
+                            job_id, outfit_idx + 1, n_outfits, scene_frame_url[:80])
 
             # ── 3b: GPT-4o Vision — analyze frame + generate multishot prompts
             _update_job(job_id, progress=base_progress + int(20 / n_outfits),

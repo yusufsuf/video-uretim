@@ -144,6 +144,7 @@ class DefileCollectionRequest(BaseModel):
     )
     runway_background_url: Optional[str] = None
     runway_background_extra_urls: Optional[List[str]] = None
+    start_frame_url: Optional[str] = None  # If provided, skip NB2 — use this as scene frame
     aspect_ratio: str = "9:16"
     generate_audio: bool = True
     provider: str = "fal"  # "fal" = fal.ai | "kling" = Kling Direct
