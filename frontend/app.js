@@ -1032,37 +1032,50 @@ function openDefileNB2() {
 
 
 function renderDefileGrid() {
-    const grid = document.getElementById("defile-collection-grid");
-    const emptyMsg = document.getElementById("defile-empty-msg");
-    const countEl = document.getElementById("defile-outfit-count");
-    if (!grid) return;
-
-    if (countEl) countEl.textContent = `${defileOutfits.length} kıyafet seçildi`;
+    const list = document.getElementById("defile-elements-list");
+    const addBtns = document.getElementById("defile-add-element-btns");
+    if (!list) return;
 
     if (defileOutfits.length === 0) {
-        if (!emptyMsg) {
-            grid.innerHTML = `<div class="defile-collection-empty" id="defile-empty-msg">Henüz kıyafet eklenmedi. Kütüphaneden seçin.</div>`;
-        }
-        document.getElementById("wizard-next-btn").disabled = true;
-        return;
+        list.innerHTML = `
+            <div class="studio-element-empty">
+                <div class="studio-element-empty-icon">◈</div>
+                <div class="studio-element-empty-text">Henüz element seçilmedi</div>
+            </div>`;
+    } else {
+        const catLabels = { character: "Karakter", costume: "Kostüm", scene: "Mekan", style: "Stil", effect: "Efekt", other: "Diğer", element: "Element", background: "Arka Plan" };
+        list.innerHTML = defileOutfits.map((el, idx) => `
+            <div class="studio-selected-card" style="margin-bottom:8px">
+                <img src="${el.front_url}" alt="${el.name}" class="studio-element-thumb">
+                <div class="studio-element-info">
+                    <div class="studio-element-name-label">${el.name || `Element ${idx + 1}`}</div>
+                    <div class="studio-element-token-badge">${catLabels[el.category] || el.category || "Element"} · ${(el.extra_urls || []).length + 1} görsel</div>
+                </div>
+                <button class="studio-change-btn" onclick="removeDefileOutfit(${idx})">✕ Çıkar</button>
+            </div>`).join("");
     }
 
-    grid.innerHTML = defileOutfits.map((outfit, idx) => `
-        <div class="defile-outfit-card">
-            <img src="${outfit.front_url}" alt="${outfit.name || `Kıyafet ${idx + 1}`}">
-            <div class="defile-outfit-card-overlay">
-                <span>${outfit.name || `Kıyafet ${idx + 1}`}</span>
-                <button class="defile-outfit-remove" onclick="removeDefileOutfit(${idx})">✕</button>
-            </div>
-        </div>
-    `).join("");
+    if (addBtns) addBtns.style.display = "block";
 
-    document.getElementById("wizard-next-btn").disabled = defileOutfits.length < 1;
+    const nextBtn = document.getElementById("wizard-next-btn");
+    if (nextBtn) nextBtn.disabled = defileOutfits.length === 0;
+
+    // Re-attach pick/create buttons (use onclick to avoid stacking)
+    const pickBtn = document.getElementById("defile-add-outfit-btn");
+    if (pickBtn) pickBtn.onclick = openDefileOutfitPicker;
+    const createBtn = document.getElementById("defile-create-btn");
+    if (createBtn) createBtn.onclick = openStudioCreateModalForDefile;
 }
 
 function removeDefileOutfit(idx) {
     defileOutfits.splice(idx, 1);
     renderDefileGrid();
+}
+
+function openStudioCreateModalForDefile() {
+    // Reuse studio create modal, but on save add to defile instead
+    window._defileCreateMode = true;
+    openStudioCreateModal();
 }
 
 // updateDefileShots removed — replaced by renderDefileShotDesigner
@@ -1117,7 +1130,7 @@ let _defilePickerMode = false;
 function openDefileOutfitPicker() {
     _defilePickerMode = true;
     _libPickerTarget = "defile-outfit";
-    _libPickerActiveTab = "character";
+    _libPickerActiveTab = "";
 
     const modal   = document.getElementById("lib-picker-modal");
     const title   = document.getElementById("lib-picker-title");
@@ -1125,11 +1138,19 @@ function openDefileOutfitPicker() {
     const grid    = document.getElementById("lib-picker-grid");
     const closeBtn = document.getElementById("lib-picker-close");
 
-    title.textContent = "Kıyafet / Element Seç";
-    tabs.innerHTML = `
-        <button class="lib-picker-tab active" data-cat="character">Elbiseler</button>
-        <button class="lib-picker-tab" data-cat="element">Elementler</button>
-    `;
+    title.textContent = "Element Seç";
+    const catTabs = [
+        { cat: "",         label: "Tümü" },
+        { cat: "character", label: "Karakter" },
+        { cat: "costume",  label: "Kostüm" },
+        { cat: "scene",    label: "Mekan" },
+        { cat: "style",    label: "Stil" },
+        { cat: "effect",   label: "Efekt" },
+        { cat: "other",    label: "Diğer" },
+    ];
+    tabs.innerHTML = catTabs.map((t, i) =>
+        `<button class="lib-picker-tab${i === 0 ? " active" : ""}" data-cat="${t.cat}">${t.label}</button>`
+    ).join("");
     tabs.querySelectorAll(".lib-picker-tab").forEach(btn => {
         btn.addEventListener("click", () => {
             tabs.querySelectorAll(".lib-picker-tab").forEach(b => b.classList.remove("active"));
@@ -1152,18 +1173,18 @@ function openDefileOutfitPicker() {
         }
     };
 
-    _fetchAndRenderDefileOutfitLibrary(grid, "character");
+    _fetchAndRenderDefileOutfitLibrary(grid, "");
 }
 
-async function _fetchAndRenderDefileOutfitLibrary(grid, category = "character") {
+async function _fetchAndRenderDefileOutfitLibrary(grid, category = "") {
     grid.innerHTML = `<div class="lib-picker-loading">Yükleniyor...</div>`;
-    const catLabel = category === "element" ? "element" : "elbise";
     try {
-        const resp = await fetch(`/library/items?category=${category}`, { headers: getAuthHeaders() });
+        const url = category ? `/library/items?category=${category}` : `/library/items`;
+        const resp = await fetch(url, { headers: getAuthHeaders() });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const items = await resp.json();
         if (!items.length) {
-            grid.innerHTML = `<div class="lib-picker-empty">Kütüphanede ${catLabel} yok.<br><a href="/library" target="_blank">Kütüphaneye git →</a></div>`;
+            grid.innerHTML = `<div class="lib-picker-empty">Kütüphanede element yok.<br><a href="/library" target="_blank">Kütüphaneye git →</a></div>`;
             return;
         }
 
@@ -1201,6 +1222,7 @@ async function _fetchAndRenderDefileOutfitLibrary(grid, category = "character") 
                         back_url: extras[1] || null,
                         extra_urls: extras,
                         name: item.name,
+                        category: item.category || "costume",
                     });
                     el.classList.add("defile-picker-selected");
                     const check = document.createElement("div");
@@ -1697,6 +1719,14 @@ function openStudioCreateModal() {
     // Reset fields
     const nameInput = document.getElementById("create-elem-name");
     if (nameInput) nameInput.value = "";
+
+    // Show category selector for defile mode, hide for studio mode
+    const catSelect = document.getElementById("create-elem-category");
+    if (catSelect) {
+        catSelect.style.display = window._defileCreateMode ? "" : "none";
+        catSelect.value = "costume";
+    }
+
     _updateCreateSaveBtn();
 
     // Setup upload zones
@@ -1739,6 +1769,7 @@ function closeStudioCreateModal() {
     const modal = document.getElementById("studio-create-modal");
     if (modal) modal.style.display = "none";
     document.body.style.overflow = "";
+    window._defileCreateMode = false;
 }
 
 async function saveStudioElement() {
@@ -1748,9 +1779,12 @@ async function saveStudioElement() {
 
     if (btn) { btn.disabled = true; btn.textContent = "Kaydediliyor..."; }
 
+    const catSelect = document.getElementById("create-elem-category");
+    const category = catSelect ? catSelect.value : "element";
+
     const fd = new FormData();
     fd.append("name",     name);
-    fd.append("category", "element");
+    fd.append("category", category);
     fd.append("file",     _createFrontFile);
     if (_createAngle1File) fd.append("file2", _createAngle1File);
     if (_createAngle2File) fd.append("file3", _createAngle2File);
@@ -1760,10 +1794,26 @@ async function saveStudioElement() {
         const resp = await fetch("/library/items", { method: "POST", headers: getAuthHeaders(), body: fd });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const item = await resp.json();
-        if (studioElements.length < STUDIO_MAX_ELEMENTS) studioElements.push(item);
-        closeStudioCreateModal();
-        _renderStudioElementsState();
-        renderStudioShots();
+
+        if (window._defileCreateMode) {
+            // Add to defile outfits instead of studio elements
+            window._defileCreateMode = false;
+            defileOutfits.push({
+                front_url: item.image_url,
+                side_url: (item.extra_urls || [])[0] || null,
+                back_url: (item.extra_urls || [])[1] || null,
+                extra_urls: item.extra_urls || [],
+                name: item.name,
+                category: item.category,
+            });
+            closeStudioCreateModal();
+            renderDefileGrid();
+        } else {
+            if (studioElements.length < STUDIO_MAX_ELEMENTS) studioElements.push(item);
+            closeStudioCreateModal();
+            _renderStudioElementsState();
+            renderStudioShots();
+        }
         const nextBtn = document.getElementById("wizard-next-btn");
         if (nextBtn) nextBtn.disabled = false;
     } catch (err) {

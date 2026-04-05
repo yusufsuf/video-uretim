@@ -260,19 +260,21 @@
                 <!-- Defile: Koleksiyon Seçimi -->
 
                 <div class="wizard-step" id="step-defile" style="display:none">
-                    <div class="wizard-step-title">Defile Koleksiyonu</div>
-                    <div class="wizard-step-sub">Kütüphaneden kıyafet seçin. Her kıyafet ayrı bir pist geçişi olacak.</div>
+                    <div class="wizard-step-title">Element Seçin</div>
+                    <div class="wizard-step-sub">Birden fazla element seçebilirsiniz. Her element ayrı bir pist geçişi olacak.</div>
 
-                    <div style="display:flex;gap:8px;margin-top:16px;align-items:center;flex-wrap:wrap">
-                        <button class="lib-pick-btn" id="defile-add-outfit-btn">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"/><path d="M8 7h8M8 11h8M8 15h4"/></svg>
-                            Kütüphaneden Kıyafet Ekle
-                        </button>
-                        <span id="defile-outfit-count" style="font-size:0.72rem;color:var(--text-muted)">0 kıyafet seçildi</span>
-                    </div>
+                    <!-- Seçili elementler listesi -->
+                    <div id="defile-elements-list" style="margin-top:16px"></div>
 
-                    <div class="defile-collection-grid" id="defile-collection-grid">
-                        <div class="defile-collection-empty" id="defile-empty-msg">Henüz kıyafet eklenmedi. Kütüphaneden seçin.</div>
+                    <!-- Ekle butonları (studio tarzı) -->
+                    <div id="defile-add-element-btns" style="margin-top:12px">
+                        <button class="studio-pick-btn" id="defile-add-outfit-btn">Kütüphaneden Seç</button>
+                        <div class="studio-or-row">
+                            <span class="studio-or-line"></span>
+                            <span class="studio-or-text">veya</span>
+                            <span class="studio-or-line"></span>
+                        </div>
+                        <button class="studio-create-btn" id="defile-create-btn">+ Yeni Element Oluştur</button>
                     </div>
 
                     <!-- Defile Shot Designer -->
@@ -690,6 +692,14 @@
                     </div>
                 </div>
                 <input type="text" id="create-elem-name" class="form-input" placeholder="Element ismi (örn. Elbise1)" style="margin-top:14px">
+                <select id="create-elem-category" class="form-input" style="margin-top:8px">
+                    <option value="costume">Kostüm</option>
+                    <option value="character">Karakter</option>
+                    <option value="scene">Mekan</option>
+                    <option value="style">Stil</option>
+                    <option value="effect">Efekt</option>
+                    <option value="other">Diğer</option>
+                </select>
                 <select id="create-elem-type" class="form-input" style="margin-top:8px">
                     <option value="Costumes">Kostüm</option>
                     <option value="Characters">Karakter</option>

@@ -129,6 +129,7 @@ class DefileOutfit(BaseModel):
     back_url: Optional[str] = None
     extra_urls: Optional[List[str]] = None  # all extra angle URLs from element library
     name: Optional[str] = None
+    category: Optional[str] = None  # e.g. "costume", "scene", "character", etc.
 
 
 class DefileShotConfig(BaseModel):

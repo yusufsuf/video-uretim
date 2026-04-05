@@ -15,7 +15,12 @@ from services.video_service import upload_to_fal
 
 router = APIRouter(tags=["library"])
 
-ALLOWED_CATEGORIES = {"character", "background", "style", "element"}
+ALLOWED_CATEGORIES = {
+    # Legacy categories (existing data)
+    "character", "background", "style",
+    # New element sub-categories
+    "element", "costume", "scene", "effect", "item", "other",
+}
 ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 
 

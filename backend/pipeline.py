@@ -1252,21 +1252,56 @@ async def run_defile_collection_pipeline(
             fal_bg_pool.append(await _to_fal_url(bg_url))
         logger.info("[%s] Defile: bg pool size=%d", job_id, len(fal_bg_pool))
 
-        # Upload outfit images to fal.ai CDN
-        fal_outfits: list = []  # (fal_front, fal_side, fal_back)
-        for outfit in request.outfits:
-            fal_front = await _to_fal_url(outfit.front_url)
-            fal_side = await _to_fal_url(outfit.side_url) if outfit.side_url else None
-            fal_back = await _to_fal_url(outfit.back_url) if outfit.back_url else None
-            fal_outfits.append((fal_front, fal_side, fal_back))
-        logger.info("[%s] Defile: %d outfits on fal.ai CDN", job_id, len(fal_outfits))
+        # ── Step 2b: Separate scene elements from outfit elements ─────────
+        # Scene/mekan elements are shared across all outfits as Kling elements
+        scene_elements: list = []  # DefileOutfit items with category="scene"
+        outfit_only: list = []     # Non-scene outfits
+        for _o in request.outfits:
+            if _o.category == "scene":
+                scene_elements.append(_o)
+            else:
+                outfit_only.append(_o)
+
+        # Build Kling element dicts for scene elements
+        kling_scene_elements: list = []
+        for _se in scene_elements:
+            _se_front_c = await _to_fal_url_compressed(_se.front_url)
+            _se_refs: list = []
+            if _se.side_url:
+                _se_refs.append(await _to_fal_url_compressed(_se.side_url))
+            if _se.back_url:
+                _se_refs.append(await _to_fal_url_compressed(_se.back_url))
+            for _seu in (_se.extra_urls or []):
+                if _seu and len(_se_refs) < 3:
+                    _se_refs.append(await _to_fal_url_compressed(_seu))
+            if not _se_refs:
+                _se_refs = [_se_front_c]
+            kling_scene_elements.append({"frontal_image_url": _se_front_c, "reference_image_urls": _se_refs})
+        if kling_scene_elements:
+            logger.info("[%s] Defile: %d scene elements prepared for Kling", job_id, len(kling_scene_elements))
+
+        # If all items are scene elements, nothing to generate
+        if not outfit_only:
+            outfit_only = [scene_elements[0]]  # fallback: treat first scene as outfit
+            scene_elements = scene_elements[1:]
+            kling_scene_elements = kling_scene_elements[1:] if kling_scene_elements else []
+
+        n_outfits = len(outfit_only)
+
+        # Re-upload outfit images for the filtered list
+        fal_outfits_filtered: list = []
+        for _of in outfit_only:
+            fal_front = await _to_fal_url(_of.front_url)
+            fal_side = await _to_fal_url(_of.side_url) if _of.side_url else None
+            fal_back = await _to_fal_url(_of.back_url) if _of.back_url else None
+            fal_outfits_filtered.append((fal_front, fal_side, fal_back))
 
         # ── Step 3: Per-outfit: NB2 compose → GPT prompts → Kling ────────
         clip_paths: list = []
 
-        for outfit_idx, outfit in enumerate(request.outfits):
+        for outfit_idx, outfit in enumerate(outfit_only):
             outfit_name = outfit.name or f"Kıyafet {outfit_idx + 1}"
-            fal_front, fal_side, fal_back = fal_outfits[outfit_idx]
+            fal_front, fal_side, fal_back = fal_outfits_filtered[outfit_idx]
             base_progress = 20 + int((outfit_idx / n_outfits) * 65)
 
             # Background for this outfit (cycle pool)
@@ -1353,9 +1388,9 @@ async def run_defile_collection_pipeline(
             if not _elem_refs:
                 _elem_refs = [elem_front_c]
             outfit_element: dict = {"frontal_image_url": elem_front_c, "reference_image_urls": _elem_refs}
-            kling_outfit_elements = [outfit_element]
-            logger.info("[%s] Defile outfit %d elements: frontal + %d refs",
-                        job_id, outfit_idx + 1, len(_elem_refs))
+            kling_outfit_elements = [outfit_element] + kling_scene_elements
+            logger.info("[%s] Defile outfit %d elements: 1 outfit + %d scene = %d total",
+                        job_id, outfit_idx + 1, len(kling_scene_elements), len(kling_outfit_elements))
 
             # ── 3c: Video generation — single multishot call per outfit ─────
 
@@ -1384,7 +1419,7 @@ async def run_defile_collection_pipeline(
                 from services.kling_service import (  # type: ignore[import]
                     generate_multishot_video as _kling_gen,
                 )
-                # Get cached or create new Kling element
+                # Get cached or create new Kling element for outfit
                 logger.info("[%s] Defile outfit %d: getting/creating Kling element...", job_id, outfit_idx + 1)
                 _kling_eid = await get_or_create_kling_element(
                     front_url=outfit.front_url,
@@ -1396,9 +1431,22 @@ async def run_defile_collection_pipeline(
                 _kling_elem_list = [{"element_id": int(_kling_eid)}]
                 logger.info("[%s] Defile outfit %d: Kling element_id=%d", job_id, outfit_idx + 1, _kling_eid)
 
-                # Prepend <<<element_1>>> to each prompt for Kling native token format
+                # Also create Kling elements for scene elements
+                for _si, _se in enumerate(scene_elements):
+                    _scene_eid = await get_or_create_kling_element(
+                        front_url=_se.front_url,
+                        frontal_image_url=kling_scene_elements[_si]["frontal_image_url"],
+                        reference_image_urls=kling_scene_elements[_si]["reference_image_urls"],
+                        name=f"scene{_si + 1}",
+                        description=f"defile scene element {_si + 1}",
+                    )
+                    _kling_elem_list.append({"element_id": int(_scene_eid)})
+                    logger.info("[%s] Defile scene %d: Kling element_id=%d", job_id, _si + 1, _scene_eid)
+
+                # Build token references: <<<element_1>>> for outfit, <<<element_2>>> etc for scenes
+                _elem_tokens = " ".join(f"<<<element_{i + 1}>>>" for i in range(len(_kling_elem_list)))
                 _kling_prompts = [
-                    {"duration": p["duration"], "prompt": f"<<<element_1>>> {p['prompt']}"}
+                    {"duration": p["duration"], "prompt": f"{_elem_tokens} {p['prompt']}"}
                     for p in multi_prompt
                 ]
 

@@ -13,27 +13,35 @@ function getAuthHeaders() {
 let currentCategory = "";
 let uploadFiles = [null, null, null, null]; // [primary, extra1, extra2, extra3]
 
+// All categories use the same 4-slot layout (element-style)
+const DEFAULT_SLOTS = [
+    { label: "Ön Görünüm",  required: true },
+    { label: "Açı 2", required: false },
+    { label: "Açı 3", required: false },
+    { label: "Açı 4", required: false },
+];
+
 const SLOT_DEFS = {
-    character:  [
-        { label: "Ön Görünüm",  required: true },
-        { label: "Yan Görünüm", required: false },
-        { label: "Arka Görünüm",required: false },
-    ],
-    background: [
-        { label: "Görsel 1", required: true },
-        { label: "Görsel 2", required: false },
-        { label: "Görsel 3", required: false },
-        { label: "Görsel 4", required: false },
-    ],
-    style: [
-        { label: "Stil Görseli", required: true },
-    ],
+    character:  DEFAULT_SLOTS,
+    costume:    DEFAULT_SLOTS,
+    scene:      DEFAULT_SLOTS,
+    style:      DEFAULT_SLOTS,
+    effect:     DEFAULT_SLOTS,
+    other:      DEFAULT_SLOTS,
+    // Legacy
+    background: DEFAULT_SLOTS,
+    element:    DEFAULT_SLOTS,
 };
 
 const SLOT_HINTS = {
-    character:  "Ön görünüm zorunlu, yan ve arka opsiyonel — daha iyi tutarlılık için 3 açı önerilir",
-    background: "1 zorunlu, en fazla 4 görsel yükleyebilirsiniz",
-    style:      "Renk paleti, kompozisyon ve atmosfer referansı için tek görsel",
+    character:  "Ön görünüm zorunlu, farklı açılar opsiyonel — daha iyi tutarlılık için çoklu açı önerilir",
+    costume:    "Ön görünüm zorunlu, farklı açılar opsiyonel — daha iyi tutarlılık için çoklu açı önerilir",
+    scene:      "Ana görsel zorunlu, farklı açılar veya varyasyonlar opsiyonel",
+    style:      "Stil referans görseli zorunlu, ek görseller opsiyonel",
+    effect:     "Efekt görseli zorunlu, ek referanslar opsiyonel",
+    other:      "Ana görsel zorunlu, ek görseller opsiyonel",
+    background: "Ana görsel zorunlu, ek görseller opsiyonel",
+    element:    "Ön görünüm zorunlu, farklı açılar opsiyonel",
 };
 
 // ─── Load items ──────────────────────────────────────────────────
@@ -42,6 +50,7 @@ async function loadItems(category) {
     const grid = document.getElementById("lib-grid");
     grid.innerHTML = `<div class="lib-empty">Yükleniyor...</div>`;
 
+    // Legacy mapping: "character" tab also shows old "element" items
     const url = category
         ? `${API}/library/items?category=${category}`
         : `${API}/library/items`;
@@ -58,7 +67,11 @@ async function loadItems(category) {
 
 function renderGrid(items) {
     const grid = document.getElementById("lib-grid");
-    const catLabels = { character: "Elbise", background: "Arka Plan", style: "Stil" };
+    const catLabels = {
+        character: "Karakter", costume: "Kostüm", scene: "Mekan",
+        style: "Stil", effect: "Efekt", other: "Diğer",
+        background: "Arka Plan", element: "Element",
+    };
 
     const uploadCard = `
         <button class="lib-upload-card" id="upload-card-btn">
@@ -73,21 +86,14 @@ function renderGrid(items) {
             const extras = item.extra_urls || [];
             let thumbsHtml = "";
 
-            if (item.category === "character" && extras.length > 0) {
-                // Side-by-side: front + side/back column
+            if (extras.length > 0) {
+                // Side-by-side: front + extras column
                 thumbsHtml = `
                     <div class="lib-item-views">
                         <img src="${item.image_url}" class="primary" alt="">
                         <div class="extras">
-                            ${extras.slice(0, 2).map(u => `<img src="${u}" alt="">`).join("")}
+                            ${extras.slice(0, 3).map(u => `<img src="${u}" alt="">`).join("")}
                         </div>
-                    </div>`;
-            } else if (item.category === "background" && extras.length > 0) {
-                // 2×2 grid
-                const all = [item.image_url, ...extras].slice(0, 4);
-                thumbsHtml = `
-                    <div class="lib-item-bg-grid">
-                        ${all.map(u => `<img src="${u}" alt="">`).join("")}
                     </div>`;
             } else {
                 thumbsHtml = `<img src="${item.image_url}" alt="${item.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover">`;
