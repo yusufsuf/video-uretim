@@ -987,7 +987,7 @@ function _hideAllSteps() {
         const el = document.getElementById(`step-${i}`);
         if (el) el.style.display = "none";
     }
-    ["step-defile", "step-defile-choice", "step-studio-1", "step-studio-2"].forEach(id => {
+    ["step-defile", "step-studio-1", "step-studio-2"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = "none";
     });

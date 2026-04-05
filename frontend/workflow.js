@@ -26,6 +26,7 @@ let wfBgExtraUrls = [];
 let wfOutfitData = [];
 let wfJobId = null;
 let wfPollInterval = null;
+let wfDebugPayload = null;
 
 // ─── Init ──────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
@@ -326,6 +327,7 @@ async function pollStatus() {
         const text = document.getElementById("wf-progress-text");
         bar.style.width = `${job.progress || 0}%`;
         text.textContent = job.message || "";
+        if (job.debug_payload) wfDebugPayload = job.debug_payload;
 
         if (job.status === "completed") {
             clearInterval(wfPollInterval);
@@ -343,7 +345,7 @@ async function pollStatus() {
 }
 
 function showResult(url) {
-    const fullUrl = `${API}${url}`;
+    const fullUrl = url.startsWith("http") ? url : `${API}${url}`;
     document.getElementById("wf-progress").style.display = "none";
     const resultEl = document.getElementById("wf-result");
     const video = document.getElementById("wf-result-video");
@@ -356,6 +358,22 @@ function showResult(url) {
         a.download = "workflow_video.mp4";
         a.click();
     };
+
+    // Show debug payload if available
+    if (wfDebugPayload) {
+        let payloadEl = document.getElementById("wf-debug-payload");
+        if (!payloadEl) {
+            payloadEl = document.createElement("div");
+            payloadEl.id = "wf-debug-payload";
+            payloadEl.style.cssText = "margin-top:14px";
+            resultEl.parentNode.appendChild(payloadEl);
+        }
+        payloadEl.innerHTML = `
+            <details style="margin-top:12px">
+                <summary style="cursor:pointer;font-size:0.72rem;font-weight:600;color:var(--text-secondary);user-select:none">API Payload</summary>
+                <pre style="margin-top:8px;padding:12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;font-size:0.68rem;color:var(--text-muted);overflow-x:auto;white-space:pre-wrap;word-break:break-all">${JSON.stringify(wfDebugPayload, null, 2)}</pre>
+            </details>`;
+    }
 
     // Mark step completed
     document.getElementById("wf-step-4").classList.remove("active");
