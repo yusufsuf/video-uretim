@@ -463,18 +463,28 @@ async def run_pipeline(
                 )
             else:
                 # ── STANDARD CUSTOM PATH ───────────────────────────────────
-                _update_job(job_id, progress=45, message="Senaryo üretiliyor...")
-                fal_back_url = await _to_fal_url(back_url) if back_url else None
-                fal_side_url_prompt = await _to_fal_url(side_url) if side_url else None
-                multi_prompt_custom = await generate_custom_multishot_prompt(
-                    video_description=video_description,
-                    image_url=fal_front_url,
-                    back_image_url=fal_back_url,
-                    side_image_url=fal_side_url_prompt,
-                    scene_count=custom_scene_count,
-                    total_duration=custom_total_duration,
-                )
-                logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
+                # Check if user provided per-shot prompts → skip GPT
+                _custom_user_shots = request.shots and all((s.description or "").strip() for s in request.shots)
+                if _custom_user_shots:
+                    _update_job(job_id, progress=45, message="Kullanıcı senaryosu kullanılıyor...")
+                    multi_prompt_custom = [
+                        {"duration": s.duration, "prompt": s.description.strip()}
+                        for s in request.shots
+                    ]
+                    logger.info("[%s] Custom: using %d user-provided prompts (GPT skipped)", job_id, len(multi_prompt_custom))
+                else:
+                    _update_job(job_id, progress=45, message="Senaryo üretiliyor...")
+                    fal_back_url = await _to_fal_url(back_url) if back_url else None
+                    fal_side_url_prompt = await _to_fal_url(side_url) if side_url else None
+                    multi_prompt_custom = await generate_custom_multishot_prompt(
+                        video_description=video_description,
+                        image_url=fal_front_url,
+                        back_image_url=fal_back_url,
+                        side_image_url=fal_side_url_prompt,
+                        scene_count=custom_scene_count,
+                        total_duration=custom_total_duration,
+                    )
+                    logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
 
                 # Inject no-train note into every shot prompt (positive reinforcement)
                 if _custom_no_train_note:
@@ -531,16 +541,26 @@ async def run_pipeline(
             # Start frame: use dedicated upload or fall back to front image
             fal_ozel_start = await _to_fal_url(start_frame_url if start_frame_url else front_url)
 
-            _update_job(job_id, progress=30, message="Sahneler planlanıyor...")
-            ozel_shots = await generate_ozel_multishot_prompt(
-                image_url=fal_ozel_front,
-                back_image_url=ozel_back_url,
-                side_image_url=ozel_side_url,
-                video_description=video_description,
-                scene_count=custom_scene_count,
-                total_duration=custom_total_duration,
-                start_frame_url=fal_ozel_start,
-            )
+            # Check if user provided per-shot prompts → skip GPT
+            _ozel_user_shots = request.shots and all((s.description or "").strip() for s in request.shots)
+            if _ozel_user_shots:
+                _update_job(job_id, progress=30, message="Kullanıcı senaryosu kullanılıyor...")
+                ozel_shots = [
+                    {"duration": s.duration, "prompt": f"@Element1 {s.description.strip()}"}
+                    for s in request.shots
+                ]
+                logger.info("[%s] Ozel: using %d user-provided prompts (GPT skipped)", job_id, len(ozel_shots))
+            else:
+                _update_job(job_id, progress=30, message="Sahneler planlanıyor...")
+                ozel_shots = await generate_ozel_multishot_prompt(
+                    image_url=fal_ozel_front,
+                    back_image_url=ozel_back_url,
+                    side_image_url=ozel_side_url,
+                    video_description=video_description,
+                    scene_count=custom_scene_count,
+                    total_duration=custom_total_duration,
+                    start_frame_url=fal_ozel_start,
+                )
 
             total_ozel_dur = sum(int(p["duration"]) for p in ozel_shots)
 
@@ -625,17 +645,25 @@ async def run_pipeline(
             # GPT-4o-mini ile kullanıcının açıklamasını Kling-optimized İngilizce prompt'a çevir
             if request.shots:
                 import re as _re
+                # Check if ALL shots have user-provided descriptions → skip GPT translate
+                _all_have_desc = all((s.description or "").strip() for s in request.shots)
                 studio_shots = []
                 for shot in request.shots:
                     desc = (shot.description or "").strip()
                     if desc:
-                        # Strip any existing @ElementN tokens, then GPT-translate the description
-                        desc_stripped = _re.sub(r'^(@[Ee]lement\d+\s*)+', '', desc).strip()
-                        translated = await translate_studio_shot_description(
-                            user_description=desc_stripped,
-                            scene_anchor=scene_anchor,
-                        )
-                        prompt = f"{_element_prefix} {translated}"
+                        if _all_have_desc:
+                            # User provided prompts — use directly without GPT translation
+                            desc_stripped = _re.sub(r'^(@[Ee]lement\d+\s*)+', '', desc).strip()
+                            prompt = f"{_element_prefix} {desc_stripped}"
+                            logger.info("[%s] Studio shot: using user prompt directly (GPT skipped)", job_id)
+                        else:
+                            # Mixed — translate via GPT
+                            desc_stripped = _re.sub(r'^(@[Ee]lement\d+\s*)+', '', desc).strip()
+                            translated = await translate_studio_shot_description(
+                                user_description=desc_stripped,
+                                scene_anchor=scene_anchor,
+                            )
+                            prompt = f"{_element_prefix} {translated}"
                     else:
                         prompt = f"{_element_prefix} In the {scene_anchor}, model walks elegantly with tiny concealed steps, sealed skirt moves as one piece, showcasing the garment"
                     studio_shots.append({"duration": shot.duration, "prompt": prompt[:480]})
@@ -722,33 +750,65 @@ async def run_pipeline(
             logger.info("[%s] Studio video ready: %s", job_id, final_path)
 
         else:
-            # ── Steps 1-3: analysis + prompts + background ─────────────────
-            _update_job(job_id, status=JobStatus.ANALYZING, progress=5, message="Elbise analiz ediliyor...")
-            logger.info("[%s] Step 1 – Analysing garment", job_id)
+            # Check if user provided per-shot prompts for ALL shots → skip analysis + GPT
+            _classic_user_prompts = request.shots and all((s.description or "").strip() for s in request.shots)
 
-            analysis = await analyse_dress(front_path, back_path)
-            _update_job(job_id, analysis=analysis, progress=15, message="Elbise analizi tamamlandı.")
-            logger.info("[%s] Analysis result: %s", job_id, analysis.garment_type)
+            if _classic_user_prompts:
+                # ── USER PROMPTS: skip GPT analysis + scene generation ────
+                logger.info("[%s] User provided all shot prompts — skipping GPT analysis & scene generation", job_id)
+                _update_job(job_id, progress=20, message="Kullanıcı senaryosu kullanılıyor...")
 
-            has_train = _has_train(analysis)
-            no_train_note = _HEM_LOCK if has_train else f"{_HEM_LOCK} No train."
-            kling_negative = _BASE_NEGATIVE if has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
-            logger.info("[%s] Train detected: %s", job_id, has_train)
+                # Minimal defaults (no GPT analysis)
+                analysis = None
+                has_train = False
+                no_train_note = _HEM_LOCK
+                kling_negative = _BASE_NEGATIVE + _TRAIN_NEGATIVE
 
-            _update_job(job_id, status=JobStatus.GENERATING_PROMPTS, progress=20, message="Sahneler planlanıyor...")
-            logger.info("[%s] Step 2 – Generating multi-scene prompts (duration=%ds, scenes=%d)", job_id, duration, scene_count)
+                # Build a synthetic scene_prompt from user shots
+                from models import DefileShotConfig as _DSC  # noqa: F811
+                scene_prompt = MultiScenePrompt(
+                    background_image_prompt="fashion runway, dramatic lighting",
+                    total_duration=sum(s.duration for s in request.shots),
+                    scene_count=len(request.shots),
+                    scenes=[
+                        SingleScenePrompt(
+                            scene_number=i + 1,
+                            duration=str(s.duration),
+                            prompt=s.description.strip(),
+                        )
+                        for i, s in enumerate(request.shots)
+                    ],
+                )
+                _update_job(job_id, scene_prompt=scene_prompt, progress=30,
+                            message=f"{len(request.shots)} sahne (kullanıcı senaryosu).")
+            else:
+                # ── Steps 1-3: analysis + prompts + background ─────────────────
+                _update_job(job_id, status=JobStatus.ANALYZING, progress=5, message="Elbise analiz ediliyor...")
+                logger.info("[%s] Step 1 – Analysing garment", job_id)
 
-            scene_prompt = await generate_multi_scene_prompt(
-                analysis=analysis,
-                request=request,
-                total_duration=duration,
-                scene_count=scene_count,
-                video_description=video_description,
-                location_image_path=reference_image_path,
-                style_image_url=library_style_url,
-            )
-            _update_job(job_id, scene_prompt=scene_prompt, progress=30, message=f"{scene_prompt.scene_count} sahne planlandı.")
-            logger.info("[%s] Planned %d scenes", job_id, scene_prompt.scene_count)
+                analysis = await analyse_dress(front_path, back_path)
+                _update_job(job_id, analysis=analysis, progress=15, message="Elbise analizi tamamlandı.")
+                logger.info("[%s] Analysis result: %s", job_id, analysis.garment_type)
+
+                has_train = _has_train(analysis)
+                no_train_note = _HEM_LOCK if has_train else f"{_HEM_LOCK} No train."
+                kling_negative = _BASE_NEGATIVE if has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
+                logger.info("[%s] Train detected: %s", job_id, has_train)
+
+                _update_job(job_id, status=JobStatus.GENERATING_PROMPTS, progress=20, message="Sahneler planlanıyor...")
+                logger.info("[%s] Step 2 – Generating multi-scene prompts (duration=%ds, scenes=%d)", job_id, duration, scene_count)
+
+                scene_prompt = await generate_multi_scene_prompt(
+                    analysis=analysis,
+                    request=request,
+                    total_duration=duration,
+                    scene_count=scene_count,
+                    video_description=video_description,
+                    location_image_path=reference_image_path,
+                    style_image_url=library_style_url,
+                )
+                _update_job(job_id, scene_prompt=scene_prompt, progress=30, message=f"{scene_prompt.scene_count} sahne planlandı.")
+                logger.info("[%s] Planned %d scenes", job_id, scene_prompt.scene_count)
 
             if reference_image_url:
                 background_url = reference_image_url
@@ -803,7 +863,7 @@ async def run_pipeline(
                 _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
                             progress=55, message="Sahne kompoze ediliyor (multishot)...")
 
-                garment_hint = f"{analysis.color} {analysis.garment_type}"
+                garment_hint = f"{analysis.color} {analysis.garment_type}" if analysis else "garment"
                 nb2_prompt = (
                     f"Fashion editorial photo: the first image is the background scene — keep it exactly. "
                     f"Place a fashion model wearing the {garment_hint} from the garment reference images "
@@ -820,21 +880,31 @@ async def run_pipeline(
                 )
                 logger.info("[%s] Multishot scene frame: %s", job_id, scene_frame_url[:80])
 
-                _update_job(job_id, progress=65, message="Senaryo üretiliyor (multishot)...")
+                # Check if user provided per-shot prompts → skip GPT
+                _ms_user_prompts = request.shots and all((s.description or "").strip() for s in request.shots)
 
-                if request.shots:
-                    shot_configs_ms = request.shots
+                if _ms_user_prompts:
+                    _update_job(job_id, progress=65, message="Kullanıcı senaryosu kullanılıyor (multishot)...")
+                    multi_prompt = [
+                        {"duration": s.duration, "prompt": s.description.strip()}
+                        for s in request.shots
+                    ]
+                    logger.info("[%s] Multishot: using %d user-provided prompts (GPT skipped)", job_id, len(multi_prompt))
                 else:
-                    from models import DefileShotConfig
-                    shot_configs_ms = [DefileShotConfig(duration=int(s.duration)) for s in scene_prompt.scenes]
+                    _update_job(job_id, progress=65, message="Senaryo üretiliyor (multishot)...")
+                    if request.shots:
+                        shot_configs_ms = request.shots
+                    else:
+                        from models import DefileShotConfig
+                        shot_configs_ms = [DefileShotConfig(duration=int(s.duration)) for s in scene_prompt.scenes]
 
-                multi_prompt = await generate_defile_multishot_prompt(
-                    scene_frame_url=scene_frame_url,
-                    shot_configs=shot_configs_ms,
-                    outfit_name="",
-                    video_description=video_description,
-                )
-                logger.info("[%s] Multishot: %d prompt(s) generated", job_id, len(multi_prompt))
+                    multi_prompt = await generate_defile_multishot_prompt(
+                        scene_frame_url=scene_frame_url,
+                        shot_configs=shot_configs_ms,
+                        outfit_name="",
+                        video_description=video_description,
+                    )
+                    logger.info("[%s] Multishot: %d prompt(s) generated", job_id, len(multi_prompt))
 
                 _update_job(job_id, progress=72, message="Video üretiliyor (multishot)...")
 
@@ -887,7 +957,7 @@ async def run_pipeline(
 
                     angle = (scene.camera_angle or "eye_level").replace("_", " ")
                     size = (scene.shot_size or "full_body").replace("_", " ")
-                    garment_hint = f"{analysis.color} {analysis.garment_type}"
+                    garment_hint = f"{analysis.color} {analysis.garment_type}" if analysis else "garment"
                     nb2_prompt = (
                         f"Fashion editorial photo: the first image is the background scene — keep it exactly. "
                         f"Place a fashion model wearing the {garment_hint} from the garment reference images "
@@ -1351,22 +1421,31 @@ async def run_defile_collection_pipeline(
                 logger.info("[%s] Outfit %d/%d scene frame: %s",
                             job_id, outfit_idx + 1, n_outfits, scene_frame_url[:80])
 
-            # ── 3b: GPT-4o Vision — analyze frame + generate multishot prompts
-            _update_job(job_id, progress=base_progress + int(20 / n_outfits),
-                        message=f"{outfit_name} — senaryo üretiliyor ({outfit_idx + 1}/{n_outfits})...")
+            # ── 3b: Prompts — use user-provided or generate via GPT-4o Vision
+            _user_has_prompts = all(sc.prompt for sc in shot_configs)
 
-            multi_prompt = await generate_defile_multishot_prompt(
-                scene_frame_url=scene_frame_url,
-                shot_configs=shot_configs,
-                outfit_name=outfit_name,
-            )
-            logger.info("[%s] Outfit %d/%d prompts: %d shots, %ds total",
-                        job_id, outfit_idx + 1, n_outfits, len(multi_prompt), total_duration)
+            if _user_has_prompts:
+                # User provided prompts for all shots — skip GPT entirely
+                _update_job(job_id, progress=base_progress + int(20 / n_outfits),
+                            message=f"{outfit_name} — kullanıcı senaryosu kullanılıyor ({outfit_idx + 1}/{n_outfits})...")
+                multi_prompt = [
+                    {"duration": sc.duration, "prompt": sc.prompt}
+                    for sc in shot_configs
+                ]
+                logger.info("[%s] Outfit %d/%d: using %d user-provided prompts (GPT skipped)",
+                            job_id, outfit_idx + 1, n_outfits, len(multi_prompt))
+            else:
+                _update_job(job_id, progress=base_progress + int(20 / n_outfits),
+                            message=f"{outfit_name} — senaryo üretiliyor ({outfit_idx + 1}/{n_outfits})...")
+                multi_prompt = await generate_defile_multishot_prompt(
+                    scene_frame_url=scene_frame_url,
+                    shot_configs=shot_configs,
+                    outfit_name=outfit_name,
+                )
+                logger.info("[%s] Outfit %d/%d prompts: %d shots, %ds total",
+                            job_id, outfit_idx + 1, n_outfits, len(multi_prompt), total_duration)
 
             # Front-load hem/slit constraint so it's never truncated at Kling's 512-char limit.
-            # Old approach (append _HEM_LOCK after ~480-char prompt) left only ~32 chars of
-            # constraint — "NO front slit" was silently cut off. Fix: prepend _HEM_LOCK_SHORT,
-            # then fill remaining space with the shot description.
             _defile_rem = 512 - len(_HEM_LOCK_SHORT) - 1
             multi_prompt = [
                 {"duration": p["duration"], "prompt": (_HEM_LOCK_SHORT + " " + str(p["prompt"])[:_defile_rem])[:512]}  # type: ignore[index]

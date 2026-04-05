@@ -135,6 +135,7 @@ class DefileOutfit(BaseModel):
 class DefileShotConfig(BaseModel):
     """Global defile multishot konfigürasyonu — tek bir sahne."""
     duration: int = Field(default=5, ge=3, le=10, description="Sahne süresi (saniye)")
+    prompt: Optional[str] = None  # User-provided prompt — if set, skip GPT generation
 
 
 class DefileCollectionRequest(BaseModel):

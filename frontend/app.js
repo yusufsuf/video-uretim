@@ -197,7 +197,7 @@ let libraryStyleUrl    = null;
 let videoMode = "video";          // "video" | "defile" | "studio"
 let generationMode = "multishot";   // always multishot
 let defileOutfits = [];           // [{front_url, side_url, back_url, name}]
-let defileShotConfigs = [{ duration: 5 }]; // global shot list [{duration}]
+let defileShotConfigs = [{ duration: 5, prompt: "" }]; // global shot list [{duration}]
 let defileBgUrl = null;
 let defileBgExtraUrls = [];
 let defileAspectRatio = "9:16";
@@ -228,14 +228,20 @@ function renderDefileShotDesigner() {
     if (addBtn) addBtn.style.display = defileShotConfigs.length >= DEFILE_MAX_SHOTS ? "none" : "block";
 
     container.innerHTML = defileShotConfigs.map((cfg, idx) => `
-        <div style="display:flex;align-items:center;gap:8px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px">
-            <span style="font-size:0.72rem;font-weight:600;color:var(--text-muted);min-width:52px">Sahne ${idx + 1}</span>
-            <input type="range" class="shot-dur-slider" style="flex:1" min="${DEFILE_MIN_SHOT}" max="${DEFILE_MAX_SHOT}" value="${cfg.duration}"
-                oninput="updateDefileShotDuration(${idx}, this.value)">
-            <span style="font-size:0.72rem;font-weight:600;color:var(--text-primary);min-width:24px;text-align:right">${cfg.duration}s</span>
-            ${defileShotConfigs.length > 1
-                ? `<button onclick="removeDefileShot(${idx})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.8rem;padding:2px 4px;line-height:1" title="Sahneyi kaldır">✕</button>`
-                : ""}
+        <div style="background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px">
+            <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:0.72rem;font-weight:600;color:var(--text-muted);min-width:52px">Sahne ${idx + 1}</span>
+                <input type="range" class="shot-dur-slider" style="flex:1" min="${DEFILE_MIN_SHOT}" max="${DEFILE_MAX_SHOT}" value="${cfg.duration}"
+                    oninput="updateDefileShotDuration(${idx}, this.value)">
+                <span style="font-size:0.72rem;font-weight:600;color:var(--text-primary);min-width:24px;text-align:right">${cfg.duration}s</span>
+                ${defileShotConfigs.length > 1
+                    ? `<button onclick="removeDefileShot(${idx})" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:0.8rem;padding:2px 4px;line-height:1" title="Sahneyi kaldır">✕</button>`
+                    : ""}
+            </div>
+            <textarea class="defile-shot-prompt" data-idx="${idx}" rows="2"
+                placeholder="Prompt (boş bırakırsan AI üretir)"
+                style="width:100%;margin-top:6px;font-size:0.72rem;padding:6px 8px;border:1px solid var(--border-subtle);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);resize:vertical;font-family:inherit"
+                oninput="updateDefileShotPrompt(${idx}, this.value)">${cfg.prompt || ""}</textarea>
         </div>
     `).join("");
 }
@@ -245,11 +251,15 @@ function updateDefileShotDuration(idx, val) {
     renderDefileShotDesigner();
 }
 
+function updateDefileShotPrompt(idx, val) {
+    defileShotConfigs[idx].prompt = val;
+}
+
 function addDefileShot() {
     if (defileShotConfigs.length >= DEFILE_MAX_SHOTS) return;
     const remaining = DEFILE_MAX_TOTAL - _defileTotalDuration();
     const dur = Math.max(DEFILE_MIN_SHOT, Math.min(DEFILE_MAX_SHOT, remaining > 0 ? remaining : DEFILE_MIN_SHOT));
-    defileShotConfigs.push({ duration: dur });
+    defileShotConfigs.push({ duration: dur, prompt: "" });
     renderDefileShotDesigner();
 }
 
@@ -694,7 +704,7 @@ function applyDefileJsonConfig() {
         alert('Geçersiz JSON: ' + e.message);
         return;
     }
-    defileShotConfigs = configs.map(c => ({ duration: Number(c.duration) || 5 }));
+    defileShotConfigs = configs.map(c => ({ duration: Number(c.duration) || 5, prompt: c.prompt || "" }));
     renderDefileShotDesigner();
     toggleDefileJsonLoad(false);
 }
@@ -1003,7 +1013,7 @@ function openDefile() {
 function openDefileNB2() {
     videoMode = "defile";
     defileOutfits = [];
-    defileShotConfigs = [{ duration: 5 }];
+    defileShotConfigs = [{ duration: 5, prompt: "" }];
     defileBgUrl = null;
     defileBgExtraUrls = [];
     defileAspectRatio = "9:16";
@@ -1367,6 +1377,7 @@ async function startDefileCollection() {
 
 window.removeDefileOutfit        = removeDefileOutfit;
 window.updateDefileShotDuration  = updateDefileShotDuration;
+window.updateDefileShotPrompt    = updateDefileShotPrompt;
 window.addDefileShot             = addDefileShot;
 window.removeDefileShot          = removeDefileShot;
 window.clearDefileBg             = clearDefileBg;
@@ -2317,7 +2328,7 @@ newBtn?.addEventListener("click", () => {
     // Reset defile state
     videoMode = "video";
     defileOutfits = [];
-    defileShotConfigs = [{ duration: 5 }];
+    defileShotConfigs = [{ duration: 5, prompt: "" }];
     defileBgUrl = null;
     defileStartFrameFile = null;
     defileStartFrameUrl = null;
