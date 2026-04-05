@@ -1674,7 +1674,7 @@ function openStudioElementPicker() {
 async function _fetchAndRenderStudioElements(grid) {
     grid.innerHTML = `<div class="lib-picker-loading">Yükleniyor...</div>`;
     try {
-        const resp = await fetch("/library/items?category=element", { headers: getAuthHeaders() });
+        const resp = await fetch("/library/items", { headers: getAuthHeaders() });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const items = await resp.json();
         if (!items.length) {
@@ -1734,8 +1734,13 @@ function openStudioCreateModal() {
     // Show category selector for defile mode, hide for studio mode
     const catSelect = document.getElementById("create-elem-category");
     if (catSelect) {
-        catSelect.style.display = window._defileCreateMode ? "" : "none";
-        catSelect.value = "costume";
+        if (window._defileCreateMode) {
+            catSelect.style.display = "";
+            catSelect.value = "costume";
+        } else {
+            catSelect.style.display = "none";
+            catSelect.value = "element";
+        }
     }
 
     _updateCreateSaveBtn();
