@@ -292,6 +292,45 @@ def _save_to_history(job: JobResponse):
         logger.error("Failed to save history: %s", e)
 
 
+async def get_or_create_kling_element(
+    front_url: str,
+    frontal_image_url: str,
+    reference_image_urls: list,
+    name: str = "garment",
+    description: str = "fashion garment",
+) -> int:
+    """Return cached kling_element_id from Supabase, or create a new one and cache it.
+
+    front_url: the original library image_url (for cache lookup)
+    frontal_image_url / reference_image_urls: compressed URLs for Kling API
+    """
+    from services.kling_service import create_element  # type: ignore[import]
+    from services.library_service import get_item_by_url, set_kling_element_id
+
+    # Check cache
+    item = await get_item_by_url(front_url)
+    if item and item.get("kling_element_id"):
+        logger.info("Kling element cache HIT: item=%s, element_id=%d",
+                     item["id"], item["kling_element_id"])
+        return int(item["kling_element_id"])
+
+    # Create new element
+    element_id = await create_element(
+        frontal_image_url=frontal_image_url,
+        reference_image_urls=reference_image_urls,
+        name=name,
+        description=description,
+    )
+
+    # Cache it
+    if item:
+        await set_kling_element_id(item["id"], element_id)
+    else:
+        logger.info("Kling element created (no library item to cache): element_id=%d", element_id)
+
+    return element_id
+
+
 def _update_job(job_id: str, **kwargs):
     if job_id in jobs:
         for k, v in kwargs.items():
@@ -339,27 +378,25 @@ async def run_pipeline(
         if provider == "kling":
             from services.kling_service import (  # type: ignore[import]
                 generate_multishot_video as _kling_gen,
-                create_element as _kling_create_elem,
             )
-            import asyncio as _aio
 
-            # Pop fal.ai-style elements list and create real Kling elements
+            # Pop fal.ai-style elements list and create real Kling elements (with cache)
             fal_elements = kwargs.pop("elements", []) or []
             element_list = []
             if fal_elements:
                 logger.info("[%s] Creating %d Kling element(s)...", job_id, len(fal_elements))
-                coros = [
-                    _kling_create_elem(
+                for i, e in enumerate(fal_elements):
+                    if i >= 3:
+                        break
+                    eid = await get_or_create_kling_element(
+                        front_url=e.get("original_front_url", e["frontal_image_url"]),
                         frontal_image_url=e["frontal_image_url"],
                         reference_image_urls=e.get("reference_image_urls", []),
                         name=f"garment{i + 1}",
                         description=f"fashion garment {i + 1}",
                     )
-                    for i, e in enumerate(fal_elements) if i < 3  # Kling max 3 elements
-                ]
-                element_ids = await _aio.gather(*coros)
-                element_list = [{"element_id": int(eid)} for eid in element_ids]
-                logger.info("[%s] Kling elements ready: %s", job_id, element_ids)
+                    element_list.append({"element_id": int(eid)})
+                logger.info("[%s] Kling elements ready: %s", job_id, element_list)
 
             # Replace @ElementN → <<<element_N>>> (Kling native token format)
             if "multi_prompt" in kwargs:
@@ -544,6 +581,7 @@ async def run_pipeline(
                     kling_elements.append({
                         "frontal_image_url": _fal_front,
                         "reference_image_urls": _fal_extras if _fal_extras else [_fal_front],
+                        "original_front_url": _ed["front_url"],
                     })
             else:
                 fal_studio_front = await _to_fal_url_compressed(front_url)
@@ -557,6 +595,7 @@ async def run_pipeline(
                 kling_elements = [{
                     "frontal_image_url": fal_studio_front,
                     "reference_image_urls": studio_ref_urls if studio_ref_urls else [fal_studio_front],
+                    "original_front_url": front_url,
                 }]
             fal_studio_front = kling_elements[0]["frontal_image_url"]
             # Token prefix for all active elements: "@Element1", "@Element1 @Element2", etc.
@@ -1319,22 +1358,36 @@ async def run_defile_collection_pipeline(
                         job_id, outfit_idx + 1, len(_elem_refs))
 
             # ── 3c: Video generation — single multishot call per outfit ─────
-            _update_job(job_id, progress=base_progress + int(35 / n_outfits),
-                        message=f"{outfit_name} — video üretiliyor ({outfit_idx + 1}/{n_outfits})...")
 
             # Re-upload scene frame so video API can download it reliably
             scene_frame_url = await _to_fal_url(scene_frame_url)
 
             _defile_provider = getattr(request, "provider", "fal")
 
+            # Build debug_payload for this outfit
+            _defile_debug = {
+                "outfit": outfit_name,
+                "start_image_url": scene_frame_url,
+                "multi_prompt": [{"prompt": p["prompt"], "duration": p["duration"]} for p in multi_prompt],
+                "duration": str(total_duration),
+                "aspect_ratio": request.aspect_ratio,
+                "generate_audio": request.generate_audio,
+                "elements": kling_outfit_elements,
+                "provider": _defile_provider,
+            }
+
+            _update_job(job_id, progress=base_progress + int(35 / n_outfits),
+                        debug_payload=_defile_debug,
+                        message=f"{outfit_name} — video üretiliyor ({outfit_idx + 1}/{n_outfits})...")
+
             if _defile_provider == "kling":
                 from services.kling_service import (  # type: ignore[import]
                     generate_multishot_video as _kling_gen,
-                    create_element as _kling_create_elem,
                 )
-                # Create Kling element from outfit images
-                logger.info("[%s] Defile outfit %d: creating Kling element...", job_id, outfit_idx + 1)
-                _kling_eid = await _kling_create_elem(
+                # Get cached or create new Kling element
+                logger.info("[%s] Defile outfit %d: getting/creating Kling element...", job_id, outfit_idx + 1)
+                _kling_eid = await get_or_create_kling_element(
+                    front_url=outfit.front_url,
                     frontal_image_url=outfit_element["frontal_image_url"],
                     reference_image_urls=outfit_element["reference_image_urls"],
                     name=f"defile{outfit_idx + 1}",

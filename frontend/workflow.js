@@ -17,13 +17,13 @@ function authHeaders() {
 }
 
 // ─── State ─────────────────────────────────────────────────────────
-let wfOutfits = [];           // [{front_url, side_url, back_url, extra_urls, name, selected}]
-let wfSelectedOutfit = null;  // single outfit for this workflow run
+let wfOutfits = [];           // [{front_url, side_url, back_url, extra_urls, name, id}]
+let wfSelectedOutfits = [];   // multi-select: array of selected outfits
 let wfShotConfigs = [{ duration: 5 }, { duration: 5 }, { duration: 5 }];
 let wfBgUrl = null;
 let wfBgExtraUrls = [];
-let wfScenario = [];          // [{duration, prompt}]
-let wfSceneFrameUrl = null;
+// Per-outfit data: wfOutfitData[i] = { outfit, shots: [...], scene_frame_url }
+let wfOutfitData = [];
 let wfJobId = null;
 let wfPollInterval = null;
 
@@ -35,6 +35,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("wf-btn-scenario").addEventListener("click", generateScenario);
     document.getElementById("wf-btn-approve-scenario").addEventListener("click", approveScenario);
     document.getElementById("wf-btn-approve-scene").addEventListener("click", approveScene);
+    document.getElementById("wf-bg-pick-btn").addEventListener("click", () => openWfLibPicker("background"));
 });
 
 // ─── Step 1: Outfit Loading ────────────────────────────────────────
@@ -76,10 +77,13 @@ async function loadOutfits() {
 
         grid.querySelectorAll(".wf-outfit-card").forEach(card => {
             card.addEventListener("click", () => {
-                grid.querySelectorAll(".wf-outfit-card").forEach(c => c.classList.remove("selected"));
-                card.classList.add("selected");
-                wfSelectedOutfit = wfOutfits[parseInt(card.dataset.idx)];
-                document.getElementById("wf-btn-scenario").disabled = false;
+                card.classList.toggle("selected");
+                // Rebuild selected list
+                wfSelectedOutfits = [];
+                grid.querySelectorAll(".wf-outfit-card.selected").forEach(c => {
+                    wfSelectedOutfits.push(wfOutfits[parseInt(c.dataset.idx)]);
+                });
+                document.getElementById("wf-btn-scenario").disabled = wfSelectedOutfits.length === 0;
             });
         });
     } catch (err) {
@@ -142,30 +146,40 @@ function activateStep(num) {
 
 // ─── Step 2: Generate Scenario ─────────────────────────────────────
 async function generateScenario() {
-    if (!wfSelectedOutfit) return;
+    if (!wfSelectedOutfits.length) return;
 
     const btn = document.getElementById("wf-btn-scenario");
     btn.disabled = true;
-    btn.innerHTML = `<span class="wf-spinner"></span>Senaryo üretiliyor...`;
+    btn.innerHTML = `<span class="wf-spinner"></span>Senaryo üretiliyor (0/${wfSelectedOutfits.length})...`;
+
+    wfOutfitData = [];
 
     try {
-        const resp = await fetch(`${API}/api/workflow/scenario`, {
-            method: "POST",
-            headers: { ...authHeaders(), "Content-Type": "application/json" },
-            body: JSON.stringify({
-                outfit: wfSelectedOutfit,
-                shot_configs: wfShotConfigs,
-                background_url: wfBgUrl,
-                aspect_ratio: document.getElementById("wf-aspect").value,
-                director_note: document.getElementById("wf-director-note").value.trim() || null,
-            }),
-        });
+        for (let i = 0; i < wfSelectedOutfits.length; i++) {
+            btn.innerHTML = `<span class="wf-spinner"></span>Senaryo üretiliyor (${i + 1}/${wfSelectedOutfits.length})...`;
 
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
+            const resp = await fetch(`${API}/api/workflow/scenario`, {
+                method: "POST",
+                headers: { ...authHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    outfit: wfSelectedOutfits[i],
+                    shot_configs: wfShotConfigs,
+                    background_url: wfBgUrl,
+                    aspect_ratio: document.getElementById("wf-aspect").value,
+                    director_note: document.getElementById("wf-director-note").value.trim() || null,
+                }),
+            });
 
-        wfScenario = data.shots;
-        wfSceneFrameUrl = data.scene_frame_url;
+            if (!resp.ok) throw new Error(`HTTP ${resp.status} (kıyafet ${i + 1})`);
+            const data = await resp.json();
+
+            wfOutfitData.push({
+                outfit: wfSelectedOutfits[i],
+                shots: data.shots,
+                scene_frame_url: data.scene_frame_url,
+            });
+        }
+
         renderScenario();
         activateStep(2);
     } catch (err) {
@@ -178,23 +192,30 @@ async function generateScenario() {
 
 function renderScenario() {
     const list = document.getElementById("wf-scenario-list");
-    list.innerHTML = wfScenario.map((shot, idx) => `
-        <div class="wf-scenario-card" data-idx="${idx}">
-            <div class="wf-shot-label">Sahne ${idx + 1} (${shot.duration}s)</div>
-            <div class="wf-shot-prompt">${shot.prompt}</div>
-            <textarea class="wf-scenario-edit" data-idx="${idx}">${shot.prompt}</textarea>
-        </div>
-    `).join("");
+    let html = "";
+    wfOutfitData.forEach((od, oi) => {
+        html += `<div style="font-weight:600;font-size:0.82rem;margin-top:${oi > 0 ? 16 : 0}px;margin-bottom:8px;color:var(--text-primary)">${od.outfit.name || `Kıyafet ${oi + 1}`}</div>`;
+        od.shots.forEach((shot, si) => {
+            html += `
+                <div class="wf-scenario-card" data-outfit="${oi}" data-shot="${si}">
+                    <div class="wf-shot-label">Sahne ${si + 1} (${shot.duration}s)</div>
+                    <div class="wf-shot-prompt">${shot.prompt}</div>
+                    <textarea class="wf-scenario-edit" data-outfit="${oi}" data-shot="${si}">${shot.prompt}</textarea>
+                </div>`;
+        });
+    });
+    list.innerHTML = html;
 }
 
 window.wfEditScenario = () => {
     document.querySelectorAll(".wf-scenario-card").forEach(card => {
         card.classList.toggle("editing");
     });
-    // Save edited prompts back
     document.querySelectorAll(".wf-scenario-edit").forEach(ta => {
         ta.addEventListener("input", () => {
-            wfScenario[parseInt(ta.dataset.idx)].prompt = ta.value;
+            const oi = parseInt(ta.dataset.outfit);
+            const si = parseInt(ta.dataset.shot);
+            wfOutfitData[oi].shots[si].prompt = ta.value;
         });
     });
 };
@@ -203,29 +224,32 @@ window.wfRegenerateScenario = () => {
     generateScenario();
 };
 
-// ─── Step 3: Approve Scenario → Generate Scene Frame ───────────────
+// ─── Step 3: Approve Scenario → Generate Scene Frames ──────────────
 async function approveScenario() {
     const btn = document.getElementById("wf-btn-approve-scenario");
     btn.disabled = true;
-    btn.innerHTML = `<span class="wf-spinner"></span>Sahne karesi oluşturuluyor...`;
 
     try {
-        const resp = await fetch(`${API}/api/workflow/scene-frame`, {
-            method: "POST",
-            headers: { ...authHeaders(), "Content-Type": "application/json" },
-            body: JSON.stringify({
-                outfit: wfSelectedOutfit,
-                background_url: wfBgUrl,
-                background_extra_urls: wfBgExtraUrls,
-                aspect_ratio: document.getElementById("wf-aspect").value,
-            }),
-        });
+        for (let i = 0; i < wfOutfitData.length; i++) {
+            btn.innerHTML = `<span class="wf-spinner"></span>Sahne karesi oluşturuluyor (${i + 1}/${wfOutfitData.length})...`;
 
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
+            const resp = await fetch(`${API}/api/workflow/scene-frame`, {
+                method: "POST",
+                headers: { ...authHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    outfit: wfOutfitData[i].outfit,
+                    background_url: wfBgUrl,
+                    background_extra_urls: wfBgExtraUrls,
+                    aspect_ratio: document.getElementById("wf-aspect").value,
+                }),
+            });
 
-        wfSceneFrameUrl = data.scene_frame_url;
-        document.getElementById("wf-scene-img").src = wfSceneFrameUrl;
+            if (!resp.ok) throw new Error(`HTTP ${resp.status} (kıyafet ${i + 1})`);
+            const data = await resp.json();
+            wfOutfitData[i].scene_frame_url = data.scene_frame_url;
+        }
+
+        renderSceneFrames();
         activateStep(3);
     } catch (err) {
         alert("Sahne karesi oluşturulamadı: " + err.message);
@@ -233,6 +257,16 @@ async function approveScenario() {
         btn.disabled = false;
         btn.textContent = "Onayla ve Devam Et";
     }
+}
+
+function renderSceneFrames() {
+    const preview = document.getElementById("wf-scene-preview");
+    preview.innerHTML = wfOutfitData.map((od, i) => `
+        <div style="margin-bottom:12px">
+            <div style="font-weight:600;font-size:0.78rem;margin-bottom:6px;color:var(--text-primary)">${od.outfit.name || `Kıyafet ${i + 1}`}</div>
+            <img src="${od.scene_frame_url}" alt="Sahne karesi ${i + 1}" style="max-width:100%;border-radius:8px;border:1px solid var(--border-subtle)">
+        </div>
+    `).join("");
 }
 
 window.wfRegenerateScene = () => {
@@ -245,14 +279,19 @@ async function approveScene() {
     btn.disabled = true;
     btn.textContent = "Video başlatılıyor...";
 
+    // Build per-outfit payload
+    const outfitPayloads = wfOutfitData.map(od => ({
+        outfit: od.outfit,
+        scene_frame_url: od.scene_frame_url,
+        shots: od.shots,
+    }));
+
     try {
         const resp = await fetch(`${API}/api/workflow/generate`, {
             method: "POST",
             headers: { ...authHeaders(), "Content-Type": "application/json" },
             body: JSON.stringify({
-                outfit: wfSelectedOutfit,
-                scene_frame_url: wfSceneFrameUrl,
-                shots: wfScenario,
+                outfits: outfitPayloads,
                 aspect_ratio: document.getElementById("wf-aspect").value,
                 generate_audio: document.getElementById("wf-audio").value === "true",
                 provider: document.getElementById("wf-provider").value,
@@ -322,4 +361,64 @@ function showResult(url) {
     document.getElementById("wf-step-4").classList.remove("active");
     document.getElementById("wf-step-4").classList.add("completed");
     document.getElementById("wf-step-4").querySelector(".wf-step-status").textContent = "Tamamlandı";
+}
+
+
+// ─── Library Picker ───────────────────────────────────────────────
+let _wfLibTarget = null; // "background" | "outfit"
+
+async function openWfLibPicker(target) {
+    _wfLibTarget = target;
+    const modal = document.getElementById("wf-lib-modal");
+    const title = document.getElementById("wf-lib-title");
+    const grid  = document.getElementById("wf-lib-grid");
+    const close = document.getElementById("wf-lib-close");
+
+    title.textContent = target === "background" ? "Arka Plan Seç" : "Kıyafet Seç";
+    modal.style.display = "flex";
+
+    close.onclick = () => { modal.style.display = "none"; };
+    modal.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
+
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:0.8rem;padding:32px">Yükleniyor...</div>`;
+
+    try {
+        const resp = await fetch(`/library/items?category=${target}`, { headers: authHeaders() });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const items = await resp.json();
+
+        if (!items.length) {
+            grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:0.8rem;padding:32px">Bu kategoride öğe yok. <a href="/library" target="_blank">Kütüphaneye git →</a></div>`;
+            return;
+        }
+
+        grid.innerHTML = items.map(it => `
+            <div class="wf-lib-item" data-id="${it.id}" style="cursor:pointer;border:2px solid transparent;border-radius:8px;overflow:hidden;transition:border-color 0.15s">
+                <img src="${it.image_url}" alt="${it.name}" loading="lazy" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block">
+                <div style="font-size:0.68rem;padding:4px 6px;text-align:center;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.name}</div>
+            </div>
+        `).join("");
+
+        const itemMap = Object.fromEntries(items.map(it => [it.id, it]));
+        grid.querySelectorAll(".wf-lib-item").forEach(el => {
+            el.addEventListener("click", () => {
+                const item = itemMap[el.dataset.id];
+                if (item) selectWfLibItem(item);
+            });
+        });
+    } catch (err) {
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:0.8rem;padding:32px">Yüklenemedi: ${err.message}</div>`;
+    }
+}
+
+function selectWfLibItem(item) {
+    if (_wfLibTarget === "background") {
+        wfBgUrl = item.image_url;
+        wfBgExtraUrls = item.extra_urls || [];
+        const preview = document.getElementById("wf-bg-preview");
+        const img = document.getElementById("wf-bg-img");
+        if (img) img.src = item.image_url;
+        if (preview) preview.style.display = "flex";
+    }
+    document.getElementById("wf-lib-modal").style.display = "none";
 }

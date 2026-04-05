@@ -100,6 +100,32 @@ async def add_item(
     return res.data[0]
 
 
+async def get_item_by_url(image_url: str) -> Optional[dict]:
+    """Find a library item by its image_url. Returns the row dict or None."""
+    def _query():
+        return _db().table("library_items").select("*").eq("image_url", image_url).limit(1).execute()
+
+    try:
+        res = await asyncio.to_thread(_query)  # type: ignore[arg-type]
+        return res.data[0] if res.data else None
+    except Exception:
+        return None
+
+
+async def set_kling_element_id(item_id: str, element_id: int) -> None:
+    """Cache a Kling element_id on a library item."""
+    def _update():
+        _db().table("library_items").update(
+            {"kling_element_id": element_id}
+        ).eq("id", item_id).execute()
+
+    try:
+        await asyncio.to_thread(_update)  # type: ignore[arg-type]
+        logger.info("Cached kling_element_id=%d for item %s", element_id, item_id)
+    except Exception as exc:
+        logger.warning("Failed to cache kling_element_id for %s: %s", item_id, exc)
+
+
 async def delete_item(user_id: str, item_id: str) -> None:
     """Delete a library item and all its storage files (verifies ownership first)."""
     def _fetch():

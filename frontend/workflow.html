@@ -545,6 +545,20 @@
         </div>
     </div>
 
+    <!-- Library Picker Modal -->
+    <div id="wf-lib-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center">
+        <div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:14px;width:90%;max-width:560px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border-subtle)">
+                <span id="wf-lib-title" style="font-weight:600;font-size:0.85rem">Seç</span>
+                <button id="wf-lib-close" style="background:none;border:none;color:var(--text-muted);font-size:1.1rem;cursor:pointer">✕</button>
+            </div>
+            <div id="wf-lib-tabs" style="display:flex;gap:4px;padding:10px 18px 0"></div>
+            <div id="wf-lib-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;padding:14px 18px;overflow-y:auto;flex:1;min-height:200px">
+                <div style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:0.8rem;padding:32px">Yükleniyor...</div>
+            </div>
+        </div>
+    </div>
+
     <script src="workflow.js"></script>
 </body>
 

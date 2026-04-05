@@ -96,6 +96,7 @@ class LibraryItem(BaseModel):
     category: str  # character | background | style
     image_url: str
     storage_path: str
+    kling_element_id: Optional[int] = None  # cached Kling element ID
     created_at: Optional[str] = None
 
 

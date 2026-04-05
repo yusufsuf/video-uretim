@@ -53,10 +53,15 @@ class SceneFrameRequest(BaseModel):
     aspect_ratio: str = "9:16"
 
 
-class GenerateRequest(BaseModel):
+class WfOutfitPayload(BaseModel):
+    """Per-outfit data: outfit + approved scene frame + approved shots."""
     outfit: WfOutfit
     scene_frame_url: str
     shots: List[dict]   # [{duration, prompt}]
+
+
+class GenerateRequest(BaseModel):
+    outfits: List[WfOutfitPayload]          # one or more outfits
     aspect_ratio: str = "9:16"
     generate_audio: bool = False
     provider: str = "kling"
@@ -216,11 +221,10 @@ async def generate_video(
 
 
 async def _run_workflow_video(job_id: str, req: GenerateRequest):
-    """Execute video generation for workflow — reuses existing pipeline services."""
-    from services.video_service import generate_multishot_video, download_file
+    """Execute video generation for workflow — supports multi-outfit with concat."""
+    from services.video_service import generate_multishot_video, download_file, concatenate_clips
     from pipeline import _to_fal_url, _to_fal_url_compressed
 
-    # Import Kling-specific helpers
     _HEM_LOCK_SHORT = "NO slit anywhere. NO front slit. Sealed floor-length gown. Skirt fully closed. Legs hidden."
     _DEFILE_NEGATIVE = (
         "blur, distort, low quality, deformed hands, deformed face, "
@@ -237,95 +241,127 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
     )
 
     try:
-        n_shots = len(req.shots)
-        total_duration = sum(int(s["duration"]) for s in req.shots)
+        n_outfits = len(req.outfits)
+        total_shots = sum(len(op.shots) for op in req.outfits)
+        clip_paths: list = []
 
-        _update_job(job_id, status=JobStatus.GENERATING_VIDEO, progress=10,
-                    message="Promptlar hazırlanıyor...")
+        for oi, op in enumerate(req.outfits):
+            outfit_name = op.outfit.name or f"Kıyafet {oi + 1}"
+            total_duration = sum(int(s["duration"]) for s in op.shots)
+            base_progress = 10 + int((oi / n_outfits) * 75)
 
-        # Prepend hem lock to each prompt
-        _rem = 512 - len(_HEM_LOCK_SHORT) - 1
-        multi_prompt = [
-            {
-                "duration": s["duration"],
-                "prompt": (_HEM_LOCK_SHORT + " " + str(s["prompt"])[:_rem])[:512],
-            }
-            for s in req.shots
-        ]
+            _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
+                        progress=base_progress,
+                        message=f"{outfit_name} — promptlar hazırlanıyor ({oi + 1}/{n_outfits})...")
 
-        # Build element data
-        _update_job(job_id, progress=20, message="Element görselleri hazırlanıyor...")
-
-        elem_front = await _to_fal_url_compressed(req.outfit.front_url)
-        elem_refs = []
-        if req.outfit.side_url:
-            elem_refs.append(await _to_fal_url_compressed(req.outfit.side_url))
-        if req.outfit.back_url:
-            elem_refs.append(await _to_fal_url_compressed(req.outfit.back_url))
-        for eu in (req.outfit.extra_urls or []):
-            if eu and len(elem_refs) < 3:
-                elem_refs.append(await _to_fal_url_compressed(eu))
-        if not elem_refs:
-            elem_refs = [elem_front]
-
-        outfit_element = {
-            "frontal_image_url": elem_front,
-            "reference_image_urls": elem_refs,
-        }
-
-        # Re-upload scene frame
-        scene_frame_fal = await _to_fal_url(req.scene_frame_url)
-
-        _update_job(job_id, progress=35, message="Video üretiliyor...")
-
-        if req.provider == "kling":
-            from services.kling_service import (  # type: ignore[import]
-                generate_multishot_video as kling_gen,
-                create_element as kling_create_elem,
-            )
-
-            # Create Kling element
-            _update_job(job_id, progress=40, message="Kling element oluşturuluyor...")
-            kling_eid = await kling_create_elem(
-                frontal_image_url=elem_front,
-                reference_image_urls=elem_refs,
-                name="workflow",
-                description="workflow garment",
-            )
-            logger.info("[%s] Workflow: Kling element_id=%d", job_id, kling_eid)
-
-            # Prepend <<<element_1>>> token
-            kling_prompts = [
-                {"duration": p["duration"], "prompt": f"<<<element_1>>> {p['prompt']}"}
-                for p in multi_prompt
+            # Prepend hem lock to each prompt
+            _rem = 512 - len(_HEM_LOCK_SHORT) - 1
+            multi_prompt = [
+                {
+                    "duration": s["duration"],
+                    "prompt": (_HEM_LOCK_SHORT + " " + str(s["prompt"])[:_rem])[:512],
+                }
+                for s in op.shots
             ]
 
-            _update_job(job_id, progress=55, message="Kling video üretiliyor...")
-            clip_url = await kling_gen(
-                start_image_url=scene_frame_fal,
-                multi_prompt=kling_prompts,
-                duration=str(total_duration),
-                aspect_ratio=req.aspect_ratio,
-                generate_audio=req.generate_audio,
-                element_list=[{"element_id": int(kling_eid)}],
-                negative_prompt=_DEFILE_NEGATIVE,
-            )
-        else:
-            _update_job(job_id, progress=55, message="fal.ai video üretiliyor...")
-            clip_url = await generate_multishot_video(
-                start_image_url=scene_frame_fal,
-                multi_prompt=multi_prompt,
-                duration=str(total_duration),
-                aspect_ratio=req.aspect_ratio,
-                generate_audio=req.generate_audio,
-                elements=[outfit_element],
-                negative_prompt=_DEFILE_NEGATIVE,
-            )
+            # Build element data
+            elem_front = await _to_fal_url_compressed(op.outfit.front_url)
+            elem_refs: list = []
+            if op.outfit.side_url:
+                elem_refs.append(await _to_fal_url_compressed(op.outfit.side_url))
+            if op.outfit.back_url:
+                elem_refs.append(await _to_fal_url_compressed(op.outfit.back_url))
+            for eu in (op.outfit.extra_urls or []):
+                if eu and len(elem_refs) < 3:
+                    elem_refs.append(await _to_fal_url_compressed(eu))
+            if not elem_refs:
+                elem_refs = [elem_front]
 
-        _update_job(job_id, progress=85, message="Video indiriliyor...")
+            outfit_element = {
+                "frontal_image_url": elem_front,
+                "reference_image_urls": elem_refs,
+            }
+
+            scene_frame_fal = await _to_fal_url(op.scene_frame_url)
+
+            # Build debug_payload for this outfit
+            _debug_payload = {
+                "outfit": outfit_name,
+                "start_image_url": scene_frame_fal,
+                "multi_prompt": [{"prompt": p["prompt"], "duration": p["duration"]} for p in multi_prompt],
+                "duration": str(total_duration),
+                "aspect_ratio": req.aspect_ratio,
+                "generate_audio": req.generate_audio,
+                "elements": [outfit_element],
+                "provider": req.provider,
+            }
+
+            if req.provider == "kling":
+                from services.kling_service import (  # type: ignore[import]
+                    generate_multishot_video as kling_gen,
+                )
+                from pipeline import get_or_create_kling_element
+
+                _update_job(job_id, progress=base_progress + int(15 / n_outfits),
+                            message=f"{outfit_name} — Kling element oluşturuluyor ({oi + 1}/{n_outfits})...")
+                kling_eid = await get_or_create_kling_element(
+                    front_url=op.outfit.front_url,
+                    frontal_image_url=elem_front,
+                    reference_image_urls=elem_refs,
+                    name=f"workflow{oi + 1}",
+                    description=f"workflow garment {oi + 1}",
+                )
+                logger.info("[%s] Workflow outfit %d: Kling element_id=%d", job_id, oi + 1, kling_eid)
+
+                kling_prompts = [
+                    {"duration": p["duration"], "prompt": f"<<<element_1>>> {p['prompt']}"}
+                    for p in multi_prompt
+                ]
+
+                _debug_payload["element_list"] = [{"element_id": int(kling_eid)}]
+
+                _update_job(job_id, progress=base_progress + int(35 / n_outfits),
+                            debug_payload=_debug_payload,
+                            message=f"{outfit_name} — video üretiliyor ({oi + 1}/{n_outfits})...")
+                clip_url = await kling_gen(
+                    start_image_url=scene_frame_fal,
+                    multi_prompt=kling_prompts,
+                    duration=str(total_duration),
+                    aspect_ratio=req.aspect_ratio,
+                    generate_audio=req.generate_audio,
+                    element_list=[{"element_id": int(kling_eid)}],
+                    negative_prompt=_DEFILE_NEGATIVE,
+                )
+            else:
+                _update_job(job_id, progress=base_progress + int(35 / n_outfits),
+                            debug_payload=_debug_payload,
+                            message=f"{outfit_name} — video üretiliyor ({oi + 1}/{n_outfits})...")
+                clip_url = await generate_multishot_video(
+                    start_image_url=scene_frame_fal,
+                    multi_prompt=multi_prompt,
+                    duration=str(total_duration),
+                    aspect_ratio=req.aspect_ratio,
+                    generate_audio=req.generate_audio,
+                    elements=[outfit_element],
+                    negative_prompt=_DEFILE_NEGATIVE,
+                )
+
+            clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
+            clip_paths.append(clip_path)
+            logger.info("[%s] Workflow outfit %d/%d clip: %s", job_id, oi + 1, n_outfits, clip_path)
+
+        # Concatenate if multiple outfits
+        _update_job(job_id, progress=88, message="Video birleştiriliyor...")
         final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
-        clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
-        shutil.move(clip_path, final_path)
+        if len(clip_paths) > 1:
+            concatenate_clips(clip_paths, final_path)
+            for p in clip_paths:
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+        else:
+            shutil.move(clip_paths[0], final_path)
 
         # Upload to Supabase
         result_url = None
@@ -350,7 +386,7 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
             job_id,
             status=JobStatus.COMPLETED,
             progress=100,
-            message=f"Workflow tamamlandı! {n_shots} sahne, {total_duration}s.",
+            message=f"Workflow tamamlandı! {n_outfits} kıyafet, {total_shots} sahne.",
             result_url=result_url,
         )
 
