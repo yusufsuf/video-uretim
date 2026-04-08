@@ -86,7 +86,7 @@ async def generate_scenario(
     from services.nano_banana_service import generate_background, generate_scene_frame
     from pipeline import _to_fal_url
 
-    # Build a simple NB2 scene frame for GPT to analyze
+    # Build a simple NB Pro scene frame for GPT to analyze
     # First, get background
     if body.background_url:
         bg_url = body.background_url
@@ -109,26 +109,16 @@ async def generate_scenario(
 
     fal_bg = await _to_fal_url(bg_url)
 
-    # NB2 compose
-    nb2_prompt = (
-        "Fashion editorial photo: the first image is the location/scene — "
-        "preserve it EXACTLY as-is: architecture, lighting, floor, walls, all structural elements unchanged. "
-        "Do NOT add spectators, audience, crowd, cameramen, photographers, trees, flowers, plants, or any props not already in the scene. "
-        "Place a tall fashion model in this space wearing the garment from the reference images (images 2 onward). "
-        "Full body visible, frontal medium-wide shot, confident stance. "
-        "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
-        "CRITICAL: the garment hem must touch and rest exactly on the floor — "
-        "the bottom of the garment grazes the floor surface. "
-        "Shoes and feet must NOT be visible — the hem completely covers the feet. "
-        "Professional fashion photography, sharp focus, editorial quality."
-    )
+    # NB Pro compose
+    from pipeline import _build_nb_pro_compose_prompt
+    nb_pro_prompt = _build_nb_pro_compose_prompt(analysis=None)
 
     scene_frame_url = await generate_scene_frame(
         image_urls=[fal_bg] + garment_refs,
-        prompt=nb2_prompt,
+        prompt=nb_pro_prompt,
         aspect_ratio=body.aspect_ratio,
     )
-    logger.info("Workflow scenario: NB2 scene frame: %s", scene_frame_url[:80] if scene_frame_url else "N/A")
+    logger.info("Workflow scenario: NB Pro scene frame: %s", scene_frame_url[:80] if scene_frame_url else "N/A")
 
     # GPT scenario generation
     shot_configs_typed = [DefileShotConfig(duration=s.duration) for s in body.shot_configs]
@@ -154,9 +144,9 @@ async def generate_scene_frame_endpoint(
     body: SceneFrameRequest,
     _user: dict = Depends(get_current_user),
 ):
-    """(Re)generate NB2 scene frame for user approval."""
+    """(Re)generate NB Pro scene frame for user approval."""
     from services.nano_banana_service import generate_background, generate_scene_frame
-    from pipeline import _to_fal_url
+    from pipeline import _to_fal_url, _build_nb_pro_compose_prompt
 
     if body.background_url:
         bg_url = body.background_url
@@ -178,22 +168,11 @@ async def generate_scene_frame_endpoint(
 
     fal_bg = await _to_fal_url(bg_url)
 
-    nb2_prompt = (
-        "Fashion editorial photo: the first image is the location/scene — "
-        "preserve it EXACTLY as-is: architecture, lighting, floor, walls, all structural elements unchanged. "
-        "Do NOT add spectators, audience, crowd, cameramen, photographers, trees, flowers, plants, or any props not already in the scene. "
-        "Place a tall fashion model in this space wearing the garment from the reference images (images 2 onward). "
-        "Full body visible, frontal medium-wide shot, confident stance. "
-        "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
-        "CRITICAL: the garment hem must touch and rest exactly on the floor — "
-        "the bottom of the garment grazes the floor surface. "
-        "Shoes and feet must NOT be visible — the hem completely covers the feet. "
-        "Professional fashion photography, sharp focus, editorial quality."
-    )
+    nb_pro_prompt = _build_nb_pro_compose_prompt(analysis=None)
 
     scene_frame_url = await generate_scene_frame(
         image_urls=[fal_bg] + garment_refs,
-        prompt=nb2_prompt,
+        prompt=nb_pro_prompt,
         aspect_ratio=body.aspect_ratio,
     )
 
@@ -223,22 +202,7 @@ async def generate_video(
 async def _run_workflow_video(job_id: str, req: GenerateRequest):
     """Execute video generation for workflow — supports multi-outfit with concat."""
     from services.video_service import generate_multishot_video, download_file, concatenate_clips
-    from pipeline import _to_fal_url, _to_fal_url_compressed
-
-    _HEM_LOCK_SHORT = "NO slit anywhere. NO front slit. Sealed floor-length gown. Skirt fully closed. Legs hidden."
-    _DEFILE_NEGATIVE = (
-        "blur, distort, low quality, deformed hands, deformed face, "
-        "changed outfit, different dress, altered silhouette, different fabric, "
-        "costume change, wardrobe change, morphing clothes, feet, bare feet, "
-        "shoes, heels, boots, footwear, visible ankles, visible toes, "
-        "floating hem, lifted skirt, hem above ground, gap between dress and floor, "
-        "short dress, mini dress, midi dress, knee-length dress, calf-length dress, "
-        "cropped skirt, raised hemline, above-ankle hem, shortened dress, "
-        "spectators, audience, crowd, seated guests, cameraman, photographer, crew, "
-        "people in background, bystanders, onlookers, "
-        "trees, flowers, plants, flower arrangements, decorative props, added accessories, "
-        "extra furniture, added decor, altered background, modified scenery"
-    )
+    from pipeline import _to_fal_url, _to_fal_url_compressed, _HEM_LOCK_SHORT, _DEFILE_NEGATIVE, _build_enhanced_prompt
 
     try:
         n_outfits = len(req.outfits)
@@ -254,12 +218,15 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
                         progress=base_progress,
                         message=f"{outfit_name} — promptlar hazırlanıyor ({oi + 1}/{n_outfits})...")
 
-            # Prepend hem lock to each prompt
-            _rem = 512 - len(_HEM_LOCK_SHORT) - 1
+            # Enhance each prompt with 7-layer system (garment anchor, fabric physics, light, micro)
             multi_prompt = [
                 {
                     "duration": s["duration"],
-                    "prompt": (_HEM_LOCK_SHORT + " " + str(s["prompt"])[:_rem])[:512],
+                    "prompt": _build_enhanced_prompt(
+                        base_prompt=str(s["prompt"]),
+                        analysis=None,
+                        max_len=512,
+                    ),
                 }
                 for s in op.shots
             ]

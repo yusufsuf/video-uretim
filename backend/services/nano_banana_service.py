@@ -1,4 +1,4 @@
-"""Nano Banana 2 Service – generates background images and composes scene frames using fal.ai."""
+"""Nano Banana Pro Service – generates background images and composes scene frames using fal.ai."""
 
 import asyncio
 import logging
@@ -14,13 +14,17 @@ logger = logging.getLogger(__name__)
 # Ensure FAL_KEY is set
 os.environ["FAL_KEY"] = settings.FAL_KEY
 
+# ── Model IDs ────────────────────────────────────────────────────────────────
+_NB_PRO_MODEL = "fal-ai/nano-banana/pro"
+_NB_PRO_EDIT_MODEL = "fal-ai/nano-banana/pro/edit"
+
 
 async def generate_background(
     prompt: str,
     aspect_ratio: str = "9:16",
     resolution: str = "2K",
 ) -> str:
-    """Generate a background/scene image using Nano Banana 2.
+    """Generate a background/scene image using Nano Banana Pro.
 
     Args:
         prompt: Text description of the background scene (no people/model).
@@ -30,10 +34,10 @@ async def generate_background(
     Returns:
         URL of the generated background image.
     """
-    logger.info("Generating background via Nano Banana 2 – prompt: %s", prompt[:100])
+    logger.info("Generating background via Nano Banana Pro – prompt: %s", prompt[:100])
 
     result = await fal_client.run_async(
-        "fal-ai/nano-banana-2",
+        _NB_PRO_MODEL,
         arguments={
             "prompt": prompt,
             "num_images": 1,
@@ -46,7 +50,7 @@ async def generate_background(
 
     images = result.get("images", [])
     if not images:
-        raise RuntimeError("Nano Banana 2 returned no images")
+        raise RuntimeError("Nano Banana Pro returned no images")
 
     image_url = images[0].get("url", "")
     logger.info("Background generated: %s", image_url[:100])
@@ -58,7 +62,7 @@ async def generate_scene_frame(
     prompt: str,
     aspect_ratio: str = "9:16",
 ) -> str:
-    """Compose a per-shot scene frame using Nano Banana 2 Edit.
+    """Compose a per-shot scene frame using Nano Banana Pro Edit.
 
     Combines the background (image_urls[0]) with garment reference images
     (image_urls[1:]) to produce a single photorealistic frame ready to be
@@ -72,17 +76,17 @@ async def generate_scene_frame(
     Returns:
         URL of the composed scene frame.
     """
-    logger.info("Nano Banana 2 Edit – composing scene frame, refs=%d", len(image_urls))
+    logger.info("Nano Banana Pro Edit – composing scene frame, refs=%d", len(image_urls))
 
     result = await fal_client.run_async(
-        "fal-ai/nano-banana-2/edit",
+        _NB_PRO_EDIT_MODEL,
         arguments={
             "prompt": prompt,
             "image_urls": image_urls,
             "num_images": 1,
             "aspect_ratio": aspect_ratio,
             "output_format": "png",
-            "resolution": "1K",
+            "resolution": "2K",
             "safety_tolerance": "4",
             "limit_generations": True,
         },
@@ -90,7 +94,7 @@ async def generate_scene_frame(
 
     images = result.get("images", [])
     if not images:
-        raise RuntimeError("Nano Banana 2 Edit returned no images for scene frame")
+        raise RuntimeError("Nano Banana Pro Edit returned no images for scene frame")
 
     image_url = images[0].get("url", "")
     logger.info("Scene frame composed: %s", image_url[:100])
@@ -111,7 +115,7 @@ async def generate_venue_variants(
     count: int,
     aspect_ratio: str = "9:16",
 ) -> list:
-    """Generate N angle variants of a venue photo using NB2 Edit.
+    """Generate N angle variants of a venue photo using NB Pro Edit.
 
     Args:
         venue_image_url: fal.ai CDN URL of the source venue photo.

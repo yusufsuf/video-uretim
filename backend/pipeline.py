@@ -3,7 +3,7 @@
 New Flow (v2):
 1. Analyse the garment (GPT-4o Vision)
 2. Generate multi-scene prompts (GPT-4o – cinematography rules)
-3. Generate background image (Nano Banana 2 via fal.ai)
+3. Generate background image (Nano Banana Pro via fal.ai)
 4. Generate multishot video (Kling 3.0 Pro with elements + start_image)
 5. (Optional) Watermark overlay
 """
@@ -114,11 +114,12 @@ def _tr_error(exc: Exception) -> str:
 _ELEMENTS_MAX_BYTES = 9 * 1024 * 1024  # 9 MB — safe margin under Kling's 10 MB limit
 _ELEMENTS_MAX_PX = 1536  # max dimension for element images
 
-_BASE_NEGATIVE = (
-    "blur, distort, low quality, deformed hands, deformed face, "
+# ── Layered Negative Prompt System ────────────────────────────────────────────
+# Layer 1: STRUCTURAL — garment integrity
+_NEG_STRUCTURAL = (
     "changed outfit, different dress, altered silhouette, different fabric, "
-    "costume change, wardrobe change, morphing clothes, "
-    "feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, "
+    "costume change, wardrobe change, morphing clothes, distortion, extra fabric, "
+    "tail formation, dress change, redesign, altered proportions, "
     "floating hem, lifted skirt, hem above ground, gap between dress and floor, "
     "short dress, mini dress, midi dress, knee-length dress, calf-length dress, "
     "cropped skirt, raised hemline, above-ankle hem, shortened dress, "
@@ -127,19 +128,42 @@ _BASE_NEGATIVE = (
     "opened hem, split skirt, parted skirt, walking slit, step gap, slit while walking, "
     "skirt opening during movement, fabric parting while walking"
 )
+# Layer 2: ANATOMICAL — human figure integrity
+_NEG_ANATOMICAL = (
+    "deformed hands, deformed face, extra limbs, missing fingers, elongated neck, "
+    "fused face, asymmetric eyes, bad anatomy, distorted face, disfigured, "
+    "extra fingers, mutated hands, poorly drawn face"
+)
+# Layer 3: TECHNICAL — image/video quality
+_NEG_TECHNICAL = (
+    "blur, distort, low quality, low resolution, pixelated, grainy, "
+    "noise, compression artifacts, jpeg artifacts, glitches, flicker, "
+    "frame drops, shaky, watermark, text, logo, oversaturated, "
+    "cartoon, anime, illustration, painting, artificial, synthetic, plastic"
+)
+# Layer 4: FOOT/SHOE visibility (fashion-specific)
+_NEG_FEET = (
+    "feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes"
+)
+
+# Composite negatives
+_BASE_NEGATIVE = f"{_NEG_STRUCTURAL}, {_NEG_ANATOMICAL}, {_NEG_TECHNICAL}, {_NEG_FEET}"
+
 _TRAIN_NEGATIVE = (
     ", train, trailing fabric, floor-length train, dragging hem, sweeping train, "
     "extended hem, pooling fabric, cathedral train, chapel train, court train, "
     "brush train, fabric trail, hem trail, skirt extension, elongated skirt back"
 )
 
-_DEFILE_NEGATIVE = (
-    _BASE_NEGATIVE + ", "
+# Defile adds environmental layer
+_NEG_ENVIRONMENTAL = (
     "spectators, audience, crowd, seated guests, cameraman, photographer, crew, "
     "people in background, bystanders, onlookers, "
     "trees, flowers, plants, flower arrangements, decorative props, added accessories, "
-    "extra furniture, added decor, altered background, modified scenery"
+    "extra furniture, added decor, altered background, modified scenery, "
+    "cluttered background, distracting elements, messy, chaotic"
 )
+_DEFILE_NEGATIVE = f"{_BASE_NEGATIVE}, {_NEG_ENVIRONMENTAL}"
 
 # Full HEM_LOCK used in classic/multishot modes (no strict 512-char constraint)
 _HEM_LOCK = (
@@ -166,6 +190,190 @@ def _has_train(analysis) -> bool:
         analysis.description_en or "",
     ]).lower()
     return any(w in combined for w in _TRAIN_WORDS)
+
+
+# ── Prompt Engineering System ─────────────────────────────────────────────────
+# Source: sistem-detayları.txt — 7-layer prompt engineering for NB Pro + Kling
+
+# 1. FABRIC PHYSICS — auto-detected from DressAnalysisResult.fabric
+_FABRIC_PHYSICS: dict[str, str] = {
+    # Lightweight / flowing
+    "silk":    "silk floats with a gentle delay, fluid drape, liquid sheen, specular highlights",
+    "satin":   "satin falls with a gentle delay, liquid sheen, smooth specular highlights on folds",
+    "chiffon": "translucent chiffon, light refraction, delicate float, gossamer layers",
+    "organza": "sheer organza with light refraction, translucency, delicate hexagonal weave texture",
+    "tulle":   "soft tulle layers with airy volume, translucent mesh, gentle float",
+    "crepe":   "matte crepe with subtle drape, soft flowing movement, minimal sheen",
+    "jersey":  "stretchy jersey clings to form, smooth drape, body-hugging movement",
+    # Heavy / structured
+    "velvet":  "light-trapping velvet, shadow pooling in folds, directional nap with subtle sheen",
+    "denim":   "denim keeps its weight, holds its structure, stiff fabric movement",
+    "wool":    "wool keeps its weight, structured drape, warm heavy fabric movement",
+    "tweed":   "textured tweed holds its structure, woven surface detail, structured movement",
+    "leather": "leather holds rigid form, smooth surface sheen, minimal fabric movement",
+    "lace":    "intricate lace overlay with transparency, delicate pattern visible, fine needlework detail",
+    "sequin":  "sequined surface catching light, shimmering reflections shift with movement",
+    "brocade": "heavy brocade with raised woven pattern, structured drape, rich texture detail",
+    # Defaults
+    "cotton":  "natural cotton drape, soft matte texture, gentle movement",
+    "linen":   "linen with natural creases, matte texture, structured casual drape",
+    "polyester": "smooth synthetic drape, consistent sheen, fluid movement",
+}
+
+def _get_fabric_physics(analysis) -> str:
+    """Extract fabric physics prompt from garment analysis."""
+    if not analysis:
+        return ""
+    fabric = (analysis.fabric or "").lower().strip()
+    # Direct match
+    for key, prompt in _FABRIC_PHYSICS.items():
+        if key in fabric:
+            return prompt
+    # Fuzzy match on description
+    desc = (analysis.description_en or "").lower()
+    for key, prompt in _FABRIC_PHYSICS.items():
+        if key in desc:
+            return prompt
+    return "natural fabric drape, consistent texture throughout movement"
+
+
+# 2. LIGHT ANCHORING — constant across all NB Pro and Kling prompts
+_LIGHT_ANCHOR = (
+    "Two-point lighting: soft key light at 45 degrees from left, "
+    "cool rim light at 120 degrees from right for silhouette separation. "
+    "Catchlights visible in eyes. Consistent shadow direction throughout."
+)
+
+_LIGHT_ANCHOR_SHORT = "Soft key light 45° left, cool rim light 120° right, consistent shadows."
+
+
+# 3. CAMERA VOCABULARY — Kling-optimized sinema dili
+_CAMERA_VOCABULARY: dict[str, str] = {
+    "dolly_in":   "slow dolly-in push toward subject, 35mm cinematic feel, smooth steady movement",
+    "dolly_out":  "slow dolly-out pulling away from subject, revealing full silhouette and environment",
+    "orbit":      "quarter-circle orbit at hip height, revealing garment from multiple angles, smooth arc",
+    "pan":        "locked-off tripod, slow horizontal pan following the model's walk, hip height camera",
+    "tilt_up":    "locked-off tripod, slow vertical tilt from hem detail up to full silhouette reveal",
+    "tilt_down":  "locked-off tripod, slow vertical tilt from face down to hem and fabric detail",
+    "tracking":   "lateral tracking shot at hip height, camera moves parallel to model's walk, steady pace",
+    "crane":      "elevated crane descending slowly, bird's-eye transitioning to eye-level reveal",
+    "static":     "locked-off static tripod at eye level, premium stability, model moves within frame",
+    "low_angle":  "low angle static shot looking upward, model dominates frame, power and elegance",
+    "high_angle": "elevated angle looking down, geometric composition, full garment silhouette visible",
+    "close_up":   "tight close-up, 85mm portrait lens feel, fabric texture and construction detail",
+    "medium":     "medium shot at waist height, 50mm prime feel, balanced figure and garment detail",
+    "wide":       "wide establishing shot, 24mm cinematic, full environment and silhouette context",
+}
+
+def _get_camera_prompt(camera_move: str, shot_size: str = "", camera_angle: str = "") -> str:
+    """Get Kling-optimized camera prompt from camera_move + optional size/angle."""
+    cam = _CAMERA_VOCABULARY.get(camera_move, _CAMERA_VOCABULARY["static"])
+    # Override with specific shot_size if given
+    if shot_size and shot_size in _CAMERA_VOCABULARY:
+        cam = _CAMERA_VOCABULARY[shot_size]
+    return cam
+
+
+# 4. IMMUTABLE GARMENT ANCHOR — built from DressAnalysisResult
+def _build_garment_anchor(analysis) -> str:
+    """Build an immutable anchor block from garment analysis for prompt consistency."""
+    if not analysis:
+        return ""
+    parts = []
+    if analysis.color:
+        parts.append(analysis.color)
+    if analysis.fabric:
+        parts.append(analysis.fabric)
+    if analysis.garment_type:
+        parts.append(analysis.garment_type)
+    if analysis.cut_style:
+        parts.append(f"{analysis.cut_style} cut")
+    if analysis.length:
+        parts.append(f"{analysis.length} length")
+    anchor = " ".join(parts) if parts else "garment"
+    return (
+        f"[GARMENT ANCHOR: {anchor}. "
+        f"Exact cut preserved, no redesign, unchanged silhouette, no added fabric, "
+        f"structure remains identical throughout all movement.]"
+    )
+
+
+# 5. MICRO-ACTIONS — subtle realism details
+_MICRO_ACTIONS = (
+    "Subtle natural breathing visible. "
+    "Fabric settles naturally with gravity after each movement. "
+    "Hair responds subtly to movement direction."
+)
+
+
+# 6. COMPOSITE PROMPT BUILDER — combines all layers for Kling shot prompts
+def _build_enhanced_prompt(
+    base_prompt: str,
+    analysis=None,
+    camera_move: str = "",
+    include_light: bool = True,
+    include_micro: bool = True,
+    max_len: int = 512,
+) -> str:
+    """Build a 7-layer enhanced prompt for Kling video generation.
+
+    Layers: garment_anchor + fabric_physics + light + camera + base + micro
+    Priority: garment_anchor and fabric_physics are NEVER truncated.
+    """
+    parts: list[str] = []
+
+    # Layer 1: Garment anchor (highest priority)
+    anchor = _build_garment_anchor(analysis)
+    if anchor:
+        parts.append(anchor)
+
+    # Layer 2: Fabric physics
+    physics = _get_fabric_physics(analysis)
+    if physics:
+        parts.append(physics)
+
+    # Layer 3: Light anchoring
+    if include_light:
+        parts.append(_LIGHT_ANCHOR_SHORT)
+
+    # Layer 4: Camera
+    if camera_move:
+        parts.append(_get_camera_prompt(camera_move))
+
+    # Layer 5: Base prompt (the actual shot description)
+    parts.append(base_prompt)
+
+    # Layer 6: Micro-actions
+    if include_micro:
+        parts.append(_MICRO_ACTIONS)
+
+    combined = " ".join(parts)
+    return combined[:max_len]
+
+
+# 7. ENHANCED NB PRO PROMPT BUILDER — for scene frame composition
+def _build_nb_pro_compose_prompt(
+    analysis=None,
+    aspect_ratio: str = "9:16",
+) -> str:
+    """Build an enhanced NB Pro Edit prompt for scene frame composition."""
+    garment_hint = f"{analysis.color} {analysis.garment_type}" if analysis else "garment"
+    fabric_hint = _get_fabric_physics(analysis) if analysis else ""
+
+    return (
+        f"Fashion editorial photo: the first image is the location/scene — "
+        f"preserve it EXACTLY as-is: architecture, lighting, floor, walls, all structural elements unchanged. "
+        f"Do NOT add spectators, audience, crowd, cameramen, photographers, trees, flowers, plants, or any props not already in the scene. "
+        f"Place a tall fashion model in this space wearing the {garment_hint} from the reference images (images 2 onward). "
+        f"Full body visible, frontal medium-wide shot, confident stance. "
+        f"Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
+        f"{fabric_hint + '. ' if fabric_hint else ''}"
+        f"{_LIGHT_ANCHOR} "
+        f"CRITICAL: the garment hem must touch and rest exactly on the floor — "
+        f"the bottom of the garment grazes the floor surface. "
+        f"Shoes and feet must NOT be visible — the hem completely covers the feet. "
+        f"Professional fashion photography, sharp focus, editorial quality."
+    )
 
 
 async def _to_fal_url_compressed(url: str) -> str:
@@ -234,7 +442,7 @@ def _is_ssrf_safe(url: str) -> bool:
 async def _to_fal_url(url: str) -> str:
     """Ensure a URL is reachable from fal.ai by re-uploading to fal.ai CDN if needed.
 
-    NB2 Edit (and some other fal.ai models) cannot access Supabase storage or
+    NB Pro Edit (and some other fal.ai models) cannot access Supabase storage or
     local-server URLs. This helper downloads the file and re-uploads it so
     fal.ai can fetch it reliably.
     """
@@ -419,8 +627,8 @@ async def run_pipeline(
         scene_count = max(1, min(8, scene_count))
 
         if generation_mode == "custom":
-            # ── CUSTOM MODE: skip analysis / NB2 / background ─────────────
-            logger.info("[%s] Custom mode: bypassing analysis, NB2, background", job_id)
+            # ── CUSTOM MODE: skip analysis / NB Pro / background ─────────────
+            logger.info("[%s] Custom mode: bypassing analysis, NB Pro, background", job_id)
 
             _update_job(job_id, progress=20, message="Görsel hazırlanıyor...")
             fal_front_url = await _to_fal_url(front_url)
@@ -582,7 +790,7 @@ async def run_pipeline(
             logger.info("[%s] Ozel video ready: %s", job_id, final_path)
 
         elif generation_mode == "studio":
-            # ── STUDIO MODE: kullanıcı tanımlı çekimler + elements, NB2/GPT yok ──
+            # ── STUDIO MODE: kullanıcı tanımlı çekimler + elements, NB Pro/GPT yok ──
             logger.info("[%s] Studio mode: user shots + @Element1 elements", job_id)
 
             _update_job(job_id, progress=15, message="Görsel hazırlanıyor...")
@@ -816,7 +1024,7 @@ async def run_pipeline(
                 _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=50, message="Yüklenen arka plan kullanılıyor...")
             else:
                 _update_job(job_id, status=JobStatus.GENERATING_BACKGROUND, progress=35, message="Arka plan üretiliyor...")
-                logger.info("[%s] Step 3 – Generating background image via Nano Banana 2", job_id)
+                logger.info("[%s] Step 3 – Generating background image via Nano Banana Pro", job_id)
                 bg_prompt = scene_prompt.background_image_prompt
                 logger.info("[%s] Background prompt: %s", job_id, bg_prompt[:120])
                 background_url = await generate_background(prompt=bg_prompt, aspect_ratio=aspect_ratio)
@@ -857,25 +1065,17 @@ async def run_pipeline(
             logger.info("[%s] Background pool on fal.ai CDN: %d", job_id, len(fal_bg_pool))
 
             if generation_mode == "multishot":
-                # ── MULTISHOT MODE: single NB2 compose → GPT prompts → single Kling call ──
-                logger.info("[%s] Multishot mode: single NB2 + GPT multishot prompts + Kling", job_id)
+                # ── MULTISHOT MODE: single NB Pro compose → GPT prompts → single Kling call ──
+                logger.info("[%s] Multishot mode: single NB Pro + GPT multishot prompts + Kling", job_id)
 
                 _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
                             progress=55, message="Sahne kompoze ediliyor (multishot)...")
 
-                garment_hint = f"{analysis.color} {analysis.garment_type}" if analysis else "garment"
-                nb2_prompt = (
-                    f"Fashion editorial photo: the first image is the background scene — keep it exactly. "
-                    f"Place a fashion model wearing the {garment_hint} from the garment reference images "
-                    f"(images 2 onward) into this background. "
-                    f"Preserve every garment detail: exact colors, pattern, texture, cut, length. "
-                    f"Camera angle: eye level. Shot framing: full body, medium-wide. "
-                    f"Professional fashion photography, sharp focus, natural elegant pose."
-                )
+                nb_pro_prompt = _build_nb_pro_compose_prompt(analysis=analysis)
 
                 scene_frame_url = await generate_scene_frame(
                     image_urls=[fal_bg_pool[0]] + fal_garment_refs,
-                    prompt=nb2_prompt,
+                    prompt=nb_pro_prompt,
                     aspect_ratio=aspect_ratio,
                 )
                 logger.info("[%s] Multishot scene frame: %s", job_id, scene_frame_url[:80])
@@ -910,13 +1110,18 @@ async def run_pipeline(
 
                 scene_frame_url = await _to_fal_url(scene_frame_url)
 
-                garment_lock = scene_prompt.garment_lock_description
-                if garment_lock and no_train_note:
-                    multi_prompt = [{"duration": p["duration"], "prompt": f"{garment_lock} {no_train_note}. {p['prompt']}"} for p in multi_prompt]
-                elif garment_lock:
-                    multi_prompt = [{"duration": p["duration"], "prompt": f"{garment_lock}. {p['prompt']}"} for p in multi_prompt]
-                elif no_train_note:
-                    multi_prompt = [{"duration": p["duration"], "prompt": f"{no_train_note}. {p['prompt']}"} for p in multi_prompt]
+                # Enhance each shot prompt with 7-layer system
+                multi_prompt = [
+                    {
+                        "duration": p["duration"],
+                        "prompt": _build_enhanced_prompt(
+                            base_prompt=f"{no_train_note}. {p['prompt']}",
+                            analysis=analysis,
+                            max_len=512,
+                        ),
+                    }
+                    for p in multi_prompt
+                ]
                 total_ms_duration = sum(int(p["duration"]) for p in multi_prompt)
                 clip_url = await _gen_video(
                     start_image_url=scene_frame_url,
@@ -935,10 +1140,10 @@ async def run_pipeline(
                 logger.info("[%s] Multishot video ready: %s", job_id, final_path)
 
             else:
-                # ── CLASSIC MODE: per-shot NB2 compose + Kling animate ──────
+                # ── CLASSIC MODE: per-shot NB Pro compose + Kling animate ──────
                 all_scenes = scene_prompt.scenes
                 n_shots = len(all_scenes)
-                logger.info("[%s] %d scene(s) — NB2 compose + Kling per shot (classic)", job_id, n_shots)
+                logger.info("[%s] %d scene(s) — NB Pro compose + Kling per shot (classic)", job_id, n_shots)
 
                 clip_paths = []
                 current_start_image = fal_bg_pool[0]
@@ -957,20 +1162,12 @@ async def run_pipeline(
 
                     angle = (scene.camera_angle or "eye_level").replace("_", " ")
                     size = (scene.shot_size or "full_body").replace("_", " ")
-                    garment_hint = f"{analysis.color} {analysis.garment_type}" if analysis else "garment"
-                    nb2_prompt = (
-                        f"Fashion editorial photo: the first image is the background scene — keep it exactly. "
-                        f"Place a fashion model wearing the {garment_hint} from the garment reference images "
-                        f"(images 2 onward) into this background. "
-                        f"Preserve every garment detail: exact colors, pattern, texture, cut, length. "
-                        f"Camera angle: {angle}. Shot framing: {size}. "
-                        f"Context: {scene.prompt}. "
-                        f"Professional fashion photography, sharp focus, natural elegant pose."
-                    )
+                    nb_pro_classic = _build_nb_pro_compose_prompt(analysis=analysis)
+                    nb_pro_classic += f" Camera angle: {angle}. Shot framing: {size}. Context: {scene.prompt}."
 
                     scene_frame_url = await generate_scene_frame(
                         image_urls=[start_image] + fal_garment_refs,
-                        prompt=nb2_prompt,
+                        prompt=nb_pro_classic,
                         aspect_ratio=aspect_ratio,
                     )
                     logger.info("[%s] Shot %d scene frame: %s", job_id, shot_idx + 1, scene_frame_url[:80])
@@ -980,15 +1177,12 @@ async def run_pipeline(
 
                     scene_frame_url = await _to_fal_url(scene_frame_url)
 
-                    garment_lock = scene_prompt.garment_lock_description
-                    if garment_lock and no_train_note:
-                        locked_prompt = f"{garment_lock} {no_train_note}. {scene.prompt}"
-                    elif garment_lock:
-                        locked_prompt = f"{garment_lock}. {scene.prompt}"
-                    elif no_train_note:
-                        locked_prompt = f"{no_train_note}. {scene.prompt}"
-                    else:
-                        locked_prompt = scene.prompt
+                    locked_prompt = _build_enhanced_prompt(
+                        base_prompt=f"{no_train_note}. {scene.prompt}",
+                        analysis=analysis,
+                        camera_move=scene.camera_movement or "",
+                        max_len=512,
+                    )
                     clip_url = await _gen_video(
                         start_image_url=scene_frame_url,
                         multi_prompt=[{"duration": scene.duration, "prompt": locked_prompt}],
@@ -1283,7 +1477,7 @@ async def run_defile_collection_pipeline(
     """Execute the defile collection pipeline.
 
     New flow (per outfit):
-      1. NB2 compose: background + outfit images → establishing scene frame
+      1. NB Pro compose: background + outfit images → establishing scene frame
       2. GPT-4o Vision: analyze scene frame → generate multishot prompts
       3. Single Kling call with multi_prompt list → one cohesive video per outfit
       4. Concatenate all outfit clips
@@ -1342,7 +1536,7 @@ async def run_defile_collection_pipeline(
             if _se.back_url:
                 _se_refs.append(await _to_fal_url_compressed(_se.back_url))
             for _seu in (_se.extra_urls or []):
-                if _seu and len(_se_refs) < 3:
+                if _seu and len(_se_refs) < 2:
                     _se_refs.append(await _to_fal_url_compressed(_seu))
             if not _se_refs:
                 _se_refs = [_se_front_c]
@@ -1366,7 +1560,7 @@ async def run_defile_collection_pipeline(
             fal_back = await _to_fal_url(_of.back_url) if _of.back_url else None
             fal_outfits_filtered.append((fal_front, fal_side, fal_back))
 
-        # ── Step 3: Per-outfit: NB2 compose → GPT prompts → Kling ────────
+        # ── Step 3: Per-outfit: NB Pro compose → GPT prompts → Kling ────────
         clip_paths: list = []
 
         for outfit_idx, outfit in enumerate(outfit_only):
@@ -1377,7 +1571,7 @@ async def run_defile_collection_pipeline(
             # Background for this outfit (cycle pool)
             bg_for_outfit = fal_bg_pool[outfit_idx % len(fal_bg_pool)]
 
-            # Garment refs: ALL angles for NB2 (front + side + back + extras)
+            # Garment refs: ALL angles for NB Pro (front + side + back + extras)
             garment_refs = [fal_front]
             if fal_side: garment_refs.append(fal_side)
             if fal_back: garment_refs.append(fal_back)
@@ -1386,11 +1580,11 @@ async def run_defile_collection_pipeline(
                 if _extra_u and _extra_u not in garment_refs:
                     garment_refs.append(await _to_fal_url(_extra_u))
 
-            # ── 3a: Scene frame — use provided start frame or NB2 compose ──
+            # ── 3a: Scene frame — use provided start frame or NB Pro compose ──
             if request.start_frame_url:
-                # User provided a start frame — skip NB2 composition
+                # User provided a start frame — skip NB Pro composition
                 scene_frame_url = request.start_frame_url
-                logger.info("[%s] Outfit %d/%d: using provided start frame (NB2 skipped): %s",
+                logger.info("[%s] Outfit %d/%d: using provided start frame (NB Pro skipped): %s",
                             job_id, outfit_idx + 1, n_outfits, scene_frame_url[:80])
                 _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
                             progress=base_progress,
@@ -1400,22 +1594,11 @@ async def run_defile_collection_pipeline(
                             progress=base_progress,
                             message=f"{outfit_name} — sahne kompoze ediliyor ({outfit_idx + 1}/{n_outfits})...")
 
-                nb2_prompt = (
-                    "Fashion editorial photo: the first image is the location/scene — "
-                    "preserve it EXACTLY as-is: architecture, lighting, floor, walls, all structural elements unchanged. "
-                    "Do NOT add spectators, audience, crowd, cameramen, photographers, trees, flowers, plants, or any props not already in the scene. "
-                    "Place a tall fashion model in this space wearing the garment from the reference images (images 2 onward). "
-                    "Full body visible, frontal medium-wide shot, confident stance. "
-                    "Preserve all garment details: exact colors, fabric, cut, silhouette, length. "
-                    "CRITICAL: the garment hem must touch and rest exactly on the floor — "
-                    "the bottom of the garment grazes the floor surface. "
-                    "Shoes and feet must NOT be visible — the hem completely covers the feet. "
-                    "Professional fashion photography, sharp focus, editorial quality."
-                )
+                nb_pro_prompt = _build_nb_pro_compose_prompt(analysis=None)
 
                 scene_frame_url = await generate_scene_frame(
                     image_urls=[bg_for_outfit] + garment_refs,
-                    prompt=nb2_prompt,
+                    prompt=nb_pro_prompt,
                     aspect_ratio=request.aspect_ratio,
                 )
                 logger.info("[%s] Outfit %d/%d scene frame: %s",
@@ -1460,9 +1643,9 @@ async def run_defile_collection_pipeline(
                 _elem_refs.append(await _to_fal_url_compressed(outfit.side_url))
             if outfit.back_url:
                 _elem_refs.append(await _to_fal_url_compressed(outfit.back_url))
-            # Include extra_urls from element library (up to 3 total refs for Kling)
+            # Include extra_urls from element library (max 2 refs for Kling — fewer refs = less identity drift)
             for _eu in (outfit.extra_urls or []):
-                if _eu and len(_elem_refs) < 3:
+                if _eu and len(_elem_refs) < 2:
                     _elem_refs.append(await _to_fal_url_compressed(_eu))
             if not _elem_refs:
                 _elem_refs = [elem_front_c]

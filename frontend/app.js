@@ -1021,7 +1021,7 @@ function openDefileNB2() {
     defileStartFrameUrl = null;
 
     const titleEl = document.getElementById("wizard-title");
-    if (titleEl) titleEl.textContent = "Defile — Nano Banana 2";
+    if (titleEl) titleEl.textContent = "Defile — Nano Banana Pro";
 
     _hideAllSteps();
     document.getElementById("step-defile").style.display = "block";
