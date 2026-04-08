@@ -1271,7 +1271,7 @@ function confirmDefileOutfits() {
 
 function openDefileBgPicker() {
     _libPickerTarget = "defile-bg";
-    _libPickerActiveTab = "background";
+    _libPickerActiveTab = "scene";
 
     const modal   = document.getElementById("lib-picker-modal");
     const title   = document.getElementById("lib-picker-title");
@@ -1280,14 +1280,14 @@ function openDefileBgPicker() {
     const closeBtn = document.getElementById("lib-picker-close");
 
     title.textContent = "Pist Arka Planı Seç";
-    tabs.innerHTML = `<button class="lib-picker-tab active" data-cat="background">Arka Planlar</button>`;
+    tabs.innerHTML = `<button class="lib-picker-tab active" data-cat="scene">Mekanlar</button>`;
 
     modal.style.display = "flex";
     document.body.style.overflow = "hidden";
     closeBtn.onclick = () => closeLibraryPicker();
     modal.onclick = (e) => { if (e.target === modal) closeLibraryPicker(); };
 
-    _fetchAndRenderLibrary("background", grid);
+    _fetchAndRenderLibrary("scene", grid);
 }
 
 // Defile ratio cards
