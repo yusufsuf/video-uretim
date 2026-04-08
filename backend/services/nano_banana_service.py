@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 os.environ["FAL_KEY"] = settings.FAL_KEY
 
 # ── Model IDs ────────────────────────────────────────────────────────────────
-_NB_PRO_MODEL = "fal-ai/nano-banana/pro"
-_NB_PRO_EDIT_MODEL = "fal-ai/nano-banana/pro/edit"
+_NB_PRO_MODEL = "fal-ai/nano-banana-pro"
+_NB_PRO_EDIT_MODEL = "fal-ai/nano-banana-pro/edit"
 
 
 async def generate_background(
@@ -29,7 +29,7 @@ async def generate_background(
     Args:
         prompt: Text description of the background scene (no people/model).
         aspect_ratio: One of auto, 21:9, 16:9, 3:2, 4:3, 5:4, 1:1, 4:5, 3:4, 2:3, 9:16.
-        resolution: Image resolution: 0.5K, 1K, 2K, 4K.
+        resolution: Image resolution: 1K, 2K, 4K.
 
     Returns:
         URL of the generated background image.
@@ -44,6 +44,7 @@ async def generate_background(
             "aspect_ratio": aspect_ratio,
             "output_format": "png",
             "resolution": resolution,
+            "safety_tolerance": "4",
             "limit_generations": True,
         },
     )
