@@ -467,10 +467,16 @@ def _smart_truncate(text: str, max_len: int) -> str:
         return text
     head = text[:max_len]
     soft_floor = int(max_len * 0.7)
-    for sep in [". ", "! ", "? ", ", ", "; ", " "]:
+    # Sentence-ending separators: keep the punctuation
+    for sep in (". ", "! ", "? "):
         idx = head.rfind(sep)
         if idx >= soft_floor:
-            return head[:idx + len(sep)].rstrip()
+            return head[: idx + 1].rstrip()
+    # Non-terminal separators: drop the separator + any trailing punctuation
+    for sep in (", ", "; ", " "):
+        idx = head.rfind(sep)
+        if idx >= soft_floor:
+            return head[:idx].rstrip().rstrip(",;:")
     return head  # fallback: hard cut (rare)
 
 
