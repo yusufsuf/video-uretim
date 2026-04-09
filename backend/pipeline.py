@@ -165,16 +165,11 @@ _NEG_ENVIRONMENTAL = (
 )
 _DEFILE_NEGATIVE = f"{_BASE_NEGATIVE}, {_NEG_ENVIRONMENTAL}"
 
-# Full HEM_LOCK used in classic/multishot modes (no strict 512-char constraint)
-_HEM_LOCK = (
-    "Sealed floor-length gown. NO slit anywhere — NO front slit, NO side slit, NO leg gap, NO fabric parting. "
-    "Skirt stays completely closed during all movement. "
-    "Legs and feet entirely hidden. Tiny concealed steps under sealed hem."
-)
-
-# Short HEM_LOCK injected into studio mode prompts BETWEEN @ElementN prefix and shot description.
-# Must stay under ~100 chars so shot description still has ~300+ chars of space in the 512-char limit.
-_HEM_LOCK_SHORT = "NO slit anywhere. NO front slit. Sealed floor-length gown. Skirt fully closed. Legs hidden."
+# NOTE: HEM_LOCK / HEM_LOCK_SHORT enforcement was removed — Kling elements now
+# preserve garment silhouette and slit geometry reliably from the reference
+# images alone, so force-injecting "no slit / sealed gown / legs hidden" into
+# every shot prompt caused over-correction (legs hidden on garments that
+# actually showed them, slit elimination on designs that had slits, etc.).
 
 _TRAIN_WORDS = {"train", "trailing", "sweep", "court", "chapel", "cathedral", "sweeping hem", "kuyruk", "uzun kuyruk"}
 
@@ -953,11 +948,13 @@ async def run_pipeline(
             _update_job(job_id, progress=20, message="Görsel hazırlanıyor...")
             fal_front_url = await _to_fal_url(front_url)
 
-            # Detect train from description text (no analysis in custom mode)
+            # Detect train from description text (no analysis in custom mode).
+            # Train suppression now lives entirely in the negative prompt; no
+            # positive "no train" note is injected into the shot text because
+            # elements preserve garment silhouette directly.
             _desc_lower = (video_description or "").lower()
             _custom_has_train = any(w in _desc_lower for w in _TRAIN_WORDS)
             _custom_negative = _BASE_NEGATIVE if _custom_has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
-            _custom_no_train_note = _HEM_LOCK if _custom_has_train else f"{_HEM_LOCK} No train."
 
             # Build elements for garment consistency
             _update_job(job_id, progress=55, message="Görseller hazırlanıyor (elements)...")
@@ -977,8 +974,7 @@ async def run_pipeline(
                 fal_ref_video = await _to_fal_url(reference_video_url)
 
                 _update_job(job_id, progress=70, message="Video üretiliyor (hareket kontrolü)...")
-                _base_motion = str(video_description or "")
-                _motion_prompt = (_custom_no_train_note + " " + _base_motion).strip() if _custom_no_train_note else _base_motion
+                _motion_prompt = str(video_description or "")
                 clip_url_custom = await generate_motion_control_video(
                     image_url=fal_front_url,
                     video_url=fal_ref_video,
@@ -1013,13 +1009,6 @@ async def run_pipeline(
                         total_duration=custom_total_duration,
                     )
                     logger.info("[%s] Custom multishot: %d prompt(s)", job_id, len(multi_prompt_custom))
-
-                # Inject no-train note into every shot prompt (positive reinforcement)
-                if _custom_no_train_note:
-                    multi_prompt_custom = [
-                        {"duration": p["duration"], "prompt": _custom_no_train_note + " " + p["prompt"]}
-                        for p in multi_prompt_custom
-                    ]
 
                 # Resolve garment meta (library lookup on front_url) + fabric-specific negatives
                 _custom_meta = await _resolve_garment_meta_from_url(front_url, analysis=None)
@@ -1259,19 +1248,21 @@ async def run_pipeline(
             if _studio_fabric_neg:
                 _studio_negative = _studio_negative + ", " + _studio_fabric_neg
 
-            # Enforce hem/slit lock + garment-specific constraint on every studio shot,
-            # then wrap with 7-layer quality anchors (garment lock + physics + style bible).
-            _gc = str(garment_constraint) if garment_constraint else ""
-            _gc_short = _gc[:80] if _gc else ""  # type: ignore[index]
-            _slit_infix = _HEM_LOCK_SHORT + (" " + _gc_short if _gc_short else "")  # ≤ 172 chars
+            # Wrap each shot with quality anchors (garment lock + physics + style bible).
+            # Garment shape / slit geometry is carried by the Kling elements themselves,
+            # so no positive-text hem/slit enforcement is injected here. An optional
+            # user-provided garment_constraint is the only shape hint kept.
+            _gc_short = (str(garment_constraint)[:80]).strip() if garment_constraint else ""
             _locked: list = []
             for _s in studio_shots:
                 desc = str(_s["prompt"])
                 # desc = "@Element1 [@Element2 ...] <shot description>"
                 _after_elem = desc[len(_element_prefix):].strip()  # type: ignore[index]
-                # Core: element tokens + hem/slit lock + shot description
-                _core_raw = f"{_element_prefix} {_slit_infix} {_after_elem}".strip()
-                # Apply quality layers (garment anchor prepended, style bible appended)
+                # Core: element tokens + (optional garment constraint) + shot description
+                if _gc_short:
+                    _core_raw = f"{_element_prefix} {_gc_short} {_after_elem}".strip()
+                else:
+                    _core_raw = f"{_element_prefix} {_after_elem}".strip()
                 _enhanced = _apply_quality_layers(
                     core_prompt=_core_raw,
                     meta=_studio_meta,
@@ -1347,7 +1338,6 @@ async def run_pipeline(
                 # Minimal defaults (no GPT analysis)
                 analysis = None
                 has_train = False
-                no_train_note = _HEM_LOCK
                 kling_negative = _BASE_NEGATIVE + _TRAIN_NEGATIVE
 
                 # Library lookup: user may have tagged fabric on the library item
@@ -1391,7 +1381,6 @@ async def run_pipeline(
                 logger.info("[%s] Analysis result: %s", job_id, analysis.garment_type)
 
                 has_train = _has_train(analysis)
-                no_train_note = _HEM_LOCK if has_train else f"{_HEM_LOCK} No train."
                 kling_negative = _BASE_NEGATIVE if has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
                 logger.info("[%s] Train detected: %s", job_id, has_train)
 
@@ -1533,7 +1522,7 @@ async def run_pipeline(
                     {
                         "duration": p["duration"],
                         "prompt": _build_enhanced_prompt(
-                            base_prompt=f"{no_train_note}. {p['prompt']}",
+                            base_prompt=str(p["prompt"]),
                             analysis=analysis,
                             max_len=512,
                         ),
@@ -1596,7 +1585,7 @@ async def run_pipeline(
                     scene_frame_url = await _to_fal_url(scene_frame_url)
 
                     locked_prompt = _build_enhanced_prompt(
-                        base_prompt=f"{no_train_note}. {scene.prompt}",
+                        base_prompt=str(scene.prompt),
                         analysis=analysis,
                         camera_move=scene.camera_movement or "",
                         max_len=512,
@@ -2059,14 +2048,15 @@ async def run_defile_collection_pipeline(
             if _defile_fabric_neg:
                 _defile_outfit_neg = _defile_outfit_neg + ", " + _defile_fabric_neg
 
-            # Front-load hem/slit constraint + wrap with quality layers.
-            # The quality layer wrapper prepends a short [GARMENT LOCK: ...] anchor
-            # (carrying user-authored fabric+description) and appends physics + style bible.
+            # Wrap each GPT shot with quality layers (garment lock anchor +
+            # fabric physics + style bible). Garment silhouette / slit geometry
+            # is preserved by the Kling element references, so no positive-text
+            # "sealed gown" enforcement is injected into the shot prompt.
             multi_prompt = [
                 {
                     "duration": p["duration"],
                     "prompt": _apply_quality_layers(
-                        core_prompt=f"{_HEM_LOCK_SHORT} {str(p['prompt'])}",  # type: ignore[index]
+                        core_prompt=str(p["prompt"]),  # type: ignore[index]
                         meta=_defile_meta,
                         max_len=512,
                     ),
@@ -2075,7 +2065,7 @@ async def run_defile_collection_pipeline(
             ]
 
             # ── 3b-extra: Build compressed Kling elements for garment consistency ──
-            # CRITICAL: without elements, Kling has no dress reference and freely hallucinates slits
+            # CRITICAL: elements carry the dress geometry (silhouette, slits, hem)
             elem_front_c = await _to_fal_url_compressed(outfit.front_url)
             _elem_refs: list = []
             if outfit.side_url:

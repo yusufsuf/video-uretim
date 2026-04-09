@@ -221,11 +221,10 @@ SCENE CONTINUITY RULES (critical — videos are chained clip-to-clip, each clip 
 - Do NOT introduce new environments, new backgrounds, or new lighting sources mid-sequence
 - The model's body position at the end of scene N should connect naturally with the start of scene N+1
 
-FRAMING & HEM RULES (ABSOLUTE — apply to every single shot):
-- The dress hem ALWAYS touches the ground — never write shots where hem floats, lifts, or shows a gap above floor
-- NEVER frame below the hem — feet, shoes, ankles, and toes must NEVER appear in any shot
-- Framing floor: the bottom of every frame must cut at or just above the hem, NOT below it
-- Reinforce this with language like "dress hem grazing the floor", "full-length gown pooling at ground level"
+GARMENT FIDELITY (ABSOLUTE — apply to every single shot):
+- Describe the garment exactly as it appears in the image — slits, hem length, openings, cuts are locked by the reference
+- Do NOT override garment geometry with positive enforcements like "closed skirt", "sealed gown", "legs hidden", "no slit" — element references carry the true silhouette
+- Choose framing and camera angles that naturally showcase the garment; hem/feet visibility depends on the garment, not a blanket rule
 
 FORBIDDEN:
 - '8k', 'hyper-realistic', 'unreal engine', 'masterpiece'
@@ -233,7 +232,6 @@ FORBIDDEN:
 - NEVER use Turkish — all output in English
 - Do NOT mention specific model appearance (skin color, hair etc.)
 - Do NOT use nighttime/dark settings by default
-- NEVER mention feet, shoes, heels, boots, ankles, or toes
 
 Return JSON only:
 {
@@ -544,10 +542,8 @@ Camera vocabulary (vary across shots):
 Wide Shot, Medium Shot, Close-Up, Extreme Close-Up, Low Angle, High Angle, Tracking Shot, Dolly In, Dolly Out, Arc Shot, Tilt Up, Follow Shot, Steadicam, Slow Motion
 
 ABSOLUTE RULES (every shot, no exceptions):
-- Dress hem ALWAYS touches the ground — reinforce with "hem grazing the floor" or "gown pooling at ground"
-- NEVER frame below the hem — feet, shoes, ankles must NOT appear in any shot
-- NEVER mention feet, shoes, heels, boots, ankles, or toes
-- The skirt/gown front is COMPLETELY SEALED — NO front slit, NO center front opening, NO leg gap. Write "closed skirt, no front slit" in EVERY shot prompt without exception
+- Describe the garment exactly as it appears in the image — do NOT invent, add, or remove any structural detail (slits, openings, cuts, hem length are all locked by the reference)
+- Do NOT override the garment geometry with positive phrases like "closed skirt", "sealed gown", "no front slit", "legs hidden" — the element references carry the true garment shape
 - NEVER add spectators, audience, crowd, seated guests, cameramen, photographers, or crew — the space is empty except for the model
 - NEVER add trees, flowers, plants, decorative accessories, or any elements not already in the scene
 - The background/location stays EXACTLY as it appears in the image — do not invent or add any environmental elements
@@ -678,7 +674,7 @@ GARMENT CONSISTENCY (NON-NEGOTIABLE):
 TRAIN / HEM RULE (ABSOLUTE):
 - If a train IS visible → describe its exact length and behavior
 - NEVER add a train that is not in the images
-- NEVER write "no train" or "flat hem" — the pipeline injects this automatically
+- Do NOT write positive enforcements like "closed skirt", "sealed gown", "no slit", "legs hidden" — the element reference already locks garment geometry
 
 PROMPT RULES:
 - Each shot prompt: 30-50 words, HARD LIMIT: 480 characters, in English only
@@ -824,10 +820,8 @@ STEP 3 — GENERATE SHOTS:
 
 ABSOLUTE RULES (every shot, no exceptions):
 - EVERY prompt starts with "@Element1 In the [scene anchor]," — no exceptions
-- NEVER frame below the hem — feet, shoes, ankles must NOT appear
 - NEVER add stage lights, beauty dishes, tripods, or studio equipment
-- NEVER add a train, trailing fabric, or pooling hem — if the garment has a back slit, describe it as "back center slit, flat hem, no trailing fabric"
-- For any back-view or rear-angle shot: always include "back center slit, flat hem ends at floor, no trailing fabric, no train"
+- Describe the garment exactly as the reference images show — slits, hem length, trains, openings are locked by the element reference, do NOT override them with positive phrases like "closed skirt" or "no slit"
 - Vary camera angles for cinematic flow (wide, medium, close-up, etc.)
 - Each shot continues seamlessly from the previous
 
