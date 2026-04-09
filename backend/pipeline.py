@@ -440,7 +440,7 @@ def _build_meta_anchor(meta: Optional[dict], max_len: int = 100) -> str:
         # Room left after "]" closing bracket
         desc_budget = max_len - len(prefix) - 4  # "— ]"
         if desc and desc_budget > 10:
-            desc_short = desc[:desc_budget].rstrip().rstrip(",.;:")
+            desc_short = _smart_truncate(desc, desc_budget).rstrip().rstrip(",.;:")
             return f"{prefix} — {desc_short}]"
         return f"{prefix}]"
 
