@@ -4,6 +4,7 @@ and generate multi-scene prompts for the video pipeline."""
 import base64
 import json
 import logging
+import random
 from pathlib import Path
 from typing import Optional
 
@@ -510,36 +511,126 @@ async def refine_shot_description(request: RefineShotRequest) -> str:
     return (response.choices[0].message.content or "").strip().strip('"').strip("'")
 
 
+# ─── Defile shot arc templates ───────────────────────────────────────────────
+# Bank of narrative arcs for fashion runway sequences. One is randomly
+# selected per generation to avoid repetitive shot patterns. Each arc is a
+# sequence of beats; GPT adapts the beat count to match the user-requested
+# shot count (merge when fewer, expand when more).
+_DEFILE_SHOT_ARCS: list[dict] = [
+    {
+        "name": "Classic Approach",
+        "beats": [
+            "WIDE APPROACH — model starts at the far end of the runway (under/beside the architectural feature), walks toward camera with a confident stride, full body visible",
+            "MEDIUM TRACKING — camera glides alongside at front three-quarter angle as she walks closer, revealing the front construction and fabric behavior",
+            "LOW ANGLE PIVOT — at the camera end of the runway, low upward angle as she executes a confident runway pivot/turn",
+            "BACK VIEW EXIT — follow shot from behind as she walks away down the runway toward the far end (she never turns back to face camera)",
+        ],
+    },
+    {
+        "name": "Overhead Descent",
+        "beats": [
+            "OVERHEAD WIDE — high angle top-down vantage as the model begins walking forward from the far end, establishing runway and garment silhouette in context",
+            "FRONTAL MEDIUM — eye-level medium shot as she approaches camera with a confident stride",
+            "SIDE PROFILE TRACKING — camera tracks laterally alongside her from the side of the runway, full body in profile",
+            "CLOSE-UP FRONT DETAIL — tight framing on hip/torso showing fabric construction, appliqué, or structural highlight",
+            "FACE REVEAL — soft push-in on her face and upper shoulders, composed expression, eyes forward",
+            "BACK VIEW EXIT — she pivots at the camera end and walks away, back silhouette retreating toward the arch",
+        ],
+    },
+    {
+        "name": "Editorial Detail",
+        "beats": [
+            "CLOSE-UP TEXTURE — tight shot on fabric drape, appliqué, or structural highlight as she begins to walk (upper torso framing, feet unseen)",
+            "DOLLY OUT WIDE — camera slowly pulls back revealing the full silhouette mid-stride on the runway",
+            "FRONT THREE-QUARTER — medium tracking along her front quarter angle, garment construction fully visible",
+            "ARC SHOT — camera orbits around her as she reaches the camera end and slows",
+            "BACK VIEW EXIT — slow retreat down the runway, hold focus on the back construction and hem",
+        ],
+    },
+    {
+        "name": "Dramatic Low Angle",
+        "beats": [
+            "LOW WIDE — heroic low-angle composition as she emerges from the far end, ascending framing",
+            "MEDIUM FRONT — eye-level as she continues toward camera with a clean stride",
+            "CLOSE-UP FACE — brief intimate face in frame, composed expression, gaze forward",
+            "HIP-LEVEL DETAIL — tight shot on hip/skirt transition showing fabric flow",
+            "EXIT PIVOT BACK — she reaches camera, pivots, silhouette backlit by lighting as she walks away",
+        ],
+    },
+    {
+        "name": "Side Study",
+        "beats": [
+            "WIDE FRONTAL APPROACH — establishing wide from the runway end, model walking toward camera",
+            "SIDE PROFILE PASS — camera locked at the side of the runway, full body profile as she strides past",
+            "THREE-QUARTER FRONT — returns to front three-quarter revealing construction lines and neckline",
+            "CLOSE-UP DETAIL — tight framing on a key structural element (appliqué, neckline, or waist detail)",
+            "BACK VIEW EXIT — follow shot from behind as she walks away down the runway",
+        ],
+    },
+    {
+        "name": "Couture Moment",
+        "beats": [
+            "WIDE ESTABLISHING — far wide showing her small within the architectural frame, beginning to walk forward",
+            "MEDIUM TRACKING — camera glides alongside her at front three-quarter angle",
+            "HIP-LEVEL CLOSE — tight framing on fabric flow at hip/skirt transition",
+            "FACE AND NECKLINE — soft close on face and upper neckline detail as she reaches the camera end",
+            "BACK VIEW EXIT — follow shot retreating toward the arch, focus on the back structure and hem",
+        ],
+    },
+]
+
+
+def _pick_defile_shot_arc() -> dict:
+    """Randomly select a shot arc template from the bank."""
+    return random.choice(_DEFILE_SHOT_ARCS)
+
+
+def _format_shot_arc(arc: dict, n_shots: int) -> str:
+    """Format a shot arc for injection into the GPT user message."""
+    beats = arc["beats"]
+    lines = "\n".join(f"  Beat {i + 1}: {b}" for i, b in enumerate(beats))
+    adaptation: str
+    if n_shots == len(beats):
+        adaptation = "Map each beat 1-to-1 to the requested shots."
+    elif n_shots < len(beats):
+        adaptation = (
+            f"You have {n_shots} shots but {len(beats)} beats. Merge or select beats to fit, "
+            "but ALWAYS keep an approach beat (first), at least one middle detail beat, and a back-view exit (last)."
+        )
+    else:
+        adaptation = (
+            f"You have {n_shots} shots but only {len(beats)} beats. Expand by adding intermediate "
+            "camera variations (e.g. close-up fabric detail, arc shot, dolly, tilt) while preserving the arc order."
+        )
+    return (
+        f"NARRATIVE ARC — '{arc['name']}':\n{lines}\n\n"
+        f"ADAPTATION: {adaptation}"
+    )
+
+
 _DEFILE_MULTISHOT_SYSTEM = """You are a luxury fashion film director. You receive a composed runway scene image showing a fashion model in a garment, and a list of shot durations.
 
 Your task: Write one cinematic English prompt per shot for Kling 3.0 Pro multishot video generation.
 
-RUNWAY WALK STRUCTURE — MANDATORY:
-The sequence must depict ONE complete runway journey in this exact order:
-1. Model starts at the far end of the runway and walks TOWARD the camera (front view, approach)
-2. Middle shots: cinematic detail shots as model walks closer — vary angles (low angle, close-up fabric, medium tracking)
-3. SECOND-TO-LAST shot: model reaches the camera end of the runway, slows, executes a confident runway pivot/turn
-4. LAST shot: model walks AWAY from camera down the runway (back view, retreating) — the walk is finished, model does NOT turn back around
+NARRATIVE ARC — MANDATORY SCAFFOLDING:
+The user message will contain a NARRATIVE ARC with named beats (e.g. "WIDE APPROACH", "CLOSE-UP DETAIL", "BACK VIEW EXIT"). This arc is the skeleton of the sequence — follow it in order, one beat per shot unless the adaptation instruction says otherwise.
+
+RUNWAY JOURNEY CONTRACT:
+- The sequence must depict ONE continuous runway journey, chained across shots
+- Regardless of the selected arc, the FINAL shot is ALWAYS a back view walking away — the model never turns back to face camera after the final pivot
+- Shots chain seamlessly, lighting stays constant, location never changes
 
 CRITICAL RULES:
-- The model NEVER turns back to face the camera after the final pivot — the sequence ends with the model walking away
-- Each shot continues seamlessly from the previous (chained within one video generation)
-- NEVER repeat the same camera angle or movement twice
+- Follow the arc beat order exactly; each beat becomes one shot's framing/angle intent
+- NEVER repeat the same camera angle or movement twice in a row
 - Reference the garment color and silhouette visible in the image
 - For back-view shots: explicitly describe the back structure visible in the image — shoulder elements, back opening, closure, skirt from behind
 - Style: luxury fashion film, editorial Vogue aesthetic, smooth cinematic movement
 - Each prompt: 30-50 words, HARD LIMIT: 480 characters, in English only
 - Keep lighting consistent across all shots
 
-SHOT COUNT GUIDANCE:
-- 1 shot: full runway walk from far end toward camera, model confident stride
-- 2 shots: (1) approach walk toward camera, (2) end pivot + walk away
-- 3 shots: (1) wide approach, (2) mid close-up detail, (3) pivot + walk away
-- 4 shots: (1) wide establishing approach, (2) medium tracking, (3) end pivot, (4) back view walk away
-- 5 shots: (1) wide approach, (2) low angle, (3) close-up fabric, (4) end pivot, (5) back view walk away
-
 Camera vocabulary (vary across shots):
-Wide Shot, Medium Shot, Close-Up, Extreme Close-Up, Low Angle, High Angle, Tracking Shot, Dolly In, Dolly Out, Arc Shot, Tilt Up, Follow Shot, Steadicam, Slow Motion
+Wide Shot, Medium Shot, Close-Up, Extreme Close-Up, Low Angle, High Angle, Tracking Shot, Dolly In, Dolly Out, Arc Shot, Tilt Up, Follow Shot, Steadicam, Slow Motion, Overhead
 
 ABSOLUTE RULES (every shot, no exceptions):
 - Describe the garment exactly as it appears in the image — do NOT invent, add, or remove any structural detail (slits, openings, cuts, hem length are all locked by the reference)
@@ -580,6 +671,8 @@ async def generate_defile_multishot_prompt(
     )
 
     if video_description:
+        # User override — creative direction wins, skip arc injection
+        selected_arc = None
         user_text = (
             f"Outfit: {outfit_name or 'fashion garment'}\n"
             f"Number of shots: {n_shots}\n"
@@ -591,12 +684,16 @@ async def generate_defile_multishot_prompt(
             f"Return exactly the JSON array with the durations specified above."
         )
     else:
+        # Randomly pick a narrative arc from the bank for shot variety
+        selected_arc = _pick_defile_shot_arc()
+        arc_block = _format_shot_arc(selected_arc, n_shots)
         user_text = (
             f"Outfit: {outfit_name or 'fashion garment'}\n"
             f"Number of shots: {n_shots}\n"
             f"Shot durations:\n{shots_description}\n\n"
-            "Analyze the runway scene in the image and write a cinematic multishot script. "
-            "Return exactly the JSON array with the durations specified above."
+            f"{arc_block}\n\n"
+            "Analyze the runway scene in the image and write a cinematic multishot script that "
+            "follows the narrative arc above. Return exactly the JSON array with the durations specified above."
         )
 
     response = await client.chat.completions.create(
@@ -641,7 +738,9 @@ async def generate_defile_multishot_prompt(
         prompt_text = shots[i]["prompt"] if i < len(shots) else f"Fashion model walks runway, cinematic shot {i + 1}, elegant movement, luxury editorial"
         result.append({"duration": str(cfg.duration), "prompt": prompt_text})
 
-    logger.info("Defile multishot prompts for '%s': %d shots", outfit_name, len(result))
+    arc_label = selected_arc["name"] if selected_arc else "user-direction"
+    logger.info("Defile multishot prompts for '%s': %d shots (arc: %s)",
+                outfit_name, len(result), arc_label)
     return result
 
 
