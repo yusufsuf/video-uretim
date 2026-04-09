@@ -56,12 +56,23 @@ async def create_element(
 ) -> int:
     """Create a Kling element from images. Returns element_id (int).
 
-    Kling requires at least one frontal image plus 1–3 reference images
-    that differ from the front. If no extra references are provided, the
-    frontal image is duplicated as a reference (API still accepts it).
+    Per Kling API docs: element_image_list requires one frontal_image plus
+    1–3 refer_images that MUST differ from the frontal_image. Passing the
+    same URL in both fields breaks element quality / causes API errors.
     """
-    refer_imgs = (reference_image_urls[:3]  # type: ignore[index]
-                  if reference_image_urls else [frontal_image_url])
+    # Dedupe: remove any refer_image identical to the frontal_image
+    refer_imgs = [u for u in (reference_image_urls or []) if u and u != frontal_image_url]
+    # Also drop duplicates within refer_images while preserving order
+    seen: set = set()
+    refer_imgs = [u for u in refer_imgs if not (u in seen or seen.add(u))]
+    refer_imgs = refer_imgs[:3]
+
+    if not refer_imgs:
+        raise RuntimeError(
+            "Kling element requires at least 1 reference image that differs "
+            "from the frontal image (side/back/detail view). Only the frontal "
+            "image was provided."
+        )
 
     body = {
         "element_name": name[:20],  # type: ignore[index]

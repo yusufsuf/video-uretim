@@ -278,14 +278,24 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
                     name=f"workflow{oi + 1}",
                     description=f"workflow garment {oi + 1}",
                 )
-                logger.info("[%s] Workflow outfit %d: Kling element_id=%d", job_id, oi + 1, kling_eid)
 
-                kling_prompts = [
-                    {"duration": p["duration"], "prompt": f"<<<element_1>>> {p['prompt']}"}
-                    for p in multi_prompt
-                ]
+                if kling_eid is not None:
+                    logger.info("[%s] Workflow outfit %d: Kling element_id=%d", job_id, oi + 1, kling_eid)
+                    kling_prompts = [
+                        {"duration": p["duration"], "prompt": f"<<<element_1>>> {p['prompt']}"}
+                        for p in multi_prompt
+                    ]
+                    element_list_param: list = [{"element_id": int(kling_eid)}]
+                else:
+                    logger.info("[%s] Workflow outfit %d: no Kling element (single image) — using start frame only",
+                                job_id, oi + 1)
+                    kling_prompts = [
+                        {"duration": p["duration"], "prompt": p["prompt"]}
+                        for p in multi_prompt
+                    ]
+                    element_list_param = []
 
-                _debug_payload["element_list"] = [{"element_id": int(kling_eid)}]
+                _debug_payload["element_list"] = element_list_param
 
                 _update_job(job_id, progress=base_progress + int(35 / n_outfits),
                             debug_payload=_debug_payload,
@@ -296,7 +306,7 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
                     duration=str(total_duration),
                     aspect_ratio=req.aspect_ratio,
                     generate_audio=req.generate_audio,
-                    element_list=[{"element_id": int(kling_eid)}],
+                    element_list=element_list_param,
                     negative_prompt=_DEFILE_NEGATIVE,
                 )
             else:

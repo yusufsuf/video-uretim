@@ -510,8 +510,12 @@ async def get_or_create_kling_element(
     reference_image_urls: list,
     name: str = "garment",
     description: str = "fashion garment",
-) -> int:
+) -> Optional[int]:
     """Return cached kling_element_id from Supabase, or create a new one and cache it.
+
+    Returns None if the element cannot be created because only the frontal
+    image is available (Kling requires ≥1 refer_image that differs from front).
+    Callers should skip element_list in that case.
 
     front_url: the original library image_url (for cache lookup)
     frontal_image_url / reference_image_urls: compressed URLs for Kling API
@@ -526,13 +530,22 @@ async def get_or_create_kling_element(
                      item["id"], item["kling_element_id"])
         return int(item["kling_element_id"])
 
-    # Create new element
-    element_id = await create_element(
-        frontal_image_url=frontal_image_url,
-        reference_image_urls=reference_image_urls,
-        name=name,
-        description=description,
-    )
+    # Create new element — may fail if only the frontal image was provided
+    try:
+        element_id = await create_element(
+            frontal_image_url=frontal_image_url,
+            reference_image_urls=reference_image_urls,
+            name=name,
+            description=description,
+        )
+    except RuntimeError as exc:
+        if "refer" in str(exc).lower() or "frontal" in str(exc).lower():
+            logger.warning(
+                "Kling element skipped (insufficient images): %s — falling back to start_image only",
+                exc,
+            )
+            return None
+        raise
 
     # Cache it
     if item:
@@ -607,7 +620,8 @@ async def run_pipeline(
                         name=f"garment{i + 1}",
                         description=f"fashion garment {i + 1}",
                     )
-                    element_list.append({"element_id": int(eid)})
+                    if eid is not None:
+                        element_list.append({"element_id": int(eid)})
                 logger.info("[%s] Kling elements ready: %s", job_id, element_list)
 
             # Replace @ElementN → <<<element_N>>> (Kling native token format)
@@ -1694,8 +1708,13 @@ async def run_defile_collection_pipeline(
                     name=f"defile{outfit_idx + 1}",
                     description=f"defile outfit {outfit_idx + 1}",
                 )
-                _kling_elem_list = [{"element_id": int(_kling_eid)}]
-                logger.info("[%s] Defile outfit %d: Kling element_id=%d", job_id, outfit_idx + 1, _kling_eid)
+                _kling_elem_list: list = []
+                if _kling_eid is not None:
+                    _kling_elem_list.append({"element_id": int(_kling_eid)})
+                    logger.info("[%s] Defile outfit %d: Kling element_id=%d", job_id, outfit_idx + 1, _kling_eid)
+                else:
+                    logger.info("[%s] Defile outfit %d: no Kling element (single image) — using start frame only",
+                                job_id, outfit_idx + 1)
 
                 # Also create Kling elements for scene elements
                 for _si, _se in enumerate(scene_elements):
@@ -1706,15 +1725,24 @@ async def run_defile_collection_pipeline(
                         name=f"scene{_si + 1}",
                         description=f"defile scene element {_si + 1}",
                     )
-                    _kling_elem_list.append({"element_id": int(_scene_eid)})
-                    logger.info("[%s] Defile scene %d: Kling element_id=%d", job_id, _si + 1, _scene_eid)
+                    if _scene_eid is not None:
+                        _kling_elem_list.append({"element_id": int(_scene_eid)})
+                        logger.info("[%s] Defile scene %d: Kling element_id=%d", job_id, _si + 1, _scene_eid)
+                    else:
+                        logger.info("[%s] Defile scene %d: skipped (single image)", job_id, _si + 1)
 
-                # Build token references: <<<element_1>>> for outfit, <<<element_2>>> etc for scenes
-                _elem_tokens = " ".join(f"<<<element_{i + 1}>>>" for i in range(len(_kling_elem_list)))
-                _kling_prompts = [
-                    {"duration": p["duration"], "prompt": f"{_elem_tokens} {p['prompt']}"}
-                    for p in multi_prompt
-                ]
+                # Build token references only for elements that exist
+                if _kling_elem_list:
+                    _elem_tokens = " ".join(f"<<<element_{i + 1}>>>" for i in range(len(_kling_elem_list)))
+                    _kling_prompts = [
+                        {"duration": p["duration"], "prompt": f"{_elem_tokens} {p['prompt']}"}
+                        for p in multi_prompt
+                    ]
+                else:
+                    _kling_prompts = [
+                        {"duration": p["duration"], "prompt": p["prompt"]}
+                        for p in multi_prompt
+                    ]
 
                 clip_url = await _kling_gen(
                     start_image_url=scene_frame_url,
