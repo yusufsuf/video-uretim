@@ -306,6 +306,16 @@ _MICRO_ACTIONS = (
 )
 
 
+# 5b. STYLE BIBLE — consistent style sentence appended to EVERY shot prompt.
+# Research: repeating a short, identical "style bible" across all shots of a
+# multi-shot render measurably reduces color/lighting drift between cuts.
+# Keep it short (≈ 140 chars) so it never eats the 512-char per-shot budget.
+_STYLE_BIBLE = (
+    "Style: high-end fashion editorial, cinematic color grading, "
+    "shallow depth of field, photorealistic skin, consistent lighting."
+)
+
+
 # 6. COMPOSITE PROMPT BUILDER — combines all layers for Kling shot prompts
 def _build_enhanced_prompt(
     base_prompt: str,
@@ -346,6 +356,9 @@ def _build_enhanced_prompt(
     # Layer 6: Micro-actions
     if include_micro:
         parts.append(_MICRO_ACTIONS)
+
+    # Layer 7: Style Bible — identical tail on every shot to lock cross-shot look.
+    parts.append(_STYLE_BIBLE)
 
     combined = " ".join(parts)
     return combined[:max_len]

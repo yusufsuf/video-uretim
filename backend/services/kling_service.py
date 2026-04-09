@@ -161,12 +161,23 @@ async def generate_multishot_video(
     shots = [
         {
             "index": i + 1,
-            "prompt": s["prompt"][:500],
+            "prompt": s["prompt"][:512],
             "duration": str(s["duration"]),
         }
         for i, s in enumerate(multi_prompt)
     ]
     total_dur = sum(int(s["duration"]) for s in multi_prompt)
+
+    # Kling multi_shot hard cap: 15 seconds total across all shots.
+    if total_dur > 15:
+        raise ValueError(
+            f"Kling multi_shot total duration must be ≤ 15s — got {total_dur}s "
+            f"across {len(shots)} shots. Reduce per-shot duration or shot count."
+        )
+    if total_dur < 5:
+        raise ValueError(
+            f"Kling multi_shot total duration must be ≥ 5s — got {total_dur}s."
+        )
 
     body: dict = {
         "model_name": "kling-v3",
@@ -179,6 +190,10 @@ async def generate_multishot_video(
         "aspect_ratio": aspect_ratio,
         "sound": "on" if generate_audio else "off",
         "mode": "pro",
+        # cfg_scale: how strictly the model follows the prompt.
+        # 0.7 is the sweet spot for fashion + element binding per Kling docs —
+        # high enough to lock garment/shot semantics, low enough to keep motion natural.
+        "cfg_scale": 0.7,
     }
 
     if element_list:
