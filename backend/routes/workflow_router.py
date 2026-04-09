@@ -202,7 +202,14 @@ async def generate_video(
 async def _run_workflow_video(job_id: str, req: GenerateRequest):
     """Execute video generation for workflow — supports multi-outfit with concat."""
     from services.video_service import generate_multishot_video, download_file, concatenate_clips
-    from pipeline import _to_fal_url, _to_fal_url_compressed, _HEM_LOCK_SHORT, _DEFILE_NEGATIVE, _build_enhanced_prompt
+    from pipeline import (
+        _to_fal_url,
+        _to_fal_url_compressed,
+        _DEFILE_NEGATIVE,
+        _resolve_garment_meta_from_url,
+        _apply_quality_layers,
+        _get_fabric_negative,
+    )
 
     try:
         n_outfits = len(req.outfits)
@@ -218,13 +225,29 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
                         progress=base_progress,
                         message=f"{outfit_name} — promptlar hazırlanıyor ({oi + 1}/{n_outfits})...")
 
-            # Enhance each prompt with 7-layer system (garment anchor, fabric physics, light, micro)
+            # Resolve outfit garment meta from library (fabric + user description, translated)
+            _wf_meta = await _resolve_garment_meta_from_url(op.outfit.front_url, analysis=None)
+            logger.info("[%s] Workflow outfit %d meta: fabric=%r desc=%s",
+                        job_id, oi + 1,
+                        _wf_meta.get("fabric"),
+                        (_wf_meta.get("description") or "")[:60])
+
+            # Per-outfit dynamic negative prompt — base + fabric-specific additions
+            _wf_negative = _DEFILE_NEGATIVE
+            _wf_fabric_neg = _get_fabric_negative(_wf_meta.get("fabric"))
+            if _wf_fabric_neg:
+                _wf_negative = _wf_negative + ", " + _wf_fabric_neg
+
+            # Wrap each approved shot with quality layers (FABRIC LOCK anchor +
+            # fabric physics + Style Bible + micro actions). Garment silhouette
+            # is preserved by Kling element references — no positive-text hem
+            # enforcement is injected.
             multi_prompt = [
                 {
                     "duration": s["duration"],
-                    "prompt": _build_enhanced_prompt(
-                        base_prompt=str(s["prompt"]),
-                        analysis=None,
+                    "prompt": _apply_quality_layers(
+                        core_prompt=str(s["prompt"]),
+                        meta=_wf_meta,
                         max_len=512,
                     ),
                 }
@@ -307,7 +330,7 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
                     aspect_ratio=req.aspect_ratio,
                     generate_audio=req.generate_audio,
                     element_list=element_list_param,
-                    negative_prompt=_DEFILE_NEGATIVE,
+                    negative_prompt=_wf_negative,
                 )
             else:
                 _update_job(job_id, progress=base_progress + int(35 / n_outfits),
@@ -320,7 +343,7 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
                     aspect_ratio=req.aspect_ratio,
                     generate_audio=req.generate_audio,
                     elements=[outfit_element],
-                    negative_prompt=_DEFILE_NEGATIVE,
+                    negative_prompt=_wf_negative,
                 )
 
             clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
