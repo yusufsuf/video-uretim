@@ -1730,6 +1730,10 @@ function openStudioCreateModal() {
     // Reset fields
     const nameInput = document.getElementById("create-elem-name");
     if (nameInput) nameInput.value = "";
+    const fabricSelect = document.getElementById("create-elem-fabric");
+    if (fabricSelect) fabricSelect.value = "";
+    const descTextarea = document.getElementById("create-elem-description");
+    if (descTextarea) descTextarea.value = "";
 
     // Show category selector for defile mode, hide for studio mode
     const catSelect = document.getElementById("create-elem-category");
@@ -1797,10 +1801,14 @@ async function saveStudioElement() {
 
     const catSelect = document.getElementById("create-elem-category");
     const category = catSelect ? catSelect.value : "element";
+    const fabric = (document.getElementById("create-elem-fabric")?.value || "").trim();
+    const description = (document.getElementById("create-elem-description")?.value || "").trim();
 
     const fd = new FormData();
     fd.append("name",     name);
     fd.append("category", category);
+    if (fabric)      fd.append("fabric", fabric);
+    if (description) fd.append("description", description);
     fd.append("file",     _createFrontFile);
     if (_createAngle1File) fd.append("file2", _createAngle1File);
     if (_createAngle2File) fd.append("file3", _createAngle2File);

@@ -315,6 +315,165 @@ _STYLE_BIBLE = (
     "shallow depth of field, photorealistic skin, consistent lighting."
 )
 
+# 5c. SHORTER MICRO-ACTIONS — for modes where budget is tight (Defile/Studio).
+_MICRO_ACTIONS_SHORT = "Subtle breathing, fabric settles naturally with gravity."
+
+
+# 5d. FABRIC-SPECIFIC NEGATIVE PROMPTS — injected when fabric is known
+# to prevent Kling from drifting toward the wrong texture/finish.
+_FABRIC_NEGATIVES: dict[str, str] = {
+    "silk":    "satin sheen, plastic-looking fabric, rubber texture, vinyl finish",
+    "satin":   "matte cotton finish, dull fabric, chalky texture",
+    "chiffon": "stiff fabric, heavy drape, opaque thick fabric, rigid cloth",
+    "organza": "soft flowy drape, matte fabric, thick weave",
+    "tulle":   "heavy fabric, opaque cloth, rigid structure",
+    "velvet":  "shiny synthetic fabric, plastic sheen, smooth satin finish",
+    "denim":   "soft silk-like drape, shiny fabric, fluid flow, satin sheen",
+    "leather": "soft fabric drape, cotton texture, matte cloth finish",
+    "cotton":  "synthetic plastic sheen, satin shine, vinyl finish",
+    "linen":   "shiny synthetic fabric, silk-like drape, plastic finish",
+    "wool":    "shiny synthetic fabric, plastic sheen, satin finish",
+    "tweed":   "smooth fabric, silk drape, shiny finish",
+    "lace":    "solid opaque fabric, thick weave, heavy cloth",
+    "crepe":   "shiny glossy surface, plastic sheen, satin finish",
+    "jersey":  "rigid stiff fabric, structured drape, heavy cloth",
+    "sequin":  "matte dull surface, flat fabric, no reflections",
+    "brocade": "plain flat fabric, smooth surface, no texture",
+    "polyester": "heavy matte drape, rigid cloth",
+}
+
+def _get_fabric_negative(fabric: Optional[str]) -> str:
+    """Return fabric-specific negative prompt additions."""
+    if not fabric:
+        return ""
+    f = fabric.lower().strip()
+    for key, neg in _FABRIC_NEGATIVES.items():
+        if key in f:
+            return neg
+    return ""
+
+
+# 5e. UNIFIED GARMENT META RESOLVER ────────────────────────────────────────
+# Consolidates fabric/description/color info from either DressAnalysisResult
+# or a library_items row dict. Library metadata (user-authored) takes
+# precedence over analysis (AI-inferred) when both are available.
+
+def _make_garment_meta(
+    analysis=None,
+    lib_row: Optional[dict] = None,
+) -> dict:
+    """Unified garment info for prompt enhancement.
+
+    Returns: {"fabric": str, "description": str, "color": str, "name": str}
+    Library row (user-authored) overrides analysis (AI-guessed).
+    """
+    meta: dict = {"fabric": "", "description": "", "color": "", "name": ""}
+    if analysis is not None:
+        meta["fabric"] = (getattr(analysis, "fabric", "") or "").strip()
+        meta["color"] = (getattr(analysis, "color", "") or "").strip()
+        meta["description"] = (getattr(analysis, "description_en", "") or "").strip()
+        meta["name"] = (getattr(analysis, "garment_type", "") or "").strip()
+    if lib_row:
+        if lib_row.get("fabric"):
+            meta["fabric"] = str(lib_row["fabric"]).strip()
+        if lib_row.get("description"):
+            meta["description"] = str(lib_row["description"]).strip()
+        if lib_row.get("name") and not meta["name"]:
+            meta["name"] = str(lib_row["name"]).strip()
+    return meta
+
+
+async def _resolve_garment_meta_from_url(
+    front_url: Optional[str],
+    analysis=None,
+) -> dict:
+    """Fetch library metadata for a garment URL + merge with analysis."""
+    lib_row = None
+    if front_url:
+        try:
+            from services.library_service import get_item_by_url
+            lib_row = await get_item_by_url(front_url)
+        except Exception as _exc:
+            logger.debug("Library lookup failed for %s: %s", str(front_url)[:60], _exc)
+    return _make_garment_meta(analysis=analysis, lib_row=lib_row)
+
+
+def _build_meta_anchor(meta: Optional[dict]) -> str:
+    """Build a short garment anchor (≤ 150 chars) from unified meta."""
+    if not meta:
+        return ""
+    bits: list[str] = []
+    if meta.get("color"):
+        bits.append(meta["color"])
+    if meta.get("fabric"):
+        bits.append(meta["fabric"])
+    if meta.get("name"):
+        bits.append(meta["name"])
+    anchor_core = " ".join(bits).strip() or "garment"
+    desc = (meta.get("description") or "").strip()
+    if desc:
+        anchor_core = f"{anchor_core}, {desc[:60]}"
+    return f"[GARMENT LOCK: {anchor_core[:110]}. Exact silhouette and fabric preserved.]"
+
+
+def _get_fabric_physics_str(fabric: Optional[str]) -> str:
+    """Map a fabric string (not an analysis object) to physics description."""
+    if not fabric:
+        return ""
+    f = fabric.lower().strip()
+    for key, prompt in _FABRIC_PHYSICS.items():
+        if key in f:
+            return prompt
+    return ""
+
+
+def _apply_quality_layers(
+    core_prompt: str,
+    meta: Optional[dict] = None,
+    max_len: int = 512,
+) -> str:
+    """Layer quality anchors onto an existing shot prompt from any mode.
+
+    Layer order (front → back):
+      [GARMENT LOCK ...] {core_prompt} {fabric physics} {micro actions} {style bible}
+
+    The core_prompt (whatever the mode built — HEM_LOCK, @Element tokens,
+    scene description, etc.) is preserved verbatim. Quality layers are wrapped
+    around it. If budget is tight, optional suffix layers are dropped in this
+    priority order (first to drop first): micro actions → physics → style bible.
+    The garment anchor is ALWAYS kept as it carries the fabric/description lock.
+    """
+    core = core_prompt.strip()
+    anchor = _build_meta_anchor(meta) if meta else ""
+    fabric_val = (meta or {}).get("fabric", "")
+    physics = _get_fabric_physics_str(fabric_val) if fabric_val else ""
+
+    # Start with mandatory content (anchor + core)
+    used = 0
+    parts: list[str] = []
+    if anchor:
+        parts.append(anchor)
+        used += len(anchor) + 1
+    parts.append(core)
+    used += len(core) + 1
+
+    # Try to add suffix layers in reverse-priority order
+    # (style bible last so it's added first since we reserve it highest priority among suffix)
+    suffix_candidates = [
+        ("style_bible", _STYLE_BIBLE),
+        ("physics", physics),
+        ("micro", _MICRO_ACTIONS_SHORT),
+    ]
+    for _key, layer in suffix_candidates:
+        if not layer:
+            continue
+        if used + len(layer) + 1 <= max_len:
+            parts.append(layer)
+            used += len(layer) + 1
+
+    combined = " ".join(parts)
+    return combined[:max_len]
+
 
 # 6. COMPOSITE PROMPT BUILDER — combines all layers for Kling shot prompts
 def _build_enhanced_prompt(
@@ -732,6 +891,28 @@ async def run_pipeline(
                         for p in multi_prompt_custom
                     ]
 
+                # Resolve garment meta (library lookup on front_url) + fabric-specific negatives
+                _custom_meta = await _resolve_garment_meta_from_url(front_url, analysis=None)
+                _custom_fabric_neg = _get_fabric_negative(_custom_meta.get("fabric"))
+                if _custom_fabric_neg:
+                    _custom_negative = _custom_negative + ", " + _custom_fabric_neg
+                logger.info("[%s] Custom garment meta: fabric=%r desc=%s",
+                            job_id, _custom_meta.get("fabric"),
+                            (_custom_meta.get("description") or "")[:60])
+
+                # Wrap each shot with 7-layer quality anchors
+                multi_prompt_custom = [
+                    {
+                        "duration": p["duration"],
+                        "prompt": _apply_quality_layers(
+                            core_prompt=str(p["prompt"]),  # type: ignore[index]
+                            meta=_custom_meta,
+                            max_len=512,
+                        ),
+                    }
+                    for p in multi_prompt_custom
+                ]
+
                 _update_job(job_id, progress=65, message="Video üretiliyor (özel mod)...")
                 fal_start_url = await _to_fal_url(fal_front_url)
 
@@ -800,6 +981,28 @@ async def run_pipeline(
                     total_duration=custom_total_duration,
                     start_frame_url=fal_ozel_start,
                 )
+
+            # Resolve garment meta (library lookup on front_url) + fabric negatives
+            _ozel_meta = await _resolve_garment_meta_from_url(front_url, analysis=None)
+            _ozel_fabric_neg = _get_fabric_negative(_ozel_meta.get("fabric"))
+            if _ozel_fabric_neg:
+                _ozel_negative = _ozel_negative + ", " + _ozel_fabric_neg
+            logger.info("[%s] Ozel garment meta: fabric=%r desc=%s",
+                        job_id, _ozel_meta.get("fabric"),
+                        (_ozel_meta.get("description") or "")[:60])
+
+            # Wrap each shot with 7-layer quality anchors
+            ozel_shots = [
+                {
+                    "duration": s["duration"],
+                    "prompt": _apply_quality_layers(
+                        core_prompt=str(s["prompt"]),  # type: ignore[index]
+                        meta=_ozel_meta,
+                        max_len=512,
+                    ),
+                }
+                for s in ozel_shots
+            ]
 
             total_ozel_dur = sum(int(p["duration"]) for p in ozel_shots)
 
@@ -912,25 +1115,39 @@ async def run_pipeline(
                     {"duration": 5, "prompt": f"{_element_prefix} In the {scene_anchor}, model turns gracefully showing the full garment silhouette from a 3/4 angle, skirt fabric remains sealed and closed throughout"},
                 ]
 
-            # Enforce hem/slit lock + garment-specific constraint on every studio shot.
-            # INJECT between @ElementN prefix and shot description so the constraint is
-            # never truncated. Old approach (append after 480-char desc then cut to 512)
-            # left only ~32 chars of _HEM_LOCK — "NO front slit" never reached the model.
+            # Resolve garment meta from library for element[0] (primary garment).
+            # This pulls user-authored fabric + description so the quality layers
+            # (anchor, physics, fabric-negative) can lock the correct material.
+            _studio_primary_url = kling_elements[0].get("original_front_url") or front_url
+            _studio_meta = await _resolve_garment_meta_from_url(_studio_primary_url, analysis=None)
+            logger.info("[%s] Studio garment meta: fabric=%r name=%r desc=%s",
+                        job_id, _studio_meta.get("fabric"), _studio_meta.get("name"),
+                        (_studio_meta.get("description") or "")[:60])
+
+            # Fabric-specific negative additions (e.g. silk → block "satin sheen")
+            _studio_fabric_neg = _get_fabric_negative(_studio_meta.get("fabric"))
+            if _studio_fabric_neg:
+                _studio_negative = _studio_negative + ", " + _studio_fabric_neg
+
+            # Enforce hem/slit lock + garment-specific constraint on every studio shot,
+            # then wrap with 7-layer quality anchors (garment lock + physics + style bible).
             _gc = str(garment_constraint) if garment_constraint else ""
-            _gc_short = _gc[:80] if _gc else ""  # type: ignore[index]  # cap garment analysis so slit lock always fits
+            _gc_short = _gc[:80] if _gc else ""  # type: ignore[index]
             _slit_infix = _HEM_LOCK_SHORT + (" " + _gc_short if _gc_short else "")  # ≤ 172 chars
             _locked: list = []
             for _s in studio_shots:
                 desc = str(_s["prompt"])
                 # desc = "@Element1 [@Element2 ...] <shot description>"
                 _after_elem = desc[len(_element_prefix):].strip()  # type: ignore[index]
-                _prefix_with_lock = f"{_element_prefix} {_slit_infix}"
-                _remaining = 512 - len(_prefix_with_lock) - 1
-                if _remaining > 10:
-                    _combined = f"{_prefix_with_lock} {_after_elem[:_remaining]}"  # type: ignore[index]
-                else:
-                    _combined = _prefix_with_lock[:512]  # type: ignore[index]
-                _locked.append({"duration": _s["duration"], "prompt": _combined[:512]})  # type: ignore[index]
+                # Core: element tokens + hem/slit lock + shot description
+                _core_raw = f"{_element_prefix} {_slit_infix} {_after_elem}".strip()
+                # Apply quality layers (garment anchor prepended, style bible appended)
+                _enhanced = _apply_quality_layers(
+                    core_prompt=_core_raw,
+                    meta=_studio_meta,
+                    max_len=512,
+                )
+                _locked.append({"duration": _s["duration"], "prompt": _enhanced})  # type: ignore[index]
             studio_shots = _locked
 
             total_studio_dur = sum(int(p["duration"]) for p in studio_shots)
@@ -1003,6 +1220,20 @@ async def run_pipeline(
                 no_train_note = _HEM_LOCK
                 kling_negative = _BASE_NEGATIVE + _TRAIN_NEGATIVE
 
+                # Library lookup: user may have tagged fabric on the library item
+                # even though GPT analysis is skipped. Apply fabric-specific negatives.
+                _classic_lib_row = None
+                try:
+                    from services.library_service import get_item_by_url as _get_item_by_url
+                    _classic_lib_row = await _get_item_by_url(front_url)
+                except Exception:
+                    pass
+                if _classic_lib_row and _classic_lib_row.get("fabric"):
+                    _fab_neg = _get_fabric_negative(str(_classic_lib_row["fabric"]))
+                    if _fab_neg:
+                        kling_negative = kling_negative + ", " + _fab_neg
+                        logger.info("[%s] Fabric negative (user-prompts path): %s", job_id, _fab_neg[:60])
+
                 # Build a synthetic scene_prompt from user shots
                 from models import DefileShotConfig as _DSC  # noqa: F811
                 scene_prompt = MultiScenePrompt(
@@ -1033,6 +1264,32 @@ async def run_pipeline(
                 no_train_note = _HEM_LOCK if has_train else f"{_HEM_LOCK} No train."
                 kling_negative = _BASE_NEGATIVE if has_train else _BASE_NEGATIVE + _TRAIN_NEGATIVE
                 logger.info("[%s] Train detected: %s", job_id, has_train)
+
+                # Library override: if the user uploaded this garment to library
+                # and tagged fabric/description, those user-authored values beat the
+                # GPT analysis (which can mis-read AI-generated garments).
+                _classic_lib_row = None
+                try:
+                    from services.library_service import get_item_by_url as _get_item_by_url
+                    _classic_lib_row = await _get_item_by_url(front_url)
+                except Exception:
+                    pass
+                if _classic_lib_row:
+                    if _classic_lib_row.get("fabric"):
+                        analysis.fabric = str(_classic_lib_row["fabric"])
+                        logger.info("[%s] Library fabric override: %r", job_id, analysis.fabric)
+                    if _classic_lib_row.get("description"):
+                        # Append user description to analysis.description_en so it
+                        # flows through all downstream prompts (NB Pro, GPT, _build_enhanced_prompt).
+                        _user_desc = str(_classic_lib_row["description"])
+                        analysis.description_en = (analysis.description_en or "") + " " + _user_desc
+                        logger.info("[%s] Library description added: %s", job_id, _user_desc[:80])
+
+                # Fabric-specific negative prompt (blocks wrong-material drift)
+                _classic_fab_neg = _get_fabric_negative(getattr(analysis, "fabric", ""))
+                if _classic_fab_neg:
+                    kling_negative = kling_negative + ", " + _classic_fab_neg
+                    logger.info("[%s] Fabric negative applied: %s", job_id, _classic_fab_neg[:60])
 
                 _update_job(job_id, status=JobStatus.GENERATING_PROMPTS, progress=20, message="Sahneler planlanıyor...")
                 logger.info("[%s] Step 2 – Generating multi-scene prompts (duration=%ds, scenes=%d)", job_id, duration, scene_count)
@@ -1659,10 +1916,31 @@ async def run_defile_collection_pipeline(
                 logger.info("[%s] Outfit %d/%d prompts: %d shots, %ds total",
                             job_id, outfit_idx + 1, n_outfits, len(multi_prompt), total_duration)
 
-            # Front-load hem/slit constraint so it's never truncated at Kling's 512-char limit.
-            _defile_rem = 512 - len(_HEM_LOCK_SHORT) - 1
+            # Resolve outfit garment meta from library (fabric + user description)
+            _defile_meta = await _resolve_garment_meta_from_url(outfit.front_url, analysis=None)
+            logger.info("[%s] Defile outfit %d meta: fabric=%r desc=%s",
+                        job_id, outfit_idx + 1,
+                        _defile_meta.get("fabric"),
+                        (_defile_meta.get("description") or "")[:60])
+
+            # Per-outfit dynamic negative prompt — base + fabric-specific additions
+            _defile_outfit_neg = _DEFILE_NEGATIVE
+            _defile_fabric_neg = _get_fabric_negative(_defile_meta.get("fabric"))
+            if _defile_fabric_neg:
+                _defile_outfit_neg = _defile_outfit_neg + ", " + _defile_fabric_neg
+
+            # Front-load hem/slit constraint + wrap with quality layers.
+            # The quality layer wrapper prepends a short [GARMENT LOCK: ...] anchor
+            # (carrying user-authored fabric+description) and appends physics + style bible.
             multi_prompt = [
-                {"duration": p["duration"], "prompt": (_HEM_LOCK_SHORT + " " + str(p["prompt"])[:_defile_rem])[:512]}  # type: ignore[index]
+                {
+                    "duration": p["duration"],
+                    "prompt": _apply_quality_layers(
+                        core_prompt=f"{_HEM_LOCK_SHORT} {str(p['prompt'])}",  # type: ignore[index]
+                        meta=_defile_meta,
+                        max_len=512,
+                    ),
+                }
                 for p in multi_prompt
             ]
 
@@ -1764,7 +2042,7 @@ async def run_defile_collection_pipeline(
                     aspect_ratio=request.aspect_ratio,
                     generate_audio=request.generate_audio,
                     element_list=_kling_elem_list,
-                    negative_prompt=_DEFILE_NEGATIVE,
+                    negative_prompt=_defile_outfit_neg,
                 )
             else:
                 clip_url = await generate_multishot_video(
@@ -1774,7 +2052,7 @@ async def run_defile_collection_pipeline(
                     aspect_ratio=request.aspect_ratio,
                     generate_audio=request.generate_audio,
                     elements=kling_outfit_elements,
-                    negative_prompt=_DEFILE_NEGATIVE,
+                    negative_prompt=_defile_outfit_neg,
                 )
 
             clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")

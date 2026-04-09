@@ -33,6 +33,8 @@ async def list_items(category: str = None, user: dict = Depends(get_current_user
 async def upload_item(
     name: str = Form(...),
     category: str = Form(...),
+    fabric: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
     file: UploadFile = File(...),
     file2: Optional[UploadFile] = File(None),
     file3: Optional[UploadFile] = File(None),
@@ -67,6 +69,8 @@ async def upload_item(
         primary_content_type=file.content_type or "image/jpeg",
         primary_ext=ext,
         extra_files=extra_files,
+        fabric=fabric,
+        description=description,
     )
 
 

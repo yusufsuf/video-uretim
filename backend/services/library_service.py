@@ -41,12 +41,19 @@ async def add_item(
     primary_content_type: str,
     primary_ext: str,
     extra_files: list = [],  # [(bytes, content_type, ext), ...]
+    fabric: Optional[str] = None,
+    description: Optional[str] = None,
 ) -> dict:
     """Upload images to Supabase Storage and insert a record into library_items.
 
     extra_files: list of (bytes, content_type, ext) tuples for side/back/additional images.
     For character: extra_files[0]=side, extra_files[1]=back.
     For background: extra_files[0..2] = additional background images.
+
+    fabric: optional fabric type (silk, satin, chiffon, denim, ...). Used to
+      drive fabric physics layer in prompt builder and fabric-specific negatives.
+    description: optional free-text garment description (e.g. "thin straps, V-neck,
+      ivory tone, matte finish"). Injected into garment anchor layer at render time.
     """
     primary_path = f"{user_id}/{uuid.uuid4().hex}{primary_ext}"
 
@@ -78,16 +85,24 @@ async def add_item(
         extra_urls.append(_get_url(epath))
         extra_storage_paths.append(epath)
 
+    _row: dict = {
+        "user_id": user_id,
+        "name": name,
+        "category": category,
+        "image_url": image_url,
+        "storage_path": primary_path,
+        "extra_urls": extra_urls,
+        "extra_storage_paths": extra_storage_paths,
+    }
+    # Only include fabric/description if provided — keeps existing schema compatible
+    # if the columns haven't been migrated yet.
+    if fabric:
+        _row["fabric"] = fabric.strip()[:64]
+    if description:
+        _row["description"] = description.strip()[:500]
+
     def _insert():
-        return _db().table("library_items").insert({
-            "user_id": user_id,
-            "name": name,
-            "category": category,
-            "image_url": image_url,
-            "storage_path": primary_path,
-            "extra_urls": extra_urls,
-            "extra_storage_paths": extra_storage_paths,
-        }).execute()
+        return _db().table("library_items").insert(_row).execute()
 
     try:
         res = await asyncio.to_thread(_insert)  # type: ignore[arg-type]

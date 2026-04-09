@@ -713,6 +713,30 @@
                     <option value="Effects">Efekt</option>
                     <option value="Others">Diğer</option>
                 </select>
+                <select id="create-elem-fabric" class="form-input" style="margin-top:8px">
+                    <option value="">Kumaş türü (opsiyonel)</option>
+                    <option value="silk">İpek (Silk)</option>
+                    <option value="satin">Saten (Satin)</option>
+                    <option value="chiffon">Şifon (Chiffon)</option>
+                    <option value="organza">Organze (Organza)</option>
+                    <option value="tulle">Tül (Tulle)</option>
+                    <option value="lace">Dantel (Lace)</option>
+                    <option value="velvet">Kadife (Velvet)</option>
+                    <option value="denim">Denim / Kot</option>
+                    <option value="leather">Deri (Leather)</option>
+                    <option value="cotton">Pamuk (Cotton)</option>
+                    <option value="linen">Keten (Linen)</option>
+                    <option value="wool">Yün (Wool)</option>
+                    <option value="tweed">Tüvit (Tweed)</option>
+                    <option value="jersey">Jersey / Örgü</option>
+                    <option value="crepe">Krep (Crepe)</option>
+                    <option value="brocade">Brokar (Brocade)</option>
+                    <option value="sequin">Payet (Sequin)</option>
+                    <option value="polyester">Polyester</option>
+                </select>
+                <textarea id="create-elem-description" class="form-input" rows="3"
+                    placeholder="Kumaş ve genel özellikler — örn: ince askılı, V yaka, ipek karışımı, mat finish, arkası açık..."
+                    style="margin-top:8px;resize:vertical;font-family:inherit"></textarea>
             </div>
             <div class="studio-create-footer">
                 <button id="studio-create-save-btn" class="wizard-btn-primary" disabled>Kaydet ve Seç</button>
@@ -720,7 +744,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=23"></script>
+    <script src="app.js?v=24"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');
