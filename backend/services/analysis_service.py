@@ -1109,6 +1109,45 @@ async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
     return descriptions[: len(request.shots)]
 
 
+async def translate_garment_description(user_description: str) -> str:
+    """Translate any-language garment description into concise English.
+
+    Returns up to ~25 words of English text suitable for embedding in a
+    [FABRIC LOCK: ...] Kling prompt anchor. Falls back to input on error.
+    """
+    if not user_description or not user_description.strip():
+        return user_description
+    # Fast path: ASCII-only = likely already English
+    if all(ord(c) < 128 for c in user_description):
+        return user_description
+
+    system = (
+        "You translate fashion garment descriptions into concise English for AI "
+        "video prompts. Output maximum 25 words describing fabric, cut, color, "
+        "silhouette and key visual details only. Plain text, no quotes, no prefixes."
+    )
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_description.strip()},
+            ],
+            max_tokens=80,
+            temperature=0.2,
+        )
+        translated = (resp.choices[0].message.content or "").strip()
+        # Strip surrounding quotes if any
+        if translated and translated[0] in ('"', "'") and translated[-1] in ('"', "'"):
+            translated = translated[1:-1].strip()
+        logger.info("Garment desc translated: %s → %s",
+                    user_description[:60], translated[:80])
+        return translated if translated else user_description
+    except Exception as e:
+        logger.warning("translate_garment_description failed (%s) — using raw input", e)
+        return user_description
+
+
 async def translate_studio_shot_description(
     user_description: str,
     scene_anchor: str,

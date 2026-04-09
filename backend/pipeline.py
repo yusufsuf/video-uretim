@@ -309,11 +309,13 @@ _MICRO_ACTIONS = (
 # 5b. STYLE BIBLE — consistent style sentence appended to EVERY shot prompt.
 # Research: repeating a short, identical "style bible" across all shots of a
 # multi-shot render measurably reduces color/lighting drift between cuts.
-# Keep it short (≈ 140 chars) so it never eats the 512-char per-shot budget.
+# Two versions: full (~128 chars) used when budget allows, short (~62 chars)
+# for tight budgets like Defile where HEM_LOCK + GPT text already eat space.
 _STYLE_BIBLE = (
     "Style: high-end fashion editorial, cinematic color grading, "
     "shallow depth of field, photorealistic skin, consistent lighting."
 )
+_STYLE_BIBLE_SHORT = "Style: cinematic editorial, photoreal skin, consistent light."
 
 # 5c. SHORTER MICRO-ACTIONS — for modes where budget is tight (Defile/Studio).
 _MICRO_ACTIONS_SHORT = "Subtle breathing, fabric settles naturally with gravity."
@@ -387,7 +389,12 @@ async def _resolve_garment_meta_from_url(
     front_url: Optional[str],
     analysis=None,
 ) -> dict:
-    """Fetch library metadata for a garment URL + merge with analysis."""
+    """Fetch library metadata for a garment URL + merge with analysis.
+
+    Also translates non-English (e.g. Turkish) descriptions into concise
+    English before they flow into prompt anchors, so Kling never sees raw
+    Turkish text which it cannot parse visually.
+    """
     lib_row = None
     if front_url:
         try:
@@ -395,25 +402,76 @@ async def _resolve_garment_meta_from_url(
             lib_row = await get_item_by_url(front_url)
         except Exception as _exc:
             logger.debug("Library lookup failed for %s: %s", str(front_url)[:60], _exc)
-    return _make_garment_meta(analysis=analysis, lib_row=lib_row)
+    meta = _make_garment_meta(analysis=analysis, lib_row=lib_row)
+    desc = meta.get("description") or ""
+    if desc:
+        try:
+            translated = await _ensure_english_description(desc)
+            if translated:
+                meta["description"] = translated
+        except Exception as _exc:
+            logger.debug("Description translation failed: %s", _exc)
+    return meta
 
 
-def _build_meta_anchor(meta: Optional[dict]) -> str:
-    """Build a short garment anchor (≤ 150 chars) from unified meta."""
+def _build_meta_anchor(meta: Optional[dict], max_len: int = 100) -> str:
+    """Build a terse fabric/description lock anchor (≤ max_len chars).
+
+    Priority: fabric is the key signal; description is the accent.
+    Element name (user-chosen label like "Elbise1" or "test-outfit") is
+    deliberately EXCLUDED — it's noise that leaks into prompts and confuses
+    Kling without adding any visual information.
+    """
     if not meta:
         return ""
-    bits: list[str] = []
-    if meta.get("color"):
-        bits.append(meta["color"])
-    if meta.get("fabric"):
-        bits.append(meta["fabric"])
-    if meta.get("name"):
-        bits.append(meta["name"])
-    anchor_core = " ".join(bits).strip() or "garment"
+    fabric = (meta.get("fabric") or "").strip()
     desc = (meta.get("description") or "").strip()
+    color = (meta.get("color") or "").strip()
+
+    if not fabric and not desc and not color:
+        return ""
+
+    # Start with fabric (most important signal for rendering)
+    if fabric:
+        head = fabric
+        if color:
+            head = f"{color} {head}"
+        prefix = f"[FABRIC LOCK: {head}"
+        # Room left after "]" closing bracket
+        desc_budget = max_len - len(prefix) - 4  # "— ]"
+        if desc and desc_budget > 10:
+            desc_short = desc[:desc_budget].rstrip().rstrip(",.;:")
+            return f"{prefix} — {desc_short}]"
+        return f"{prefix}]"
+
+    # No fabric — use description (or color) as outfit tag
     if desc:
-        anchor_core = f"{anchor_core}, {desc[:60]}"
-    return f"[GARMENT LOCK: {anchor_core[:110]}. Exact silhouette and fabric preserved.]"
+        body = f"{color} — {desc}" if color else desc
+        desc_budget = max_len - len("[OUTFIT: ]")
+        body_short = body[:desc_budget].rstrip().rstrip(",.;:")
+        return f"[OUTFIT: {body_short}]"
+
+    if color:
+        return f"[OUTFIT: {color[:max_len - 10]}]"
+    return ""
+
+
+def _smart_truncate(text: str, max_len: int) -> str:
+    """Truncate at the last sentence/word boundary within max_len — never mid-word.
+
+    Tries sentence boundaries first (. ! ?), then commas, then any whitespace.
+    Falls back to a hard cut only if no boundary exists in the latter 70% of
+    the budget (preventing too-aggressive loss of content).
+    """
+    if len(text) <= max_len:
+        return text
+    head = text[:max_len]
+    soft_floor = int(max_len * 0.7)
+    for sep in [". ", "! ", "? ", ", ", "; ", " "]:
+        idx = head.rfind(sep)
+        if idx >= soft_floor:
+            return head[:idx + len(sep)].rstrip()
+    return head  # fallback: hard cut (rare)
 
 
 def _get_fabric_physics_str(fabric: Optional[str]) -> str:
@@ -432,47 +490,113 @@ def _apply_quality_layers(
     meta: Optional[dict] = None,
     max_len: int = 512,
 ) -> str:
-    """Layer quality anchors onto an existing shot prompt from any mode.
+    """Layer quality anchors onto an existing shot prompt without truncating
+    the core mid-sentence.
 
-    Layer order (front → back):
-      [GARMENT LOCK ...] {core_prompt} {fabric physics} {micro actions} {style bible}
+    The core_prompt (HEM_LOCK + GPT shot description, @Element tokens, etc.)
+    is the most important signal for the model. It is ALWAYS preserved in full
+    if it fits, otherwise trimmed at a sentence/word boundary — never mid-word.
 
-    The core_prompt (whatever the mode built — HEM_LOCK, @Element tokens,
-    scene description, etc.) is preserved verbatim. Quality layers are wrapped
-    around it. If budget is tight, optional suffix layers are dropped in this
-    priority order (first to drop first): micro actions → physics → style bible.
-    The garment anchor is ALWAYS kept as it carries the fabric/description lock.
+    Strategy (priority order — highest first):
+      1. Core prompt — sacred, never cut mid-word
+      2. [FABRIC LOCK: ...] prefix — carries user-authored fabric/desc
+      3. Style Bible short — cross-shot consistency
+      4. Fabric physics — material behaviour
+      5. Micro actions — realism details
+
+    If space runs out, layers are dropped starting from the bottom of the
+    priority list. The full Style Bible is preferred over the short one
+    when there's room.
     """
     core = core_prompt.strip()
-    anchor = _build_meta_anchor(meta) if meta else ""
+    anchor = _build_meta_anchor(meta, max_len=100) if meta else ""
     fabric_val = (meta or {}).get("fabric", "")
     physics = _get_fabric_physics_str(fabric_val) if fabric_val else ""
 
-    # Start with mandatory content (anchor + core)
-    used = 0
-    parts: list[str] = []
-    if anchor:
-        parts.append(anchor)
-        used += len(anchor) + 1
-    parts.append(core)
-    used += len(core) + 1
+    # Pick the longest style bible that will plausibly fit.
+    # If core alone is already tight, prefer the short version.
+    core_budget_pressure = len(core) + len(anchor) + 2
+    preferred_style = _STYLE_BIBLE if core_budget_pressure < 350 else _STYLE_BIBLE_SHORT
 
-    # Try to add suffix layers in reverse-priority order
-    # (style bible last so it's added first since we reserve it highest priority among suffix)
-    suffix_candidates = [
-        ("style_bible", _STYLE_BIBLE),
-        ("physics", physics),
-        ("micro", _MICRO_ACTIONS_SHORT),
+    # Build the layer stack in priority order (drop from tail when over budget)
+    layers: list[tuple[str, str]] = [
+        ("core", core),
     ]
-    for _key, layer in suffix_candidates:
-        if not layer:
-            continue
-        if used + len(layer) + 1 <= max_len:
-            parts.append(layer)
-            used += len(layer) + 1
+    if anchor:
+        layers.insert(0, ("anchor", anchor))  # prepend
+    if preferred_style:
+        layers.append(("style_bible", preferred_style))
+    if physics:
+        layers.append(("physics", physics))
+    layers.append(("micro", _MICRO_ACTIONS_SHORT))
 
-    combined = " ".join(parts)
-    return combined[:max_len]
+    # Keep dropping from the tail (lowest priority) until we fit
+    def _assemble(ls: list[tuple[str, str]]) -> str:
+        return " ".join(text for _, text in ls)
+
+    while len(_assemble(layers)) > max_len and len(layers) > 2:
+        layers.pop()  # drop last (lowest priority) layer
+
+    # If dropping optional layers still isn't enough, swap full Style Bible
+    # for the short version (if present)
+    if len(_assemble(layers)) > max_len:
+        for i, (key, _txt) in enumerate(layers):
+            if key == "style_bible":
+                layers[i] = ("style_bible", _STYLE_BIBLE_SHORT)
+                break
+
+    # Last resort: drop style bible entirely
+    if len(_assemble(layers)) > max_len:
+        layers = [(k, t) for k, t in layers if k != "style_bible"]
+
+    # If we STILL don't fit, it's because anchor + core is too long.
+    # Trim the core at a word boundary (anchor stays intact as it carries fabric lock).
+    if len(_assemble(layers)) > max_len:
+        over = len(_assemble(layers)) - max_len
+        for i, (key, text) in enumerate(layers):
+            if key == "core":
+                trimmed = _smart_truncate(text, len(text) - over - 2)
+                layers[i] = ("core", trimmed)
+                break
+
+    result = _assemble(layers)
+    # Absolute safety net — if somehow still over, smart-truncate the whole thing
+    if len(result) > max_len:
+        result = _smart_truncate(result, max_len)
+    return result
+
+
+# ─── Translation cache for garment descriptions ──────────────────────────────
+# In-process cache so we don't re-translate the same user description on every
+# Defile outfit or Studio shot. Key: raw description, Value: English version.
+_DESC_TRANSLATION_CACHE: dict[str, str] = {}
+
+
+async def _ensure_english_description(desc: Optional[str]) -> Optional[str]:
+    """Translate a garment description to English if not already ASCII.
+
+    Caches results in-process to avoid repeat API calls during a single
+    Defile run with multiple outfits sharing the same description.
+    Falls back to the original text on any error.
+    """
+    if not desc:
+        return desc
+    stripped = desc.strip()
+    if not stripped:
+        return desc
+    # Fast path: already ASCII → assume English, skip translation
+    if all(ord(c) < 128 for c in stripped):
+        return stripped
+    if stripped in _DESC_TRANSLATION_CACHE:
+        return _DESC_TRANSLATION_CACHE[stripped]
+    try:
+        from services.analysis_service import translate_garment_description
+        translated = await translate_garment_description(stripped)
+        _DESC_TRANSLATION_CACHE[stripped] = translated
+        return translated
+    except Exception as _exc:
+        logger.debug("Description translation skipped: %s", _exc)
+        return stripped
 
 
 # 6. COMPOSITE PROMPT BUILDER — combines all layers for Kling shot prompts
