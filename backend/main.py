@@ -393,7 +393,7 @@ async def studio_ai_shots_endpoint(
 class ParseScenarioRequest(BaseModel):
     text: str
     shot_count: int = 4
-    default_duration: int = 5
+    total_duration: int = 15
 
 
 @app.post("/api/studio/parse-scenario")
@@ -408,7 +408,7 @@ async def parse_studio_scenario_endpoint(
     shots = await parse_studio_scenario_text(
         text=body.text,
         shot_count=max(1, min(5, body.shot_count)),
-        default_duration=max(3, min(10, body.default_duration)),
+        total_duration=max(3, min(15, body.total_duration)),
     )
     return {"shots": shots}
 

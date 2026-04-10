@@ -1552,7 +1552,7 @@ async function parseStudioScenario() {
     if (!text) { alert("Lütfen bir senaryo metni girin."); return; }
 
     const shotCount = parseInt(document.getElementById("studio-parse-shot-count")?.value || "4");
-    const defaultDur = parseInt(document.getElementById("studio-parse-duration")?.value || "5");
+    const totalDur = parseInt(document.getElementById("studio-parse-duration")?.value || "15");
 
     const btn = document.getElementById("studio-parse-btn");
     if (btn) { btn.disabled = true; btn.textContent = "Analiz ediliyor..."; }
@@ -1561,13 +1561,13 @@ async function parseStudioScenario() {
         const resp = await fetch(`${API_BASE}/api/studio/parse-scenario`, {
             method: "POST",
             headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
-            body: JSON.stringify({ text, shot_count: shotCount, default_duration: defaultDur }),
+            body: JSON.stringify({ text, shot_count: shotCount, total_duration: totalDur }),
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
         studioShots = (data.shots || []).map(s => ({
             description: s.description || "",
-            duration: parseInt(s.duration) || defaultDur,
+            duration: parseInt(s.duration) || 5,
         }));
         renderStudioShots();
         toggleStudioInputMode("shots");

@@ -1328,7 +1328,7 @@ async def translate_studio_shot_description(
 async def parse_studio_scenario_text(
     text: str,
     shot_count: int = 4,
-    default_duration: int = 5,
+    total_duration: int = 15,
 ) -> list[dict]:
     """Parse a free-form scenario/script text into individual studio shot configs.
 
@@ -1339,31 +1339,32 @@ async def parse_studio_scenario_text(
     Args:
         text: Raw scenario text from the user (e.g. "0–3 sec: Close shot...")
         shot_count: Desired number of output shots (1–5)
-        default_duration: Duration (seconds) to assign when text has no timing markers
+        total_duration: Total video duration in seconds (3–15)
 
     Returns:
         List of exactly shot_count dicts: [{description: str, duration: int}]
     """
-    system = """You are a cinematic video shot designer for luxury fashion films.
+    system = f"""You are a cinematic video shot designer for luxury fashion films.
 The user provides a scenario script (any language, any format). Your job is to convert it into individual shot descriptions for Kling 3.0 Pro multishot generation.
 
 RULES:
 - Output exactly the requested number of shots
 - Each shot: a concise English cinematic description (camera angle + model movement + mood), max 480 characters
-- Extract duration from time markers if present (e.g. "0–3 sec" = 3s, "3–7 sec" = 4s)
-- If no timing markers, use the default_duration for all shots
+- The TOTAL duration across all shots MUST equal exactly {total_duration} seconds
+- Distribute the total duration across shots intelligently — vary shot lengths based on content (action shots shorter, detail shots longer) but the sum MUST be {total_duration}s
+- If the text contains time markers (e.g. "0–3 sec", "3–7 sec"), use those to calculate per-shot durations
 - Duration per shot: minimum 3s, maximum 10s
 - Do NOT include location/background details — focus on model movement, camera angle, framing, pace, and mood
 - Do NOT include garment geometry enforcement phrases (no "closed skirt", "no slit", etc.)
 - Do NOT add spectators, crowd, or crew
 
 Return a JSON object:
-{"shots": [{"description": "...", "duration": 4}, {"description": "...", "duration": 3}]}"""
+{{"shots": [{{"description": "...", "duration": 4}}, {{"description": "...", "duration": 3}}]}}"""
 
     user_msg = (
         f"Scenario text:\n{text}\n\n"
         f"Required shots: {shot_count}\n"
-        f"Default duration (if no timing in text): {default_duration}s\n\n"
+        f"Total video duration: {total_duration}s (distribute across the {shot_count} shots)\n\n"
         "Parse this into the shot array."
     )
 
@@ -1383,23 +1384,32 @@ Return a JSON object:
         shots = parsed.get("shots") or parsed.get("Shots") or []
 
         # Enforce shot count, clamp duration, ensure required keys
+        fallback_dur = max(3, min(10, total_duration // shot_count))
         result = []
         for i in range(shot_count):
             if i < len(shots):
                 s = shots[i]
-                dur = max(3, min(10, int(s.get("duration") or default_duration)))
+                dur = max(3, min(10, int(s.get("duration") or fallback_dur)))
                 desc = str(s.get("description") or "").strip()
             else:
-                dur = default_duration
+                dur = fallback_dur
                 desc = f"Cinematic fashion shot {i + 1}, model elegant movement, warm editorial light."
             result.append({"description": desc, "duration": dur})
 
-        logger.info("parse_studio_scenario_text: %d shots from %d chars of input", len(result), len(text))
+        # Ensure total matches requested total_duration (adjust last shot)
+        current_total = sum(r["duration"] for r in result)
+        if current_total != total_duration and result:
+            diff = total_duration - current_total
+            result[-1]["duration"] = max(3, min(10, result[-1]["duration"] + diff))
+
+        logger.info("parse_studio_scenario_text: %d shots, %ds total from %d chars of input",
+                     len(result), sum(r["duration"] for r in result), len(text))
         return result
     except Exception as exc:
         logger.warning("parse_studio_scenario_text failed (%s) — returning generic shots", exc)
+        fallback_dur = max(3, min(10, total_duration // shot_count))
         return [
-            {"description": f"Cinematic fashion shot {i + 1}, model poised movement, luxury editorial.", "duration": default_duration}
+            {"description": f"Cinematic fashion shot {i + 1}, model poised movement, luxury editorial.", "duration": fallback_dur}
             for i in range(shot_count)
         ]
 

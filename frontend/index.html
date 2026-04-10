@@ -623,11 +623,11 @@
                                     style="width:52px;padding:4px 6px;font-size:0.75rem;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);text-align:center;font-family:inherit">
                             </div>
                             <div style="display:flex;align-items:center;gap:6px">
-                                <label style="font-size:0.72rem;color:var(--text-secondary)">Varsayılan Süre</label>
-                                <input id="studio-parse-duration" type="range" min="3" max="10" value="5"
+                                <label style="font-size:0.72rem;color:var(--text-secondary)">Toplam Süre</label>
+                                <input id="studio-parse-duration" type="range" min="3" max="15" value="15"
                                     oninput="document.getElementById('studio-parse-dur-label').textContent=this.value+'s'"
                                     style="width:80px">
-                                <span id="studio-parse-dur-label" style="font-size:0.72rem;color:var(--text-primary);font-weight:600;min-width:24px">5s</span>
+                                <span id="studio-parse-dur-label" style="font-size:0.72rem;color:var(--text-primary);font-weight:600;min-width:24px">15s</span>
                             </div>
                         </div>
                         <button id="studio-parse-btn" onclick="parseStudioScenario()"
