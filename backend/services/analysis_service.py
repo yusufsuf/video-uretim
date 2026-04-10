@@ -1083,7 +1083,7 @@ async def extract_scene_anchor(start_frame_url: str) -> str:
     """Start frame görselinden kısa bir sahne tanımı çıkar (Stüdyo modu için)."""
     try:
         resp = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5.4",
             messages=[{
                 "role": "user",
                 "content": [
@@ -1170,7 +1170,7 @@ async def generate_studio_ai_shots(
 
     try:
         resp = await client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5.4",
             messages=[
                 {
                     "role": "system",
@@ -1219,7 +1219,7 @@ async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
     user_msg = f"Location: {location_str}\n\nShots:\n{shots_text}\n\nWrite a cinematic description for each shot."
 
     response = await client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5.4",
         messages=[
             {"role": "system", "content": SUGGEST_SHOTS_SYSTEM},
             {"role": "user",   "content": user_msg},
@@ -1263,7 +1263,7 @@ async def translate_garment_description(user_description: str) -> str:
     )
     try:
         resp = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5.4",
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_description.strip()},
@@ -1309,7 +1309,7 @@ async def translate_studio_shot_description(
     )
     try:
         resp = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5.4",
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_msg},
@@ -1376,7 +1376,7 @@ Return a JSON object:
 
     try:
         resp = await client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-5.4",
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_msg},
@@ -1452,7 +1452,7 @@ async def analyse_garment_slits(
 
     try:
         resp = await client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5.4",
             messages=[{"role": "user", "content": image_blocks}],
             response_format={"type": "json_object"},
             max_tokens=200,
