@@ -27,11 +27,65 @@ let wfOutfitData = [];
 let wfJobId = null;
 let wfPollInterval = null;
 let wfDebugPayload = null;
+let wfShotArc = null;           // null = random, or arc ID
+let wfShotArcs = [];            // fetched from /api/defile/shot-arcs
+
+// ─── Shot Arc Picker ──────────────────────────────────────────────
+async function fetchWfShotArcs() {
+    try {
+        const resp = await fetch(`${API}/api/defile/shot-arcs`, { headers: authHeaders() });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        wfShotArcs = data.arcs || [];
+        renderWfArcPicker();
+    } catch (e) {
+        console.warn("Shot arcs fetch failed:", e);
+    }
+}
+
+function renderWfArcPicker() {
+    const grid = document.getElementById("wf-arc-grid");
+    if (!grid) return;
+    const cards = [
+        `<button class="defile-arc-card${wfShotArc === null ? ' active' : ''}"
+            onclick="selectWfShotArc(null)">
+            <span class="defile-arc-icon">🎲</span>
+            <span class="defile-arc-name">Otomatik</span>
+        </button>`,
+        ...wfShotArcs.map(a => `
+            <button class="defile-arc-card${wfShotArc === a.id ? ' active' : ''}"
+                onclick="selectWfShotArc('${a.id}')">
+                <span class="defile-arc-name">${a.name}</span>
+            </button>
+        `),
+    ];
+    grid.innerHTML = cards.join("");
+}
+
+function selectWfShotArc(arcId) {
+    wfShotArc = arcId;
+    renderWfArcPicker();
+    const beatsBox = document.getElementById("wf-arc-beats");
+    if (!arcId) {
+        if (beatsBox) beatsBox.style.display = "none";
+        return;
+    }
+    const arc = wfShotArcs.find(a => a.id === arcId);
+    if (!arc) return;
+    if (beatsBox) {
+        beatsBox.style.display = "block";
+        beatsBox.innerHTML = arc.beats
+            .map((b, i) => `<div style="margin-bottom:4px"><strong style="color:var(--text-primary)">${i + 1}.</strong> ${b}</div>`)
+            .join("");
+    }
+}
+window.selectWfShotArc = selectWfShotArc;
 
 // ─── Init ──────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
     loadOutfits();
     renderShotConfigs();
+    fetchWfShotArcs();
 
     document.getElementById("wf-btn-scenario").addEventListener("click", generateScenario);
     document.getElementById("wf-btn-approve-scenario").addEventListener("click", approveScenario);
@@ -168,6 +222,7 @@ async function generateScenario() {
                     background_url: wfBgUrl,
                     aspect_ratio: document.getElementById("wf-aspect").value,
                     director_note: document.getElementById("wf-director-note").value.trim() || null,
+                    shot_arc: wfShotArc,
                 }),
             });
 

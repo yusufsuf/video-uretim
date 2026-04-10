@@ -390,6 +390,13 @@ async def studio_ai_shots_endpoint(
     return {"shots": shots}
 
 
+@app.get("/api/defile/shot-arcs")
+async def defile_shot_arcs(_user: dict = Depends(get_current_user)):
+    """Return available narrative arc templates for the Defile shot picker."""
+    from services.analysis_service import list_defile_shot_arcs
+    return {"arcs": list_defile_shot_arcs()}
+
+
 @app.post("/api/defile/collection", response_model=JobResponse)
 @limiter.limit("10/hour")
 async def defile_collection_endpoint(

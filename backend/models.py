@@ -151,6 +151,7 @@ class DefileCollectionRequest(BaseModel):
     aspect_ratio: str = "9:16"
     generate_audio: bool = True
     provider: str = "fal"  # "fal" = fal.ai | "kling" = Kling Direct
+    shot_arc: Optional[str] = None  # Narrative arc ID (e.g. "classic_approach"). None = random pick
 
 
 class JobStatus(str, Enum):

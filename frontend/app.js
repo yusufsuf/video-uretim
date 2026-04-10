@@ -203,6 +203,71 @@ let defileBgExtraUrls = [];
 let defileAspectRatio = "9:16";
 let defileStartFrameFile = null;
 let defileStartFrameUrl = null;
+let defileShotArc = null;           // null = random, or arc ID string
+let defileShotArcs = [];            // fetched from /api/defile/shot-arcs
+
+// ── Defile Shot Arc Picker ──────────────────────────────────────────
+async function fetchDefileShotArcs() {
+    try {
+        const resp = await fetch(`${API_BASE}/api/defile/shot-arcs`, {
+            headers: getAuthHeaders(),
+        });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        defileShotArcs = data.arcs || [];
+        renderDefileArcPicker();
+    } catch (e) {
+        console.warn("Shot arcs fetch failed:", e);
+    }
+}
+
+function renderDefileArcPicker() {
+    const grid = document.getElementById("defile-arc-grid");
+    if (!grid) return;
+
+    // Auto/random card + fetched arcs
+    const cards = [
+        `<button class="defile-arc-card${defileShotArc === null ? ' active' : ''}"
+            data-arc="auto" onclick="selectDefileShotArc(null)">
+            <span class="defile-arc-icon">🎲</span>
+            <span class="defile-arc-name">Otomatik</span>
+        </button>`,
+        ...defileShotArcs.map(a => `
+            <button class="defile-arc-card${defileShotArc === a.id ? ' active' : ''}"
+                data-arc="${a.id}" onclick="selectDefileShotArc('${a.id}')">
+                <span class="defile-arc-name">${a.name}</span>
+            </button>
+        `),
+    ];
+    grid.innerHTML = cards.join("");
+}
+
+function selectDefileShotArc(arcId) {
+    defileShotArc = arcId;
+    renderDefileArcPicker();
+
+    const label = document.getElementById("defile-arc-selected-label");
+    const beatsBox = document.getElementById("defile-arc-beats");
+
+    if (!arcId) {
+        if (label) label.textContent = "🎲 Otomatik";
+        if (beatsBox) beatsBox.style.display = "none";
+        return;
+    }
+
+    const arc = defileShotArcs.find(a => a.id === arcId);
+    if (!arc) return;
+
+    if (label) label.textContent = arc.name;
+    if (beatsBox) {
+        beatsBox.style.display = "block";
+        beatsBox.innerHTML = arc.beats
+            .map((b, i) => `<div style="margin-bottom:4px"><strong style="color:var(--text-primary)">${i + 1}.</strong> ${b}</div>`)
+            .join("");
+    }
+}
+
+window.selectDefileShotArc = selectDefileShotArc;
 
 // ── Defile Shot Designer ─────────────────────────────────────────────
 const DEFILE_MAX_TOTAL = 15;
@@ -1014,11 +1079,15 @@ function openDefileNB2() {
     videoMode = "defile";
     defileOutfits = [];
     defileShotConfigs = [{ duration: 5, prompt: "" }];
+    defileShotArc = null;
     defileBgUrl = null;
     defileBgExtraUrls = [];
     defileAspectRatio = "9:16";
     defileStartFrameFile = null;
     defileStartFrameUrl = null;
+    // Fetch arcs if not already loaded
+    if (defileShotArcs.length === 0) fetchDefileShotArcs();
+    else renderDefileArcPicker();
 
     const titleEl = document.getElementById("wizard-title");
     if (titleEl) titleEl.textContent = "Defile — Nano Banana Pro";
@@ -1343,6 +1412,7 @@ async function startDefileCollection() {
         aspect_ratio: defileAspectRatio,
         generate_audio: document.getElementById("defile-audio-toggle")?.checked ?? true,
         provider: defileProvider,
+        shot_arc: defileShotArc,
     };
 
     // Capture inputs for post-generation summary

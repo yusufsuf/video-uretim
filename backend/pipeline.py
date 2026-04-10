@@ -2031,6 +2031,7 @@ async def run_defile_collection_pipeline(
                     scene_frame_url=scene_frame_url,
                     shot_configs=shot_configs,
                     outfit_name=outfit_name,
+                    shot_arc_id=getattr(request, "shot_arc", None),
                 )
                 logger.info("[%s] Outfit %d/%d prompts: %d shots, %ds total",
                             job_id, outfit_idx + 1, n_outfits, len(multi_prompt), total_duration)

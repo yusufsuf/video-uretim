@@ -44,6 +44,7 @@ class ScenarioRequest(BaseModel):
     background_url: Optional[str] = None
     aspect_ratio: str = "9:16"
     director_note: Optional[str] = None
+    shot_arc: Optional[str] = None  # Narrative arc ID — None = random
 
 
 class SceneFrameRequest(BaseModel):
@@ -127,6 +128,7 @@ async def generate_scenario(
         shot_configs=shot_configs_typed,
         outfit_name=body.outfit.name or "garment",
         video_description=body.director_note,
+        shot_arc_id=body.shot_arc,
     )
 
     logger.info("Workflow scenario: %d shots generated", len(shots))

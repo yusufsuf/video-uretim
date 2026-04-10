@@ -2414,6 +2414,41 @@ textarea.form-input {
 
 
 
+/* ── Defile Shot Arc Picker ──────────────────────────────────── */
+.defile-arc-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    color: var(--text-secondary);
+}
+.defile-arc-card:hover {
+    border-color: var(--border-default);
+    color: var(--text-primary);
+}
+.defile-arc-card.active {
+    border-color: var(--accent);
+    background: rgba(99,102,241,0.08);
+    color: var(--text-primary);
+}
+.defile-arc-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+.defile-arc-name {
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.2;
+}
+
 /* ── Studio Mode ─────────────────────────────────────────────── */
 
 .mode-card-studio {

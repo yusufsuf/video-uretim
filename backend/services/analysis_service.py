@@ -512,13 +512,15 @@ async def refine_shot_description(request: RefineShotRequest) -> str:
 
 
 # ─── Defile shot arc templates ───────────────────────────────────────────────
-# Bank of narrative arcs for fashion runway sequences. One is randomly
-# selected per generation to avoid repetitive shot patterns. Each arc is a
-# sequence of beats; GPT adapts the beat count to match the user-requested
-# shot count (merge when fewer, expand when more).
+# Bank of narrative arcs for fashion runway sequences. The user picks one
+# from the UI (or "auto" for random). Each arc is a sequence of beats; GPT
+# adapts the beat count to match the user-requested shot count (merge when
+# fewer, expand when more).
 _DEFILE_SHOT_ARCS: list[dict] = [
     {
+        "id": "classic_approach",
         "name": "Classic Approach",
+        "description": "Klasik defile: uzaktan yürüyüş → tracking → pivot → arkadan çıkış",
         "beats": [
             "WIDE APPROACH — model starts at the far end of the runway (under/beside the architectural feature), walks toward camera with a confident stride, full body visible",
             "MEDIUM TRACKING — camera glides alongside at front three-quarter angle as she walks closer, revealing the front construction and fabric behavior",
@@ -527,7 +529,9 @@ _DEFILE_SHOT_ARCS: list[dict] = [
         ],
     },
     {
+        "id": "overhead_descent",
         "name": "Overhead Descent",
+        "description": "Kuşbakışı → ön medium → yan profil → detay → yüz reveal → arka çıkış",
         "beats": [
             "OVERHEAD WIDE — high angle top-down vantage as the model begins walking forward from the far end, establishing runway and garment silhouette in context",
             "FRONTAL MEDIUM — eye-level medium shot as she approaches camera with a confident stride",
@@ -538,7 +542,9 @@ _DEFILE_SHOT_ARCS: list[dict] = [
         ],
     },
     {
+        "id": "editorial_detail",
         "name": "Editorial Detail",
+        "description": "Detay → dolly out → ¾ ön → arc shot → arkadan çıkış",
         "beats": [
             "CLOSE-UP TEXTURE — tight shot on fabric drape, appliqué, or structural highlight as she begins to walk (upper torso framing, feet unseen)",
             "DOLLY OUT WIDE — camera slowly pulls back revealing the full silhouette mid-stride on the runway",
@@ -548,7 +554,9 @@ _DEFILE_SHOT_ARCS: list[dict] = [
         ],
     },
     {
+        "id": "dramatic_low_angle",
         "name": "Dramatic Low Angle",
+        "description": "Heroic alt açı → ön → yüz → hip detay → silüet çıkış",
         "beats": [
             "LOW WIDE — heroic low-angle composition as she emerges from the far end, ascending framing",
             "MEDIUM FRONT — eye-level as she continues toward camera with a clean stride",
@@ -558,7 +566,9 @@ _DEFILE_SHOT_ARCS: list[dict] = [
         ],
     },
     {
+        "id": "side_study",
         "name": "Side Study",
+        "description": "Ön yaklaşma → yan profil → ¾ ön → detay → arkadan çıkış",
         "beats": [
             "WIDE FRONTAL APPROACH — establishing wide from the runway end, model walking toward camera",
             "SIDE PROFILE PASS — camera locked at the side of the runway, full body profile as she strides past",
@@ -568,7 +578,9 @@ _DEFILE_SHOT_ARCS: list[dict] = [
         ],
     },
     {
+        "id": "couture_moment",
         "name": "Couture Moment",
+        "description": "Wide kuruluş → tracking → hip close → yüz+yaka → arkadan çıkış",
         "beats": [
             "WIDE ESTABLISHING — far wide showing her small within the architectural frame, beginning to walk forward",
             "MEDIUM TRACKING — camera glides alongside her at front three-quarter angle",
@@ -578,6 +590,29 @@ _DEFILE_SHOT_ARCS: list[dict] = [
         ],
     },
 ]
+
+
+def _get_shot_arc_by_id(arc_id: Optional[str]) -> Optional[dict]:
+    """Find an arc by its ID. Returns None if not found or arc_id is empty/auto."""
+    if not arc_id or arc_id == "auto":
+        return None
+    for arc in _DEFILE_SHOT_ARCS:
+        if arc["id"] == arc_id:
+            return arc
+    return None
+
+
+def list_defile_shot_arcs() -> list[dict]:
+    """Return the public list of shot arcs for frontend consumption."""
+    return [
+        {
+            "id": arc["id"],
+            "name": arc["name"],
+            "description": arc["description"],
+            "beats": arc["beats"],
+        }
+        for arc in _DEFILE_SHOT_ARCS
+    ]
 
 
 def _pick_defile_shot_arc() -> dict:
@@ -651,6 +686,7 @@ async def generate_defile_multishot_prompt(
     shot_configs: list,
     outfit_name: str = "",
     video_description: Optional[str] = None,
+    shot_arc_id: Optional[str] = None,
 ) -> list[dict]:
     """Analyze a NB2-composed runway scene frame and generate multishot prompts for Kling.
 
@@ -684,8 +720,8 @@ async def generate_defile_multishot_prompt(
             f"Return exactly the JSON array with the durations specified above."
         )
     else:
-        # Randomly pick a narrative arc from the bank for shot variety
-        selected_arc = _pick_defile_shot_arc()
+        # Use explicit arc if provided by user, otherwise random pick
+        selected_arc = _get_shot_arc_by_id(shot_arc_id) or _pick_defile_shot_arc()
         arc_block = _format_shot_arc(selected_arc, n_shots)
         user_text = (
             f"Outfit: {outfit_name or 'fashion garment'}\n"
