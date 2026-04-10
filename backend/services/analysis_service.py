@@ -1349,12 +1349,18 @@ The user provides a scenario script (any language, any format). Your job is to c
 
 RULES:
 - Output exactly the requested number of shots
-- Each shot: a concise English cinematic description (camera angle + model movement + mood), max 480 characters
+- Each shot: a rich, complete English cinematic description — include ALL relevant details from the script:
+  * Camera angle and movement (e.g. "slow push-in", "low angle", "arc shot")
+  * Model movement and body language (e.g. "slowly turns her head", "subtle breathing", "shifts arm on railing")
+  * Lighting and atmosphere from the script (e.g. "golden sunlight behind her", "soft lens flare", "warm dusk glow")
+  * Location/environment cues that set the scene (e.g. "on the stone balcony", "beneath Mediterranean arches")
+  * Mood and pacing (e.g. "slow cinematic fashion film", "composed elegance", "natural minimal movement")
+- Preserve the creative intent of every section of the script faithfully — do NOT omit details
+- Max 480 characters per shot description
 - The TOTAL duration across all shots MUST equal exactly {total_duration} seconds
-- Distribute the total duration across shots intelligently — vary shot lengths based on content (action shots shorter, detail shots longer) but the sum MUST be {total_duration}s
+- Distribute the total duration across shots intelligently — vary shot lengths based on content (action shots shorter, detail/atmosphere shots longer) but the sum MUST be {total_duration}s
 - If the text contains time markers (e.g. "0–3 sec", "3–7 sec"), use those to calculate per-shot durations
 - Duration per shot: minimum 3s, maximum 10s
-- Do NOT include location/background details — focus on model movement, camera angle, framing, pace, and mood
 - Do NOT include garment geometry enforcement phrases (no "closed skirt", "no slit", etc.)
 - Do NOT add spectators, crowd, or crew
 
