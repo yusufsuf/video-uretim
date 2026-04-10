@@ -1325,6 +1325,85 @@ async def translate_studio_shot_description(
         return user_description
 
 
+async def parse_studio_scenario_text(
+    text: str,
+    shot_count: int = 4,
+    default_duration: int = 5,
+) -> list[dict]:
+    """Parse a free-form scenario/script text into individual studio shot configs.
+
+    Accepts any language and any format (time-coded, bullet points, paragraph).
+    Returns a list of {description: str, duration: int} dicts ready to fill
+    the studio shot cards.
+
+    Args:
+        text: Raw scenario text from the user (e.g. "0–3 sec: Close shot...")
+        shot_count: Desired number of output shots (1–5)
+        default_duration: Duration (seconds) to assign when text has no timing markers
+
+    Returns:
+        List of exactly shot_count dicts: [{description: str, duration: int}]
+    """
+    system = """You are a cinematic video shot designer for luxury fashion films.
+The user provides a scenario script (any language, any format). Your job is to convert it into individual shot descriptions for Kling 3.0 Pro multishot generation.
+
+RULES:
+- Output exactly the requested number of shots
+- Each shot: a concise English cinematic description (camera angle + model movement + mood), max 480 characters
+- Extract duration from time markers if present (e.g. "0–3 sec" = 3s, "3–7 sec" = 4s)
+- If no timing markers, use the default_duration for all shots
+- Duration per shot: minimum 3s, maximum 10s
+- Do NOT include location/background details — focus on model movement, camera angle, framing, pace, and mood
+- Do NOT include garment geometry enforcement phrases (no "closed skirt", "no slit", etc.)
+- Do NOT add spectators, crowd, or crew
+
+Return a JSON object:
+{"shots": [{"description": "...", "duration": 4}, {"description": "...", "duration": 3}]}"""
+
+    user_msg = (
+        f"Scenario text:\n{text}\n\n"
+        f"Required shots: {shot_count}\n"
+        f"Default duration (if no timing in text): {default_duration}s\n\n"
+        "Parse this into the shot array."
+    )
+
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_msg},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=1200,
+            temperature=0.3,
+        )
+        raw = (resp.choices[0].message.content or "").strip()
+        parsed = json.loads(raw)
+        shots = parsed.get("shots") or parsed.get("Shots") or []
+
+        # Enforce shot count, clamp duration, ensure required keys
+        result = []
+        for i in range(shot_count):
+            if i < len(shots):
+                s = shots[i]
+                dur = max(3, min(10, int(s.get("duration") or default_duration)))
+                desc = str(s.get("description") or "").strip()
+            else:
+                dur = default_duration
+                desc = f"Cinematic fashion shot {i + 1}, model elegant movement, warm editorial light."
+            result.append({"description": desc, "duration": dur})
+
+        logger.info("parse_studio_scenario_text: %d shots from %d chars of input", len(result), len(text))
+        return result
+    except Exception as exc:
+        logger.warning("parse_studio_scenario_text failed (%s) — returning generic shots", exc)
+        return [
+            {"description": f"Cinematic fashion shot {i + 1}, model poised movement, luxury editorial.", "duration": default_duration}
+            for i in range(shot_count)
+        ]
+
+
 async def analyse_garment_slits(
     frontal_url: str,
     reference_urls: Optional[list[str]] = None,

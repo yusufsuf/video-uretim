@@ -593,13 +593,48 @@
 
                     <div class="studio-section-label" style="display:flex;align-items:center;justify-content:space-between">
                         <span>Çekimler</span>
-                        <span id="studio-total-dur-label" style="font-size:0.72rem;color:var(--text-secondary)">10s toplam</span>
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <span id="studio-total-dur-label" style="font-size:0.72rem;color:var(--text-secondary)">10s toplam</span>
+                            <button id="studio-text-mode-btn" onclick="toggleStudioInputMode()"
+                                style="font-size:0.68rem;color:var(--accent);background:none;border:1px solid var(--accent);border-radius:5px;padding:2px 8px;cursor:pointer;font-family:inherit;transition:all 0.15s"
+                                onmouseover="this.style.background='rgba(99,102,241,0.1)'"
+                                onmouseout="this.style.background='none'">Metin Modu</button>
+                        </div>
                     </div>
-                    <div id="studio-shots-container"></div>
 
-                    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-                        <button class="studio-add-shot-btn" id="studio-add-shot-btn">+ Sahne Ekle</button>
-                        <button class="studio-ai-shots-btn" id="studio-ai-shots-btn">✦ AI Çekim Öner</button>
+                    <!-- Shot kartları (varsayılan mod) -->
+                    <div id="studio-shots-mode">
+                        <div id="studio-shots-container"></div>
+                        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+                            <button class="studio-add-shot-btn" id="studio-add-shot-btn">+ Sahne Ekle</button>
+                            <button class="studio-ai-shots-btn" id="studio-ai-shots-btn">✦ AI Çekim Öner</button>
+                        </div>
+                    </div>
+
+                    <!-- Metin modu (gizli) -->
+                    <div id="studio-text-mode-panel" style="display:none">
+                        <textarea id="studio-scenario-text" rows="9"
+                            placeholder="Senaryo metninizi yapıştırın...&#10;&#10;Örn:&#10;0–3 sec: Close shot of model leaning on stone balcony, golden light.&#10;3–7 sec: Camera slowly pushes in, model shifts arm on railing.&#10;7–11 sec: Full body shot, model walks between trees.&#10;11–15 sec: Model turns away, walks toward sunset."
+                            style="width:100%;font-size:0.73rem;padding:10px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;color:var(--text-primary);resize:vertical;font-family:inherit;line-height:1.5"></textarea>
+                        <div style="display:flex;align-items:center;gap:16px;margin-top:10px;flex-wrap:wrap">
+                            <div style="display:flex;align-items:center;gap:6px">
+                                <label style="font-size:0.72rem;color:var(--text-secondary)">Sahne Sayısı</label>
+                                <input id="studio-parse-shot-count" type="number" min="1" max="5" value="4"
+                                    style="width:52px;padding:4px 6px;font-size:0.75rem;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);text-align:center;font-family:inherit">
+                            </div>
+                            <div style="display:flex;align-items:center;gap:6px">
+                                <label style="font-size:0.72rem;color:var(--text-secondary)">Varsayılan Süre</label>
+                                <input id="studio-parse-duration" type="range" min="3" max="10" value="5"
+                                    oninput="document.getElementById('studio-parse-dur-label').textContent=this.value+'s'"
+                                    style="width:80px">
+                                <span id="studio-parse-dur-label" style="font-size:0.72rem;color:var(--text-primary);font-weight:600;min-width:24px">5s</span>
+                            </div>
+                        </div>
+                        <button id="studio-parse-btn" onclick="parseStudioScenario()"
+                            style="margin-top:10px;width:100%;padding:9px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity 0.15s"
+                            onmouseover="this.style.opacity='0.88'" onmouseout="this.style.opacity='1'">
+                            Sahnelere Dönüştür
+                        </button>
                     </div>
 
                     <div style="margin-top:16px">

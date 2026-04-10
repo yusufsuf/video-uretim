@@ -1525,8 +1525,61 @@ let studioShots = [
     { description: "", duration: 5 },
 ];
 let studioAspectRatio = "9:16";
+let studioInputMode = "shots";  // "shots" | "text"
 
 const STUDIO_MAX_SHOTS = 5;
+
+// ── Studio Text Mode ─────────────────────────────────────────────────
+function toggleStudioInputMode(forceMode) {
+    studioInputMode = forceMode || (studioInputMode === "shots" ? "text" : "shots");
+    const shotsPanel = document.getElementById("studio-shots-mode");
+    const textPanel  = document.getElementById("studio-text-mode-panel");
+    const toggleBtn  = document.getElementById("studio-text-mode-btn");
+    if (!shotsPanel || !textPanel) return;
+    if (studioInputMode === "text") {
+        shotsPanel.style.display = "none";
+        textPanel.style.display  = "block";
+        if (toggleBtn) toggleBtn.textContent = "← Sahne Modu";
+    } else {
+        shotsPanel.style.display = "block";
+        textPanel.style.display  = "none";
+        if (toggleBtn) toggleBtn.textContent = "Metin Modu";
+    }
+}
+
+async function parseStudioScenario() {
+    const text = (document.getElementById("studio-scenario-text")?.value || "").trim();
+    if (!text) { alert("Lütfen bir senaryo metni girin."); return; }
+
+    const shotCount = parseInt(document.getElementById("studio-parse-shot-count")?.value || "4");
+    const defaultDur = parseInt(document.getElementById("studio-parse-duration")?.value || "5");
+
+    const btn = document.getElementById("studio-parse-btn");
+    if (btn) { btn.disabled = true; btn.textContent = "Analiz ediliyor..."; }
+
+    try {
+        const resp = await fetch(`${API_BASE}/api/studio/parse-scenario`, {
+            method: "POST",
+            headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+            body: JSON.stringify({ text, shot_count: shotCount, default_duration: defaultDur }),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        studioShots = (data.shots || []).map(s => ({
+            description: s.description || "",
+            duration: parseInt(s.duration) || defaultDur,
+        }));
+        renderStudioShots();
+        toggleStudioInputMode("shots");
+    } catch (err) {
+        alert("Senaryo dönüştürme hatası: " + err.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Sahnelere Dönüştür"; }
+    }
+}
+
+window.toggleStudioInputMode = toggleStudioInputMode;
+window.parseStudioScenario   = parseStudioScenario;
 
 function _studioTotalDur() {
     return studioShots.reduce((s, sh) => s + sh.duration, 0);
@@ -1539,6 +1592,7 @@ function openStudio() {
     studioStartFile = null;
     studioShots = [{ description: "", duration: 5 }, { description: "", duration: 5 }];
     studioAspectRatio = "9:16";
+    studioInputMode = "shots";
 
     const titleEl = document.getElementById("wizard-title");
     if (titleEl) titleEl.textContent = "Stüdyo";
@@ -1590,6 +1644,8 @@ function _studioGoToStep(step) {
         if (nextBtn) { nextBtn.textContent = "Video Üret"; nextBtn.disabled = false; }
         _setupStudioStartZone();
         renderStudioShots();
+        // Ensure correct panel visibility on step entry
+        toggleStudioInputMode(studioInputMode);
     } else {
         if (nextBtn) { nextBtn.textContent = "Devam →"; nextBtn.disabled = studioElements.length === 0; }
         _renderStudioElementsState();

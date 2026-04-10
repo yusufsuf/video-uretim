@@ -390,6 +390,29 @@ async def studio_ai_shots_endpoint(
     return {"shots": shots}
 
 
+class ParseScenarioRequest(BaseModel):
+    text: str
+    shot_count: int = 4
+    default_duration: int = 5
+
+
+@app.post("/api/studio/parse-scenario")
+async def parse_studio_scenario_endpoint(
+    body: ParseScenarioRequest,
+    _user: dict = Depends(get_current_user),
+):
+    """Parse a free-form scenario text into studio shot configs via GPT."""
+    from services.analysis_service import parse_studio_scenario_text
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="Senaryo metni boş olamaz.")
+    shots = await parse_studio_scenario_text(
+        text=body.text,
+        shot_count=max(1, min(5, body.shot_count)),
+        default_duration=max(3, min(10, body.default_duration)),
+    )
+    return {"shots": shots}
+
+
 @app.get("/api/defile/shot-arcs")
 async def defile_shot_arcs(_user: dict = Depends(get_current_user)):
     """Return available narrative arc templates for the Defile shot picker."""
