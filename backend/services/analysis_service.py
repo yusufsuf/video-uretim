@@ -664,6 +664,12 @@ CRITICAL RULES:
 - Each prompt: 30-50 words, HARD LIMIT: 480 characters, in English only
 - Keep lighting consistent across all shots
 
+CINEMATIC DEPTH (every shot):
+- End each prompt with a short phrase establishing shallow depth of field (e.g. "shallow depth of field", "background dissolves into soft bokeh", "creamy bokeh behind"). This adds cinematic separation between model and environment.
+
+SCENE ANCHORING (every shot):
+- In every shot, include a brief 3-5 word reminder of the location/environment visible in the image (e.g. "within the stone courtyard", "beneath the draped arch", "along the illuminated runway"). This prevents Kling from drifting between shots — the environment must stay locked across the entire sequence.
+
 Camera vocabulary (vary across shots):
 Wide Shot, Medium Shot, Close-Up, Extreme Close-Up, Low Angle, High Angle, Tracking Shot, Dolly In, Dolly Out, Arc Shot, Tilt Up, Follow Shot, Steadicam, Slow Motion, Overhead
 

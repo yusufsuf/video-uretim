@@ -310,7 +310,7 @@ _STYLE_BIBLE = (
     "Style: high-end fashion editorial, cinematic color grading, "
     "shallow depth of field, photorealistic skin, consistent lighting."
 )
-_STYLE_BIBLE_SHORT = "Style: cinematic editorial, photoreal skin, consistent light."
+_STYLE_BIBLE_SHORT = "Style: cinematic editorial, shallow depth of field, photoreal skin, consistent light."
 
 # 5c. SHORTER MICRO-ACTIONS — for modes where budget is tight (Defile/Studio).
 _MICRO_ACTIONS_SHORT = "Subtle breathing, fabric settles naturally with gravity."
