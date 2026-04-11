@@ -1,9 +1,10 @@
 """Fashion Video Automation – FastAPI Application
 
 Endpoints:
-  POST /api/generate      – Upload images & start the pipeline
-  GET  /api/status/{id}   – Poll job progress
-  GET  /outputs/{file}    – Serve generated videos
+  POST /api/generate            – Studio mode: start video generation pipeline
+  POST /api/defile/collection   – Defile mode: start collection pipeline
+  GET  /api/status/{id}         – Poll job progress
+  GET  /outputs/{file}          – Serve generated videos
 """
 
 import asyncio
@@ -24,9 +25,8 @@ import json
 from config import settings
 from dependencies import get_current_user
 from limiter import limiter
-from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, LocationPreset, RefineShotRequest, ShotConfig, SuggestShotsRequest
+from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, ShotConfig
 from pipeline import jobs, run_pipeline, run_defile_collection_pipeline, _load_history
-from services.analysis_service import refine_shot_description, suggest_shot_descriptions
 from pydantic import BaseModel
 
 from routes.auth_router import router as auth_router
@@ -171,9 +171,6 @@ async def generate_video_endpoint(
     back_image: Optional[UploadFile] = File(None, description="Elbise arka fotoğrafı (opsiyonel)"),
     reference_image: Optional[UploadFile] = File(None, description="Referans stil/poz resmi (opsiyonel)"),
     reference_video: Optional[UploadFile] = File(None, description="Referans hareket videosu (opsiyonel)"),
-    location: str = Form("studio"),
-    custom_location: Optional[str] = Form(None),
-    mood: Optional[str] = Form(None),
     generate_audio: str = Form("true"),
     duration: str = Form("10"),
     scene_count: str = Form("2"),
@@ -268,9 +265,6 @@ async def generate_video_endpoint(
     # Create job
     job_id = uuid.uuid4().hex[:12]
     request = GenerationRequest(
-        location=LocationPreset(location),
-        custom_location=custom_location,
-        mood=mood,
         generate_audio=generate_audio.lower() == "true",
         shots=shots_list,
     )
@@ -313,26 +307,6 @@ async def generate_video_endpoint(
     )
 
     return jobs[job_id]
-
-
-@app.post("/api/suggest-shots")
-async def suggest_shots_endpoint(
-    request: SuggestShotsRequest,
-    _user: dict = Depends(get_current_user),
-):
-    """Return AI-generated cinematic descriptions for each shot."""
-    descriptions = await suggest_shot_descriptions(request)
-    return {"descriptions": descriptions}
-
-
-@app.post("/api/refine-shot")
-async def refine_shot_endpoint(
-    request: RefineShotRequest,
-    _user: dict = Depends(get_current_user),
-):
-    """Convert a casual user description into a cinematic shot prompt."""
-    description = await refine_shot_description(request)
-    return {"description": description}
 
 
 @app.post("/api/studio/ai-shots")

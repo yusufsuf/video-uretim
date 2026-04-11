@@ -11,16 +11,6 @@ class PhotoType(str, Enum):
     FLATLAY = "flatlay"           # Düz yatırılmış ürün fotoğrafı
 
 
-class LocationPreset(str, Enum):
-    STUDIO = "studio"
-    BEACH = "beach"
-    CITY_STREET = "city_street"
-    GARDEN = "garden"
-    ROOFTOP = "rooftop"
-    RUNWAY = "runway"
-    CUSTOM = "custom"
-
-
 class DressAnalysisResult(BaseModel):
     """GPT-4o Vision tarafından üretilen elbise analiz raporu."""
     photo_type: PhotoType = Field(description="Fotoğraf tipi (mannequin / ghost / flatlay)")
@@ -78,12 +68,9 @@ class ShotConfig(BaseModel):
 
 
 class GenerationRequest(BaseModel):
-    """Frontend'den gelen video üretim talebi."""
+    """Video generation request used by studio pipeline."""
     model_config = {"protected_namespaces": ()}
 
-    location: LocationPreset = LocationPreset.STUDIO
-    custom_location: Optional[str] = None
-    mood: Optional[str] = None
     generate_audio: bool = True
     shots: Optional[List["ShotConfig"]] = None
 
@@ -98,28 +85,6 @@ class LibraryItem(BaseModel):
     storage_path: str
     kling_element_id: Optional[int] = None  # cached Kling element ID
     created_at: Optional[str] = None
-
-
-class SuggestShotItem(BaseModel):
-    camera_move: str
-    duration: int
-
-
-class SuggestShotsRequest(BaseModel):
-    location: str = "studio"
-    custom_location: Optional[str] = None
-    shots: List["SuggestShotItem"]
-
-
-class RefineShotRequest(BaseModel):
-    camera_move: str
-    duration: int
-    user_description: str
-    location: str = "studio"
-    custom_location: Optional[str] = None
-    location_image_url: Optional[str] = None  # library bg URL or base64 data URI
-    camera_angle: str = "eye_level"
-    shot_size: str = "wide"
 
 
 class DefileOutfit(BaseModel):
