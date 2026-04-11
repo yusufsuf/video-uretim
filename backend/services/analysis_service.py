@@ -1028,7 +1028,7 @@ async def extract_scene_anchor(start_frame_url: str) -> str:
                 ],
             }],
             response_format={"type": "json_object"},
-            max_tokens=80,
+            max_completion_tokens=80,
         )
         data = json.loads(resp.choices[0].message.content or "{}")
         anchor = data.get("scene_anchor", "")
@@ -1122,7 +1122,7 @@ async def generate_studio_ai_shots(
                 {"role": "user", "content": user_content},
             ],
             response_format={"type": "json_object"},
-            max_tokens=700,
+            max_completion_tokens=700,
             temperature=0.8,
         )
         data = json.loads(resp.choices[0].message.content or "{}")
@@ -1165,7 +1165,7 @@ async def translate_garment_description(user_description: str) -> str:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_description.strip()},
             ],
-            max_tokens=80,
+            max_completion_tokens=80,
             temperature=0.2,
         )
         translated = (resp.choices[0].message.content or "").strip()
@@ -1211,7 +1211,7 @@ async def translate_studio_shot_description(
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_msg},
             ],
-            max_tokens=160,
+            max_completion_tokens=160,
             temperature=0.3,
         )
         translated = (resp.choices[0].message.content or "").strip()
@@ -1279,7 +1279,7 @@ Return a JSON object:
                 {"role": "user", "content": user_msg},
             ],
             response_format={"type": "json_object"},
-            max_tokens=1200,
+            max_completion_tokens=1200,
             temperature=0.3,
         )
         raw = (resp.choices[0].message.content or "").strip()
@@ -1352,7 +1352,7 @@ async def analyse_garment_slits(
             model="gpt-5.4",
             messages=[{"role": "user", "content": image_blocks}],
             response_format={"type": "json_object"},
-            max_tokens=200,
+            max_completion_tokens=200,
             temperature=0,
         )
         data = json.loads(resp.choices[0].message.content or "{}")
