@@ -275,16 +275,30 @@ async def generate_omni_video(
     if not settings.KLING_ACCESS_KEY or not settings.KLING_SECRET_KEY:
         raise RuntimeError("KLING_ACCESS_KEY / KLING_SECRET_KEY not configured")
 
-    # Build element token prefix — Omni requires <<<element_N>>> in each prompt
-    # to actually apply the element; passing element_list alone is not enough.
-    elem_token = ""
-    if element_list:
-        elem_token = " ".join(f"<<<element_{i+1}>>>" for i in range(len(element_list))) + " "
+    # Build token prefix for prompts.
+    # Omni API requires <<<element_N>>> tokens in each shot prompt for elements to
+    # actually be applied — passing element_list alone is ignored by the model.
+    # Also prefix <<<image_1>>> to anchor the start-frame reference explicitly.
+    # Only inject tokens that are not already present (avoid double-injection when
+    # callers like defile pipeline already built the token prefix themselves).
+    img_token  = "<<<image_1>>> "
+    elem_tokens = (
+        " ".join(f"<<<element_{i+1}>>>" for i in range(len(element_list))) + " "
+        if element_list else ""
+    )
+
+    def _build_prompt(raw: str) -> str:
+        p = raw
+        if img_token.strip() not in p:
+            p = img_token + p
+        if elem_tokens and "<<<element_" not in p:
+            p = elem_tokens + p
+        return p[:512]
 
     shots = [
         {
             "index": i + 1,
-            "prompt": (elem_token + s["prompt"])[:512],
+            "prompt": _build_prompt(s["prompt"]),
             "duration": str(s["duration"]),
         }
         for i, s in enumerate(multi_prompt)
@@ -310,7 +324,7 @@ async def generate_omni_video(
 
     if element_list:
         body["element_list"] = element_list
-        logger.info("Kling Omni: using element_list=%s, token_prefix=%r", element_list, elem_token)
+        logger.info("Kling Omni: using element_list=%s, token_prefix=%r", element_list, elem_tokens)
 
     logger.info(
         "Kling Omni: model=%s, %d shots, total=%ss, aspect=%s, audio=%s, elements=%d",
