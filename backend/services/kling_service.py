@@ -275,10 +275,16 @@ async def generate_omni_video(
     if not settings.KLING_ACCESS_KEY or not settings.KLING_SECRET_KEY:
         raise RuntimeError("KLING_ACCESS_KEY / KLING_SECRET_KEY not configured")
 
+    # Build element token prefix — Omni requires <<<element_N>>> in each prompt
+    # to actually apply the element; passing element_list alone is not enough.
+    elem_token = ""
+    if element_list:
+        elem_token = " ".join(f"<<<element_{i+1}>>>" for i in range(len(element_list))) + " "
+
     shots = [
         {
             "index": i + 1,
-            "prompt": s["prompt"][:512],
+            "prompt": (elem_token + s["prompt"])[:512],
             "duration": str(s["duration"]),
         }
         for i, s in enumerate(multi_prompt)
@@ -304,7 +310,7 @@ async def generate_omni_video(
 
     if element_list:
         body["element_list"] = element_list
-        logger.info("Kling Omni: using element_list=%s", element_list)
+        logger.info("Kling Omni: using element_list=%s, token_prefix=%r", element_list, elem_token)
 
     logger.info(
         "Kling Omni: model=%s, %d shots, total=%ss, aspect=%s, audio=%s, elements=%d",
