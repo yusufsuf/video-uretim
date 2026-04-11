@@ -11,7 +11,7 @@ from typing import Optional
 from openai import AsyncOpenAI
 
 from config import settings
-from models import DressAnalysisResult, MultiScenePrompt, GenerationRequest, PhotoType, SuggestShotsRequest, RefineShotRequest
+from models import DressAnalysisResult, MultiScenePrompt, GenerationRequest, PhotoType
 
 logger = logging.getLogger(__name__)
 
@@ -445,70 +445,6 @@ Example output for 2 shots:
 ["fashion model stands tall, full body reveal, slow dolly in, soft studio lighting", "seamlessly continuing, model turns gracefully, orbit shot captures garment silhouette, warm light"]"""
 
 
-async def refine_shot_description(request: RefineShotRequest) -> str:
-    """Convert a user's casual description into a cinematic English shot prompt."""
-    cam_term    = _CAM_MOVE_MAP.get(request.camera_move, request.camera_move)
-    angle_term  = _CAMERA_ANGLE_MAP.get(request.camera_angle, request.camera_angle)
-    size_term   = _SHOT_SIZE_MAP.get(request.shot_size, request.shot_size)
-
-    system = (
-        "You are a professional fashion film director. "
-        "The user describes what they want to happen in a shot in their own words (possibly in Turkish). "
-        "Convert it into a precise, cinematic English prompt (20-35 words) suitable for an AI video generator. "
-        "You MUST incorporate ALL THREE cinematography parameters: the exact camera movement, the exact camera angle, "
-        "and the exact shot size specified. Also include the action described, garment reference as 'the outfit', and lighting. "
-        "If a location image is provided, derive the setting from that image — do NOT default to studio. "
-        "Return ONLY the prompt string, no quotes, no extra text."
-    )
-
-    if request.location_image_url:
-        user_content = [
-            {
-                "type": "text",
-                "text": (
-                    f"Camera movement: {cam_term}\n"
-                    f"Camera angle: {angle_term}\n"
-                    f"Shot size: {size_term}\n"
-                    f"Duration: {request.duration}s\n"
-                    f"User description: {request.user_description}\n\n"
-                    "The image below is the location/background reference. "
-                    "Use the setting shown in the image as the environment for this shot.\n"
-                    "Write the cinematic prompt:"
-                ),
-            },
-            {
-                "type": "image_url",
-                "image_url": {"url": request.location_image_url, "detail": "low"},
-            },
-        ]
-        model = "gpt-5.4"
-    else:
-        location_str = (
-            request.custom_location
-            if request.location == "custom" and request.custom_location
-            else _LOCATION_MAP.get(request.location, request.location)
-        )
-        user_content = (
-            f"Location: {location_str}\n"
-            f"Camera movement: {cam_term}\n"
-            f"Camera angle: {angle_term}\n"
-            f"Shot size: {size_term}\n"
-            f"Duration: {request.duration}s\n"
-            f"User description: {request.user_description}\n\n"
-            "Write the cinematic prompt:"
-        )
-        model = "gpt-4o-mini"
-
-    response = await client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user",   "content": user_content},
-        ],
-        temperature=0.7,
-        max_completion_tokens=120,
-    )
-    return (response.choices[0].message.content or "").strip().strip('"').strip("'")
 
 
 # ─── Defile shot arc templates ───────────────────────────────────────────────
@@ -1203,45 +1139,6 @@ async def generate_studio_ai_shots(
         ]
 
 
-async def suggest_shot_descriptions(request: SuggestShotsRequest) -> list[str]:
-    """Generate cinematic shot descriptions for the multishot designer."""
-    location_str = (
-        request.custom_location
-        if request.location == "custom" and request.custom_location
-        else _LOCATION_MAP.get(request.location, request.location)
-    )
-
-    shots_text = "\n".join(
-        f"  Shot {i + 1}: {_CAM_MOVE_MAP.get(s.camera_move, s.camera_move)}, {s.duration}s"
-        for i, s in enumerate(request.shots)
-    )
-
-    user_msg = f"Location: {location_str}\n\nShots:\n{shots_text}\n\nWrite a cinematic description for each shot."
-
-    response = await client.chat.completions.create(
-        model="gpt-5.4",
-        messages=[
-            {"role": "system", "content": SUGGEST_SHOTS_SYSTEM},
-            {"role": "user",   "content": user_msg},
-        ],
-        temperature=0.8,
-        max_completion_tokens=600,
-    )
-
-    raw = (response.choices[0].message.content or "").strip()
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
-    import re
-    match = re.search(r'\[.*\]', raw, re.DOTALL)
-    if match:
-        raw = match.group(0)
-
-    descriptions: list[str] = json.loads(raw)
-    # Ensure we return exactly one description per shot
-    while len(descriptions) < len(request.shots):
-        descriptions.append("")
-    return descriptions[: len(request.shots)]
 
 
 async def translate_garment_description(user_description: str) -> str:
