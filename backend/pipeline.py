@@ -899,6 +899,7 @@ async def run_pipeline(
         if provider == "kling":
             from services.kling_service import (  # type: ignore[import]
                 generate_multishot_video as _kling_gen,
+                generate_omni_video as _omni_gen,
             )
 
             # Pop fal.ai-style elements list and create real Kling elements (with cache)
@@ -932,6 +933,13 @@ async def run_pipeline(
                 ]
 
             kwargs["element_list"] = element_list if element_list else None
+
+            if kling_model == "kling-v3-omni":
+                # Omni uses separate endpoint — strip unsupported params
+                kwargs.pop("negative_prompt", None)
+                kwargs["model_name"] = kling_model
+                return await _omni_gen(**kwargs)
+
             kwargs["model_name"] = kling_model
             return await _kling_gen(**kwargs)
         return await generate_multishot_video(**kwargs)
@@ -1607,6 +1615,7 @@ async def run_defile_collection_pipeline(
             if _defile_provider == "kling":
                 from services.kling_service import (  # type: ignore[import]
                     generate_multishot_video as _kling_gen,
+                    generate_omni_video as _omni_gen,
                 )
                 # Get cached or create new Kling element for outfit
                 logger.info("[%s] Defile outfit %d: getting/creating Kling element...", job_id, outfit_idx + 1)
@@ -1653,16 +1662,28 @@ async def run_defile_collection_pipeline(
                         for p in multi_prompt
                     ]
 
-                clip_url = await _kling_gen(
-                    start_image_url=scene_frame_url,
-                    multi_prompt=_kling_prompts,
-                    duration=str(total_duration),
-                    aspect_ratio=request.aspect_ratio,
-                    generate_audio=request.generate_audio,
-                    element_list=_kling_elem_list,
-                    model_name=getattr(request, "kling_model", "kling-v3"),
-                    negative_prompt=_defile_outfit_neg,
-                )
+                _defile_model = getattr(request, "kling_model", "kling-v3")
+                if _defile_model == "kling-v3-omni":
+                    clip_url = await _omni_gen(
+                        start_image_url=scene_frame_url,
+                        multi_prompt=_kling_prompts,
+                        duration=str(total_duration),
+                        aspect_ratio=request.aspect_ratio,
+                        generate_audio=request.generate_audio,
+                        element_list=_kling_elem_list,
+                        model_name=_defile_model,
+                    )
+                else:
+                    clip_url = await _kling_gen(
+                        start_image_url=scene_frame_url,
+                        multi_prompt=_kling_prompts,
+                        duration=str(total_duration),
+                        aspect_ratio=request.aspect_ratio,
+                        generate_audio=request.generate_audio,
+                        element_list=_kling_elem_list,
+                        model_name=_defile_model,
+                        negative_prompt=_defile_outfit_neg,
+                    )
             else:
                 clip_url = await generate_multishot_video(
                     start_image_url=scene_frame_url,

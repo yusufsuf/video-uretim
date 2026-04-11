@@ -225,18 +225,16 @@ async def generate_multishot_video(
     return await _poll_task(task_id)
 
 
-async def _poll_task(task_id: str) -> str:
+async def _poll_task(task_id: str, endpoint: str = "image2video") -> str:
     """Poll Kling task until succeed/failed. Returns video URL."""
     elapsed = 0
+    poll_url = f"{_BASE_URL}/v1/videos/{endpoint}/{task_id}"
     while elapsed < _POLL_TIMEOUT:
         await asyncio.sleep(_POLL_INTERVAL)
         elapsed += _POLL_INTERVAL
 
         async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.get(
-                f"{_BASE_URL}/v1/videos/image2video/{task_id}",
-                headers=_headers(),
-            )
+            resp = await client.get(poll_url, headers=_headers())
             if resp.status_code != 200:
                 _warn = resp.text; logger.warning("Kling poll HTTP %s: %s", resp.status_code, _warn[:200])
                 continue
@@ -255,3 +253,78 @@ async def _poll_task(task_id: str) -> str:
             raise RuntimeError(f"Kling task {task_id} failed: {msg}")
 
     raise TimeoutError(f"Kling task {task_id} timed out after {_POLL_TIMEOUT}s")
+
+
+# ─── Omni Video API (/v1/videos/omni-video) ──────────────────────────────────
+
+async def generate_omni_video(
+    start_image_url: str,
+    multi_prompt: List[dict],
+    duration: str = "10",
+    aspect_ratio: str = "9:16",
+    generate_audio: bool = False,
+    element_list: Optional[List[dict]] = None,
+    model_name: str = "kling-v3-omni",  # "kling-v3-omni" | "kling-video-o1"
+) -> str:
+    """Generate a video via Kling Omni endpoint (/v1/videos/omni-video).
+
+    Used for kling-v3-omni and kling-video-o1 models.
+    Start frame passed via image_list with type=first_frame.
+    Element tokens use <<<element_N>>> format in prompts.
+    """
+    if not settings.KLING_ACCESS_KEY or not settings.KLING_SECRET_KEY:
+        raise RuntimeError("KLING_ACCESS_KEY / KLING_SECRET_KEY not configured")
+
+    shots = [
+        {
+            "index": i + 1,
+            "prompt": s["prompt"][:512],
+            "duration": str(s["duration"]),
+        }
+        for i, s in enumerate(multi_prompt)
+    ]
+    total_dur = sum(int(s["duration"]) for s in multi_prompt)
+
+    if total_dur > 15:
+        raise ValueError(f"Omni multi_shot total duration must be ≤ 15s — got {total_dur}s")
+    if total_dur < 3:
+        raise ValueError(f"Omni multi_shot total duration must be ≥ 3s — got {total_dur}s")
+
+    body: dict = {
+        "model_name": model_name,
+        "multi_shot": True,
+        "shot_type": "customize",
+        "multi_prompt": shots,
+        "image_list": [{"image_url": start_image_url, "type": "first_frame"}],
+        "duration": str(total_dur),
+        "aspect_ratio": aspect_ratio,
+        "sound": "on" if generate_audio else "off",
+        "mode": "pro",
+    }
+
+    if element_list:
+        body["element_list"] = element_list
+        logger.info("Kling Omni: using element_list=%s", element_list)
+
+    logger.info(
+        "Kling Omni: model=%s, %d shots, total=%ss, aspect=%s, audio=%s, elements=%d",
+        model_name, len(shots), total_dur, aspect_ratio, generate_audio, len(element_list or []),
+    )
+    for s in shots:
+        logger.info("  Shot [%d] (%ss): %s", s["index"], s["duration"], s["prompt"])
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{_BASE_URL}/v1/videos/omni-video",
+            json=body,
+            headers=_headers(),
+        )
+        if resp.status_code != 200:
+            _err = resp.text; raise RuntimeError(f"Kling Omni API HTTP {resp.status_code}: {_err[:300]}")
+        data = resp.json()
+        if data.get("code") != 0:
+            raise RuntimeError(f"Kling Omni API error {data.get('code')}: {data.get('message')}")
+        task_id: str = data["data"]["task_id"]
+
+    logger.info("Kling Omni task created: %s", task_id)
+    return await _poll_task(task_id, endpoint="omni-video")
