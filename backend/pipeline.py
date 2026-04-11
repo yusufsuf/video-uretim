@@ -888,6 +888,7 @@ async def run_pipeline(
     start_frame_url: Optional[str] = None,
     elements_json: Optional[str] = None,  # JSON array of {front_url, extra_urls, name}
     provider: str = "fal",  # "fal" = fal.ai proxy | "kling" = Kling Direct API
+    kling_model: str = "kling-v3",  # "kling-v3" | "kling-v3-omni"
 ):
     """Execute the full pipeline asynchronously."""
 
@@ -931,6 +932,7 @@ async def run_pipeline(
                 ]
 
             kwargs["element_list"] = element_list if element_list else None
+            kwargs["model_name"] = kling_model
             return await _kling_gen(**kwargs)
         return await generate_multishot_video(**kwargs)
 
@@ -1658,6 +1660,7 @@ async def run_defile_collection_pipeline(
                     aspect_ratio=request.aspect_ratio,
                     generate_audio=request.generate_audio,
                     element_list=_kling_elem_list,
+                    model_name=getattr(request, "kling_model", "kling-v3"),
                     negative_prompt=_defile_outfit_neg,
                 )
             else:

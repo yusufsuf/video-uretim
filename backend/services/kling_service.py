@@ -143,6 +143,7 @@ async def generate_multishot_video(
     aspect_ratio: str = "9:16",
     generate_audio: bool = False,
     element_list: Optional[List[dict]] = None,  # [{"element_id": int}, ...]
+    model_name: str = "kling-v3",  # "kling-v3" | "kling-v3-omni"
     negative_prompt: str = (
         "blur, distort, low quality, deformed hands, deformed face, "
         "changed outfit, different dress, altered silhouette, different fabric, "
@@ -180,7 +181,7 @@ async def generate_multishot_video(
         )
 
     body: dict = {
-        "model_name": "kling-v3",
+        "model_name": model_name,
         "image": start_image_url,
         "multi_shot": True,
         "shot_type": "customize",

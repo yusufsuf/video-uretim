@@ -799,6 +799,7 @@ async function startDefileCollection() {
     document.getElementById("step-3").style.display = "block";
 
     const defileProvider = document.getElementById("defile-provider-select")?.value || "fal";
+    const defileKlingModel = document.getElementById("defile-model-select")?.value || "kling-v3";
 
     // Upload start frame if provided
     let startFrameUploadUrl = null;
@@ -826,6 +827,7 @@ async function startDefileCollection() {
         aspect_ratio: defileAspectRatio,
         generate_audio: document.getElementById("defile-audio-toggle")?.checked ?? true,
         provider: defileProvider,
+        kling_model: defileKlingModel,
         shot_arc: defileShotArc,
     };
 
@@ -1477,6 +1479,7 @@ async function startStudioGeneration() {
     formData.append("aspect_ratio",   studioAspectRatio);
     formData.append("generate_audio", document.getElementById("studio-audio-toggle")?.checked ? "true" : "false");
     formData.append("provider", document.getElementById("studio-provider-select")?.value || "fal");
+    formData.append("kling_model", document.getElementById("studio-model-select")?.value || "kling-v3");
     // Required dummy front_image field (pipeline uses library_front_url when provided)
     formData.append("front_image", new Blob([], { type: "image/jpeg" }), "placeholder.jpg");
 
@@ -1777,3 +1780,16 @@ loadRecentVideos();
 window.addEventListener("resize", () => {
     shots.forEach((_, idx) => _applyCamTranslate(idx));
 });
+
+// ─── Kling Model Selectors ─────────────────────────────────────────────────
+function toggleDefileModelSelect() {
+    const provider = document.getElementById("defile-provider-select")?.value;
+    const wrapper = document.getElementById("defile-model-wrapper");
+    if (wrapper) wrapper.style.display = provider === "kling" ? "" : "none";
+}
+
+function toggleStudioModelSelect() {
+    const provider = document.getElementById("studio-provider-select")?.value;
+    const wrapper = document.getElementById("studio-model-wrapper");
+    if (wrapper) wrapper.style.display = provider === "kling" ? "flex" : "none";
+}

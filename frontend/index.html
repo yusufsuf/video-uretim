@@ -286,9 +286,16 @@
                         </div>
                         <div>
                             <div class="form-label" style="margin-bottom:6px">Video Motoru</div>
-                            <select id="defile-provider-select" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border-subtle);background:var(--bg-card);color:var(--text-primary);font-size:0.78rem;font-family:inherit">
+                            <select id="defile-provider-select" onchange="toggleDefileModelSelect()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border-subtle);background:var(--bg-card);color:var(--text-primary);font-size:0.78rem;font-family:inherit">
                                 <option value="fal">fal.ai (mevcut)</option>
                                 <option value="kling">Kling Direct</option>
+                            </select>
+                        </div>
+                        <div id="defile-model-wrapper" style="display:none">
+                            <div class="form-label" style="margin-bottom:6px">Kling Modeli</div>
+                            <select id="defile-model-select" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border-subtle);background:var(--bg-card);color:var(--text-primary);font-size:0.78rem;font-family:inherit">
+                                <option value="kling-v3">v3 (Standart)</option>
+                                <option value="kling-v3-omni">v3 Omni (Yüksek Tutarlılık)</option>
                             </select>
                         </div>
                     </div>
@@ -472,9 +479,16 @@
 
                     <div style="margin-top:12px;display:flex;align-items:center;justify-content:space-between">
                         <span style="font-size:0.78rem;color:var(--text-secondary)">Video Motoru</span>
-                        <select id="studio-provider-select" style="font-size:0.78rem;background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer">
+                        <select id="studio-provider-select" onchange="toggleStudioModelSelect()" style="font-size:0.78rem;background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer">
                             <option value="fal">fal.ai (mevcut)</option>
                             <option value="kling">Kling Direct (test)</option>
+                        </select>
+                    </div>
+                    <div id="studio-model-wrapper" style="display:none;margin-top:12px;display:none;align-items:center;justify-content:space-between">
+                        <span style="font-size:0.78rem;color:var(--text-secondary)">Kling Modeli</span>
+                        <select id="studio-model-select" style="font-size:0.78rem;background:var(--surface-2);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer">
+                            <option value="kling-v3">v3 (Standart)</option>
+                            <option value="kling-v3-omni">v3 Omni (Yüksek Tutarlılık)</option>
                         </select>
                     </div>
                 </div>

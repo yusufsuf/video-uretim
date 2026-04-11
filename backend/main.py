@@ -190,6 +190,7 @@ async def generate_video_endpoint(
     generation_mode: str = Form("classic"),
     ozel_start_frame: Optional[UploadFile] = File(None, description="Özel mod başlangıç karesi"),
     provider: str = Form("fal"),  # "fal" = fal.ai | "kling" = Kling Direct
+    kling_model: str = Form("kling-v3"),  # "kling-v3" | "kling-v3-omni"
 ):
     """Start a new fashion video generation job."""
 
@@ -303,6 +304,7 @@ async def generate_video_endpoint(
             start_frame_url=start_frame_url,
             elements_json=elements_json or None,
             provider=provider,
+            kling_model=kling_model,
         )
     )
 
