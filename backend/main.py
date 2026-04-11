@@ -506,6 +506,41 @@ async def get_order(code: str):
     return {"shot_configs": row["shot_configs"]}
 
 
+@app.get("/api/orders/{code}/studio-config")
+async def get_order_studio_config(code: str):
+    """Convert order shot_configs to studio-ready prompts.
+
+    Returns {shots: [{description, duration, name}, ...]} — same shape
+    as studioShots in the frontend, ready to be applied directly.
+    Unknown shot IDs are passed through with their type as description.
+    """
+    from services.shot_prompts import SHOT_PROMPTS
+
+    row = await lookup_order(code)
+    if not row:
+        raise HTTPException(status_code=404, detail="Kod bulunamadı.")
+
+    shots = []
+    for sc in row["shot_configs"]:
+        shot_id = sc.get("type", "")
+        duration = int(sc.get("duration", 5))
+        mapping = SHOT_PROMPTS.get(shot_id)
+        if mapping:
+            shots.append({
+                "description": mapping["prompt"],
+                "duration": duration,
+                "name": mapping["name"],
+            })
+        else:
+            shots.append({
+                "description": shot_id,
+                "duration": duration,
+                "name": shot_id,
+            })
+
+    return {"code": code.upper(), "shots": shots}
+
+
 @app.get("/admin-panel")
 async def admin_page():
     return FileResponse(os.path.join(_get_frontend_dir(), "admin.html"), media_type="text/html")

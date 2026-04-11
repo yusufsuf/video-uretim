@@ -229,12 +229,20 @@
                             style="background:var(--bg-secondary);border:1px solid var(--border-subtle);
                                    border-radius:8px;padding:14px;font-size:0.72rem;line-height:1.7;
                                    overflow-x:auto;white-space:pre-wrap;word-break:break-all;color:#7dd3fc"></pre>
-                        <button onclick="copyOrderJson()"
-                            style="margin-top:8px;padding:5px 14px;font-size:0.72rem;font-family:inherit;
-                                   background:var(--bg-secondary);border:1px solid var(--border-subtle);
-                                   border-radius:6px;color:var(--text-secondary);cursor:pointer">
-                            JSON Kopyala
-                        </button>
+                        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+                            <button onclick="copyOrderJson()"
+                                style="padding:5px 14px;font-size:0.72rem;font-family:inherit;
+                                       background:var(--bg-secondary);border:1px solid var(--border-subtle);
+                                       border-radius:6px;color:var(--text-secondary);cursor:pointer">
+                                JSON Kopyala
+                            </button>
+                            <button onclick="applyOrderToStudio()"
+                                style="padding:5px 14px;font-size:0.72rem;font-family:inherit;
+                                       background:#1d4ed8;border:1px solid #2563eb;
+                                       border-radius:6px;color:#fff;cursor:pointer;font-weight:600">
+                                Studio'da Uygula →
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -386,6 +394,17 @@
     function copyOrderJson() {
         navigator.clipboard.writeText(document.getElementById('order-json').textContent)
             .then(() => showToast('JSON kopyalandı.'));
+    }
+
+    async function applyOrderToStudio() {
+        const code = document.getElementById('order-code-input').value.trim().toUpperCase();
+        if (code.length !== 6) { showToast('6 haneli kod girin.'); return; }
+        const res = await fetch(`/api/orders/${code}/studio-config`);
+        if (!res.ok) { showToast('Studio config alınamadı.'); return; }
+        const data = await res.json();
+        localStorage.setItem('pendingOrderShots', JSON.stringify(data.shots));
+        localStorage.setItem('pendingOrderCode', code);
+        window.open('/', '_blank');
     }
 
     // Also allow Enter key on the code input

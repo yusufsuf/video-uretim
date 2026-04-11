@@ -1776,6 +1776,39 @@ async function loadRecentVideos() {
 
 loadRecentVideos();
 
+// ─── Pending Order Auto-Apply ──────────────────────────────────────────────
+// If admin opened this page from "Studio'da Uygula", pre-fill studio shots.
+(function applyPendingOrder() {
+    const raw = localStorage.getItem("pendingOrderShots");
+    const code = localStorage.getItem("pendingOrderCode");
+    if (!raw) return;
+    try {
+        const shots = JSON.parse(raw);
+        if (!Array.isArray(shots) || shots.length === 0) return;
+        localStorage.removeItem("pendingOrderShots");
+        localStorage.removeItem("pendingOrderCode");
+        // Small delay so the page fully initialises before opening studio
+        setTimeout(() => {
+            openStudio();
+            studioShots = shots.map(s => ({
+                description: s.description || "",
+                duration: parseInt(s.duration) || 5,
+            }));
+            renderStudioShots();
+            // Show a banner so admin knows which order was applied
+            if (code) {
+                const banner = document.createElement("div");
+                banner.style.cssText = "position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#1d4ed8;color:#fff;padding:8px 20px;border-radius:8px;font-size:0.82rem;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.4)";
+                banner.textContent = `Sipariş kodu ${code} uygulandı — ${shots.length} sahne yüklendi.`;
+                document.body.appendChild(banner);
+                setTimeout(() => banner.remove(), 4000);
+            }
+        }, 300);
+    } catch (e) {
+        console.warn("pendingOrderShots parse error:", e);
+    }
+})();
+
 // Re-apply carousel translate on resize
 window.addEventListener("resize", () => {
     shots.forEach((_, idx) => _applyCamTranslate(idx));
