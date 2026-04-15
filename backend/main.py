@@ -438,6 +438,18 @@ async def get_gallery(_user: dict = Depends(get_current_user)):
     return {"items": history}
 
 
+@app.delete("/api/gallery/{job_id}")
+async def delete_gallery_item(job_id: str, _user: dict = Depends(get_current_user)):
+    """Delete a job row from the Supabase jobs table."""
+    from pipeline import _get_supabase
+    try:
+        db = _get_supabase()
+        db.table("jobs").delete().eq("job_id", job_id).execute()
+        return {"ok": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Silme hatası: {e}")
+
+
 @app.post("/api/upload-temp")
 async def upload_temp_file(
     file: UploadFile = File(...),

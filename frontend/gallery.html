@@ -140,6 +140,21 @@
             background: var(--bg-card);
         }
 
+        .btn-delete {
+            background: #dc2626;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #b91c1c;
+        }
+
+        .gallery-item.removing {
+            opacity: 0;
+            transform: scale(0.9);
+            transition: opacity 0.25s, transform 0.25s;
+        }
+
         .empty-state {
             text-align: center;
             padding: 80px 20px;
@@ -227,8 +242,9 @@
                     const statusClass = isCompleted ? "status-completed" : "status-failed";
                     const statusText = isCompleted ? "Tamamlandı" : "Hata";
 
+                    const jobId = item.job_id || "";
                     html += `
-                <div class="gallery-item">
+                <div class="gallery-item" data-job-id="${jobId}">
                     <div class="gallery-video">
                         ${isCompleted && item.result_url
                             ? `<video src="${item.result_url}" muted loop preload="metadata"
@@ -243,13 +259,15 @@
                             ${date ? `<div>📅 ${date}</div>` : ""}
                             ${item.message ? `<div>💬 ${item.message}</div>` : ""}
                         </div>
-                        ${isCompleted && item.result_url ? `
                         <div class="gallery-actions">
-                            <a href="${item.result_url}" target="_blank" class="btn-view">▶ İzle</a>
-                            <a href="${item.result_url}" download class="btn-download">⬇ İndir</a>
-                            <button onclick="shareWhatsApp('${item.result_url}')"
-                                style="background:#25D366;color:white;flex:1;" class="btn-view">📱 WA</button>
-                        </div>` : ""}
+                            ${isCompleted && item.result_url ? `
+                                <a href="${item.result_url}" target="_blank" class="btn-view">▶ İzle</a>
+                                <a href="${item.result_url}" download class="btn-download">⬇ İndir</a>
+                                <button onclick="shareWhatsApp('${item.result_url}')"
+                                    style="background:#25D366;color:white;flex:1;" class="btn-view">📱 WA</button>
+                            ` : ""}
+                            <button class="btn-delete" onclick="deleteItem('${jobId}', this)">✕ Sil</button>
+                        </div>
                     </div>
                 </div>`;
                 });
@@ -261,6 +279,27 @@
                     <div class="icon">⚠️</div>
                     <p>Galeri yüklenirken hata: ${err.message}</p>
                 </div>`;
+            }
+        }
+
+        async function deleteItem(jobId, btn) {
+            if (!jobId) { alert("Bu kayıt silinemiyor (ID yok)."); return; }
+            if (!confirm("Bu videoyu silmek istediğinize emin misiniz?")) return;
+            btn.disabled = true;
+            btn.textContent = "Siliniyor...";
+            try {
+                const resp = await fetch(`${API}/api/gallery/${jobId}`, {
+                    method: "DELETE",
+                    headers: getAuthHeaders(),
+                });
+                if (!resp.ok) throw new Error("Silme başarısız");
+                const card = btn.closest(".gallery-item");
+                card.classList.add("removing");
+                setTimeout(() => card.remove(), 250);
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = "✕ Sil";
+                alert("Hata: " + err.message);
             }
         }
 

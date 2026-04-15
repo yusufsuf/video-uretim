@@ -774,7 +774,7 @@ def _load_history() -> list[dict]:
     """Load job history from Supabase jobs table."""
     try:
         db = _get_supabase()
-        res = db.table("jobs").select("*").order("created_at", desc=True).limit(100).execute()
+        res = db.table("jobs").select("*").order("created_at", desc=True).limit(1000).execute()
         return res.data or []
     except Exception as e:
         logger.error("Failed to load history: %s", e)
