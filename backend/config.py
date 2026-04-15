@@ -33,6 +33,13 @@ class Settings:
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
     TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "")
 
+    # WhatsApp / Evolution API integration
+    WHATSAPP_API_KEY: str = os.getenv("WHATSAPP_API_KEY", "")        # n8n → backend auth
+    EVOLUTION_API_URL: str = os.getenv("EVOLUTION_API_URL", "")      # backend → Evolution send
+    EVOLUTION_API_KEY: str = os.getenv("EVOLUTION_API_KEY", "")
+    EVOLUTION_INSTANCE: str = os.getenv("EVOLUTION_INSTANCE", "")
+    DAILY_VIDEO_LIMIT: int = int(os.getenv("DAILY_VIDEO_LIMIT", "5"))
+
     # Directories
     UPLOAD_DIR: str = os.path.join(os.path.dirname(__file__), "uploads")
     OUTPUT_DIR: str = os.path.join(os.path.dirname(__file__), "outputs")

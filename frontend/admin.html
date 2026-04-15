@@ -265,6 +265,26 @@
                     </table>
                 </div>
 
+                <!-- WhatsApp Kullanıcıları -->
+                <div class="card">
+                    <div class="section-heading">📱 WhatsApp Kullanıcıları</div>
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th>Numara</th>
+                                <th>İsim</th>
+                                <th>Durum</th>
+                                <th>Günlük</th>
+                                <th>Kayıt Tarihi</th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wa-tbody">
+                            <tr class="empty-row"><td colspan="6">Yükleniyor…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
             </div>
         </div>
     </main>
@@ -319,6 +339,77 @@
 
         renderPending(pending);
         renderApproved(approved);
+        loadWhatsappUsers();
+    }
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    async function loadWhatsappUsers() {
+        const tbody = document.getElementById('wa-tbody');
+        try {
+            const res = await fetch('/admin/whatsapp-users', { headers: getHeaders() });
+            if (!res.ok) throw new Error('load failed');
+            const users = await res.json();
+            renderWhatsappUsers(users);
+        } catch {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Yüklenemedi.</td></tr>';
+        }
+    }
+
+    function renderWhatsappUsers(users) {
+        const tbody = document.getElementById('wa-tbody');
+        if (!users.length) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Henüz WhatsApp kullanıcısı yok.</td></tr>';
+            return;
+        }
+        const statusMap = {
+            pending: { cls: 'pending', txt: 'Bekliyor' },
+            approved: { cls: 'approved', txt: 'Onaylı' },
+            blocked: { cls: 'pending', txt: 'Engelli' },
+        };
+        tbody.innerHTML = users.map(u => {
+            const s = statusMap[u.status] || { cls: 'pending', txt: u.status };
+            const phoneAttr = encodeURIComponent(u.phone);
+            const rowId = 'wa-' + phoneAttr;
+            const actions = u.status === 'approved'
+                ? `<button class="btn-reject" onclick="blockWA('${phoneAttr}')">Engelle</button>`
+                : u.status === 'blocked'
+                ? `<button class="btn-approve" onclick="approveWA('${phoneAttr}')">Onayla</button>`
+                : `<div class="action-btns">
+                     <button class="btn-approve" onclick="approveWA('${phoneAttr}')">Onayla</button>
+                     <button class="btn-reject" onclick="blockWA('${phoneAttr}')">Engelle</button>
+                   </div>`;
+            return `
+                <tr id="${rowId}">
+                    <td class="name-cell" style="font-family:monospace">${escapeHtml(u.phone)}</td>
+                    <td>${escapeHtml(u.name || '—')}</td>
+                    <td><span class="status-badge ${s.cls}">${s.txt}</span></td>
+                    <td>${u.daily_video_count || 0}</td>
+                    <td>${formatDate(u.created_at)}</td>
+                    <td>${actions}</td>
+                </tr>`;
+        }).join('');
+    }
+
+    async function approveWA(phoneEnc) {
+        const btns = document.querySelectorAll(`#wa-${phoneEnc} button`);
+        btns.forEach(b => b.disabled = true);
+        const res = await fetch(`/admin/whatsapp-users/${phoneEnc}/approve`, { method: 'POST', headers: getHeaders() });
+        if (res.ok) { showToast('Onaylandı.'); loadWhatsappUsers(); }
+        else { showToast('Hata oluştu.'); btns.forEach(b => b.disabled = false); }
+    }
+
+    async function blockWA(phoneEnc) {
+        if (!confirm('Bu numarayı engellemek istediğinize emin misiniz?')) return;
+        const btns = document.querySelectorAll(`#wa-${phoneEnc} button`);
+        btns.forEach(b => b.disabled = true);
+        const res = await fetch(`/admin/whatsapp-users/${phoneEnc}/block`, { method: 'POST', headers: getHeaders() });
+        if (res.ok) { showToast('Engellendi.'); loadWhatsappUsers(); }
+        else { showToast('Hata oluştu.'); btns.forEach(b => b.disabled = false); }
     }
 
     function renderPending(users) {
