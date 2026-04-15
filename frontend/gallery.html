@@ -212,6 +212,13 @@
     <script>
         const API = window.location.origin;
 
+        function escapeHTML(s) {
+            return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+                "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+            }[c]));
+        }
+        function escapeAttr(s) { return escapeHTML(s); }
+
         function getAuthHeaders() {
             const token = localStorage.getItem("auth_token");
             return token ? { "Authorization": "Bearer " + token } : {};
@@ -243,30 +250,32 @@
                     const statusText = isCompleted ? "Tamamlandı" : "Hata";
 
                     const jobId = item.job_id || "";
+                    const safeUrl = escapeAttr(item.result_url || "");
+                    const safeJobId = escapeAttr(jobId);
                     html += `
-                <div class="gallery-item" data-job-id="${jobId}">
+                <div class="gallery-item" data-job-id="${safeJobId}">
                     <div class="gallery-video">
                         ${isCompleted && item.result_url
-                            ? `<video src="${item.result_url}" muted loop preload="metadata"
+                            ? `<video src="${safeUrl}" muted loop preload="metadata"
                                 onmouseover="this.play()" onmouseout="this.pause();this.currentTime=0;"></video>`
                             : `<div style="color:var(--text-muted);font-size:0.85rem;">Video yok</div>`
                         }
                     </div>
                     <div class="gallery-info">
-                        <span class="status-badge ${statusClass}">${statusText}</span>
+                        <span class="status-badge ${statusClass}">${escapeHTML(statusText)}</span>
                         <div class="meta">
-                            ${item.analysis_summary ? `<div>👗 ${item.analysis_summary}</div>` : ""}
-                            ${date ? `<div>📅 ${date}</div>` : ""}
-                            ${item.message ? `<div>💬 ${item.message}</div>` : ""}
+                            ${item.analysis_summary ? `<div>👗 ${escapeHTML(item.analysis_summary)}</div>` : ""}
+                            ${date ? `<div>📅 ${escapeHTML(date)}</div>` : ""}
+                            ${item.message ? `<div>💬 ${escapeHTML(item.message)}</div>` : ""}
                         </div>
                         <div class="gallery-actions">
                             ${isCompleted && item.result_url ? `
-                                <a href="${item.result_url}" target="_blank" class="btn-view">▶ İzle</a>
-                                <a href="${item.result_url}" download class="btn-download">⬇ İndir</a>
-                                <button onclick="shareWhatsApp('${item.result_url}')"
+                                <a href="${safeUrl}" target="_blank" class="btn-view">▶ İzle</a>
+                                <a href="${safeUrl}" download class="btn-download">⬇ İndir</a>
+                                <button onclick="shareWhatsApp('${safeUrl}')"
                                     style="background:#25D366;color:white;flex:1;" class="btn-view">📱 WA</button>
                             ` : ""}
-                            <button class="btn-delete" onclick="deleteItem('${jobId}', this)">✕ Sil</button>
+                            <button class="btn-delete" onclick="deleteItem('${safeJobId}', this)">✕ Sil</button>
                         </div>
                     </div>
                 </div>`;

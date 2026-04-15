@@ -17,6 +17,12 @@ class Settings:
     # Public base URL (set to your Coolify domain in production)
     BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8000")
 
+    # CORS: comma-separated list of allowed origins (e.g. "https://a.com,https://b.com")
+    ALLOWED_ORIGINS: str = os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:8000,http://localhost:5173",
+    )
+
     # Supabase
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_ANON_KEY: str = os.getenv("SUPABASE_ANON_KEY", "")

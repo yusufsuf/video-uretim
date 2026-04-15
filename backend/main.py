@@ -26,8 +26,8 @@ from config import settings
 from dependencies import get_current_user
 from limiter import limiter
 from models import DefileCollectionRequest, GenerationRequest, JobResponse, JobStatus, ShotConfig
-from pipeline import jobs, run_pipeline, run_defile_collection_pipeline, _load_history
-from pydantic import BaseModel
+from pipeline import jobs, job_owners, run_pipeline, run_defile_collection_pipeline, _load_history
+from pydantic import BaseModel, Field
 
 from routes.auth_router import router as auth_router
 from routes.admin_router import router as admin_router
@@ -54,10 +54,10 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(auth_router, prefix="/auth")
@@ -133,17 +133,35 @@ def _optimize_image(path: str) -> str:
     return final_path
 
 
+_ALLOWED_UPLOAD_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".mp4", ".mov", ".webm"}
+_ALLOWED_UPLOAD_MIMES = {
+    "image/jpeg", "image/png", "image/webp", "image/bmp", "image/tiff",
+    "video/mp4", "video/quicktime", "video/webm",
+}
+_MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB hard cap (images optimized down after)
+
+
 async def _save_upload(upload: UploadFile) -> str:
     """Save an uploaded file, optimize images to stay under Kling's 10MB limit."""
-    ext = os.path.splitext(upload.filename or "img.jpg")[1]
+    ext = os.path.splitext(upload.filename or "img.jpg")[1].lower()
+    if ext not in _ALLOWED_UPLOAD_EXTS:
+        raise HTTPException(status_code=400, detail=f"Desteklenmeyen dosya türü: {ext}")
+    if upload.content_type and upload.content_type not in _ALLOWED_UPLOAD_MIMES:
+        raise HTTPException(status_code=400, detail=f"Desteklenmeyen MIME: {upload.content_type}")
+
+    content = await upload.read()
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Dosya boyutu 50 MB sınırını aşıyor.")
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Boş dosya.")
+
     filename = f"{uuid.uuid4().hex}{ext}"
     path = os.path.join(settings.UPLOAD_DIR, filename)
-    content = await upload.read()
     with open(path, "wb") as f:
         f.write(content)
 
     # Optimize images (skip video files)
-    if ext.lower() in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"):
+    if ext in (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff"):
         path = _optimize_image(path)
 
     return path
@@ -275,6 +293,7 @@ async def generate_video_endpoint(
         status=JobStatus.PENDING,
         message="İş kuyruğa alındı.",
     )
+    job_owners[job_id] = _user["id"]
 
     # Launch pipeline in background
     asyncio.create_task(
@@ -414,40 +433,72 @@ async def defile_collection_endpoint(
         status=JobStatus.PENDING,
         message="Defile kuyruğa alındı.",
     )
+    job_owners[job_id] = _user["id"]
 
     asyncio.create_task(run_defile_collection_pipeline(job_id=job_id, request=body))
     return jobs[job_id]
 
 
 @app.get("/api/status/{job_id}", response_model=JobResponse)
-async def get_job_status(job_id: str, _user: dict = Depends(get_current_user)):
-    """Poll the status of a generation job."""
+@limiter.limit("600/hour")
+async def get_job_status(request: Request, job_id: str, _user: dict = Depends(get_current_user)):
+    """Poll the status of a generation job.
+
+    Enforces ownership: non-admins can only poll their own jobs.
+    """
     if job_id not in jobs:
         return JobResponse(
             job_id=job_id,
             status=JobStatus.FAILED,
             message="Job bulunamadı.",
         )
+    is_admin = _user.get("role") == "admin"
+    owner = job_owners.get(job_id)
+    if not is_admin and owner and owner != _user["id"]:
+        raise HTTPException(status_code=403, detail="Bu işe erişim yetkiniz yok.")
     return jobs[job_id]
 
 
 @app.get("/api/gallery")
-async def get_gallery(_user: dict = Depends(get_current_user)):
-    """Return job history for the gallery page."""
-    history = _load_history()
+@limiter.limit("120/hour")
+async def get_gallery(request: Request, _user: dict = Depends(get_current_user)):
+    """Return job history for the gallery page (only the current user's jobs).
+
+    Admins see every job across the system.
+    """
+    is_admin = _user.get("role") == "admin"
+    history = _load_history(user_id=_user["id"], is_admin=is_admin)
     return {"items": history}
 
 
 @app.delete("/api/gallery/{job_id}")
-async def delete_gallery_item(job_id: str, _user: dict = Depends(get_current_user)):
-    """Delete a job row from the Supabase jobs table."""
+@limiter.limit("60/hour")
+async def delete_gallery_item(request: Request, job_id: str, _user: dict = Depends(get_current_user)):
+    """Delete a job row from the Supabase jobs table.
+
+    Enforces ownership: regular users can only delete their own jobs.
+    Admins can delete any job.
+    """
     from pipeline import _get_supabase
     try:
         db = _get_supabase()
+        is_admin = _user.get("role") == "admin"
+
+        # Verify the row exists and the caller owns it (or is admin)
+        q = db.table("jobs").select("user_id").eq("job_id", job_id).limit(1).execute()
+        rows = q.data or []
+        if not rows:
+            raise HTTPException(status_code=404, detail="Kayıt bulunamadı.")
+        if not is_admin and rows[0].get("user_id") != _user["id"]:
+            raise HTTPException(status_code=403, detail="Bu kaydı silme yetkiniz yok.")
+
         db.table("jobs").delete().eq("job_id", job_id).execute()
         return {"ok": True}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Silme hatası: {e}")
+        logger.error("Gallery delete error: %s", e)
+        raise HTTPException(status_code=500, detail="Silme işlemi başarısız.")
 
 
 @app.post("/api/upload-temp")
@@ -500,18 +551,35 @@ async def order_page():
 # ─── Order code endpoints ───────────────────────────────────────────
 
 class OrderCreate(BaseModel):
-    code: str
-    shot_configs: list
+    code: str = Field(min_length=4, max_length=16, pattern=r"^[A-Za-z0-9]+$")
+    shot_configs: list = Field(min_length=1, max_length=30)
+
+
+_ORDER_CODE_RE = __import__("re").compile(r"^[A-Za-z0-9]{4,16}$")
+
+
+def _validate_code(code: str) -> str:
+    if not _ORDER_CODE_RE.match(code or ""):
+        raise HTTPException(status_code=400, detail="Geçersiz kod formatı.")
+    return code
 
 
 @app.post("/api/orders")
-async def create_order(body: OrderCreate):
-    await save_order(body.code, body.shot_configs)
+@limiter.limit("10/hour")
+async def create_order(request: Request, body: OrderCreate):
+    try:
+        await save_order(body.code, body.shot_configs)
+    except ValueError as e:
+        if str(e) == "duplicate_code":
+            raise HTTPException(status_code=409, detail="Bu kod zaten kullanımda.")
+        raise HTTPException(status_code=400, detail="Geçersiz sipariş.")
     return {"ok": True}
 
 
 @app.get("/api/orders/{code}")
-async def get_order(code: str):
+@limiter.limit("60/hour")
+async def get_order(request: Request, code: str):
+    _validate_code(code)
     row = await lookup_order(code)
     if not row:
         raise HTTPException(status_code=404, detail="Kod bulunamadı.")
@@ -519,7 +587,12 @@ async def get_order(code: str):
 
 
 @app.get("/api/orders/{code}/studio-config")
-async def get_order_studio_config(code: str):
+@limiter.limit("60/hour")
+async def get_order_studio_config(
+    request: Request,
+    code: str,
+    _user: dict = Depends(get_current_user),
+):
     """Convert order shot_configs to studio-ready prompts.
 
     Returns {shots: [{description, duration, name}, ...]} — same shape

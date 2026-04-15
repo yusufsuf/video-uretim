@@ -714,6 +714,8 @@ async def _to_fal_url_compressed(url: str) -> str:
 
 # In-memory job store
 jobs: dict[str, JobResponse] = {}
+# Parallel map of job_id → owner user_id (for tenant isolation on history/gallery)
+job_owners: dict[str, str] = {}
 
 
 _PRIVATE_NETS = [
@@ -770,18 +772,28 @@ def _get_supabase() -> Client:
     return create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 
-def _load_history() -> list[dict]:
-    """Load job history from Supabase jobs table."""
+def _load_history(user_id: Optional[str] = None, is_admin: bool = False) -> list[dict]:
+    """Load job history from Supabase jobs table.
+
+    - Admins see all jobs.
+    - Regular users see only their own jobs (filtered by user_id).
+    - If user_id is None, returns empty list (safe default).
+    """
+    if not user_id and not is_admin:
+        return []
     try:
         db = _get_supabase()
-        res = db.table("jobs").select("*").order("created_at", desc=True).limit(1000).execute()
+        q = db.table("jobs").select("*").order("created_at", desc=True).limit(1000)
+        if not is_admin:
+            q = q.eq("user_id", user_id)
+        res = q.execute()
         return res.data or []
     except Exception as e:
         logger.error("Failed to load history: %s", e)
         return []
 
 
-def _save_to_history(job: JobResponse):
+def _save_to_history(job: JobResponse, user_id: Optional[str] = None):
     """Save completed job to Supabase jobs table."""
     try:
         db = _get_supabase()
@@ -792,6 +804,8 @@ def _save_to_history(job: JobResponse):
             "result_url": job.result_url,
             "created_at": datetime.now().isoformat(),
         }
+        if user_id:
+            entry["user_id"] = user_id
         if job.analysis:
             entry["analysis_summary"] = f"{job.analysis.garment_type} - {job.analysis.color}"
         db.table("jobs").insert(entry).execute()
@@ -857,7 +871,7 @@ def _update_job(job_id: str, **kwargs):
             setattr(jobs[job_id], k, v)
         if jobs[job_id].status in (JobStatus.COMPLETED, JobStatus.FAILED):
             try:
-                _save_to_history(jobs[job_id])
+                _save_to_history(jobs[job_id], user_id=job_owners.get(job_id))
             except Exception as e:
                 logger.error("Failed to save job history: %s", e)
 

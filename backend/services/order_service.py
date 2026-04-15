@@ -15,7 +15,14 @@ def _db() -> Client:
 
 
 async def save_order(code: str, shot_configs: list) -> dict:
-    """Insert a short-code → shot_configs mapping into the orders table."""
+    """Insert a short-code → shot_configs mapping into the orders table.
+
+    Raises ValueError if the code is already used.
+    """
+    existing = await lookup_order(code)
+    if existing:
+        raise ValueError("duplicate_code")
+
     def _insert():
         return _db().table("orders").insert({
             "code": code.upper(),
