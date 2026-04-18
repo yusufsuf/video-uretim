@@ -1249,9 +1249,36 @@ let _createFrontFile  = null;
 let _createAngle1File = null;
 let _createAngle2File = null;
 let _createAngle3File = null;
+let _createVideoFile  = null;
+let _createMode = "image"; // "image" | "video"
+
+function _setCreateMode(mode) {
+    _createMode = mode;
+    const imageBox = document.getElementById("create-uploads-image");
+    const videoBox = document.getElementById("create-uploads-video");
+    const imgBtn   = document.getElementById("create-mode-image");
+    const vidBtn   = document.getElementById("create-mode-video");
+    const hint     = document.getElementById("create-mode-hint");
+    if (mode === "video") {
+        if (imageBox) imageBox.style.display = "none";
+        if (videoBox) videoBox.style.display = "";
+        imgBtn?.classList.remove("active");
+        vidBtn?.classList.add("active");
+        if (hint) hint.innerHTML = "Tek <b>.mp4/.mov</b> yükleyin (3–8s, 9:16 veya 16:9). Kling native <b>video_refer</b> element oluşturur — element yalnızca <b>kling-video-o3+</b> ile kullanılır. İşlem ~2-3 dakika sürebilir.";
+    } else {
+        if (imageBox) imageBox.style.display = "";
+        if (videoBox) videoBox.style.display = "none";
+        vidBtn?.classList.remove("active");
+        imgBtn?.classList.add("active");
+        if (hint) hint.innerHTML = "En iyi sonuç için <b>3 farklı açıdan</b> fotoğraf yükleyin: <b>ön</b>, <b>45° yan</b> ve <b>yan profil</b>. Tüm fotoğraflar aynı kostümü göstermeli, ışık benzer olmalı. Arka/detay dördüncü slot için idealdir.";
+    }
+    _updateCreateSaveBtn();
+}
 
 function openStudioCreateModal() {
     _createFrontFile = _createAngle1File = _createAngle2File = _createAngle3File = null;
+    _createVideoFile = null;
+    _createMode = "image";
     const modal = document.getElementById("studio-create-modal");
     if (!modal) return;
     modal.style.display = "flex";
@@ -1277,14 +1304,15 @@ function openStudioCreateModal() {
         }
     }
 
-    _updateCreateSaveBtn();
+    _setCreateMode("image");
 
-    // Setup upload zones
+    // Setup upload zones (image + video)
     [
         ["create-front-zone",  "create-front-input",  f => { _createFrontFile  = f; _updateCreateSaveBtn(); }],
         ["create-angle1-zone", "create-angle1-input", f => { _createAngle1File = f; }],
         ["create-angle2-zone", "create-angle2-input", f => { _createAngle2File = f; }],
         ["create-angle3-zone", "create-angle3-input", f => { _createAngle3File = f; }],
+        ["create-video-zone",  "create-video-input",  f => { _createVideoFile  = f; _updateCreateSaveBtn(); }],
     ].forEach(([zoneId, inputId, onFile]) => {
         const zone = document.getElementById(zoneId);
         const inp  = document.getElementById(inputId);
@@ -1303,6 +1331,8 @@ function openStudioCreateModal() {
         });
     });
 
+    document.getElementById("create-mode-image")?.addEventListener("click", () => _setCreateMode("image"));
+    document.getElementById("create-mode-video")?.addEventListener("click", () => _setCreateMode("video"));
     document.getElementById("create-elem-name")?.addEventListener("input", _updateCreateSaveBtn);
     document.getElementById("studio-create-close")?.addEventListener("click", closeStudioCreateModal);
     document.getElementById("studio-create-save-btn")?.addEventListener("click", saveStudioElement);
@@ -1312,7 +1342,8 @@ function openStudioCreateModal() {
 function _updateCreateSaveBtn() {
     const btn = document.getElementById("studio-create-save-btn");
     const name = (document.getElementById("create-elem-name")?.value || "").trim();
-    if (btn) btn.disabled = !(_createFrontFile && name);
+    const primary = _createMode === "video" ? _createVideoFile : _createFrontFile;
+    if (btn) btn.disabled = !(primary && name);
 }
 
 function closeStudioCreateModal() {
@@ -1325,9 +1356,14 @@ function closeStudioCreateModal() {
 async function saveStudioElement() {
     const btn  = document.getElementById("studio-create-save-btn");
     const name = (document.getElementById("create-elem-name")?.value || "").trim();
-    if (!_createFrontFile || !name) return;
+    const isVideo = _createMode === "video";
+    const primary = isVideo ? _createVideoFile : _createFrontFile;
+    if (!primary || !name) return;
 
-    if (btn) { btn.disabled = true; btn.textContent = "Kaydediliyor..."; }
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = isVideo ? "Video element oluşturuluyor (~2-3 dk)..." : "Kaydediliyor...";
+    }
 
     const catSelect = document.getElementById("create-elem-category");
     const category = catSelect ? catSelect.value : "element";
@@ -1339,10 +1375,12 @@ async function saveStudioElement() {
     fd.append("category", category);
     if (fabric)      fd.append("fabric", fabric);
     if (description) fd.append("description", description);
-    fd.append("file",     _createFrontFile);
-    if (_createAngle1File) fd.append("file2", _createAngle1File);
-    if (_createAngle2File) fd.append("file3", _createAngle2File);
-    if (_createAngle3File) fd.append("file4", _createAngle3File);
+    fd.append("file",     primary);
+    if (!isVideo) {
+        if (_createAngle1File) fd.append("file2", _createAngle1File);
+        if (_createAngle2File) fd.append("file3", _createAngle2File);
+        if (_createAngle3File) fd.append("file4", _createAngle3File);
+    }
 
     try {
         const resp = await fetch("/library/items", { method: "POST", headers: getAuthHeaders(), body: fd });

@@ -1823,6 +1823,9 @@ textarea.form-input {
 .cam-btn:hover { background: var(--bg-card-hover); border-color: var(--border-accent); }
 .cam-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--text-primary); font-weight: 600; }
 
+/* Create-element modal: Fotoğraf / Video mode toggle */
+.create-mode-btn.active { background: var(--accent-soft); border-color: var(--accent); color: var(--text-primary); font-weight: 600; }
+
 /* Shot params row (Açı + Çekim Boyu dropdowns) */
 .shot-params-row { display: flex; gap: 8px; margin-top: 8px; }
 .shot-param { flex: 1; display: flex; flex-direction: column; gap: 3px; }

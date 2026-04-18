@@ -535,11 +535,15 @@
                 <button class="wizard-close" id="studio-create-close">✕</button>
             </div>
             <div class="studio-create-body">
-                <div class="studio-create-hint" style="font-size:12px;color:#9aa0a6;margin-bottom:10px;line-height:1.45">
+                <div class="studio-create-hint" id="create-mode-hint" style="font-size:12px;color:#9aa0a6;margin-bottom:10px;line-height:1.45">
                     En iyi sonuç için <b>3 farklı açıdan</b> fotoğraf yükleyin: <b>ön</b>, <b>45° yan</b> ve <b>yan profil</b>.
                     Tüm fotoğraflar aynı kostümü göstermeli, ışık benzer olmalı. Arka/detay dördüncü slot için idealdir.
                 </div>
-                <div class="studio-create-uploads">
+                <div style="display:flex;gap:6px;margin-bottom:10px">
+                    <button type="button" id="create-mode-image" class="wizard-btn-ghost create-mode-btn active" style="flex:1;padding:6px 10px;font-size:12px">Fotoğraf (3–4 görsel)</button>
+                    <button type="button" id="create-mode-video" class="wizard-btn-ghost create-mode-btn" style="flex:1;padding:6px 10px;font-size:12px">Video (.mp4/.mov, 3–8s)</button>
+                </div>
+                <div class="studio-create-uploads" id="create-uploads-image">
                     <div class="upload-zone" id="create-front-zone">
                         <input type="file" id="create-front-input" accept="image/*">
                         <div class="upload-zone-inner">
@@ -571,6 +575,16 @@
                             <div class="upload-hint">Opsiyonel</div>
                         </div>
                         <span class="badge muted">Opsiyonel</span>
+                    </div>
+                </div>
+                <div class="studio-create-uploads" id="create-uploads-video" style="display:none">
+                    <div class="upload-zone" id="create-video-zone" style="grid-column:1/-1">
+                        <input type="file" id="create-video-input" accept="video/mp4,video/quicktime,.mp4,.mov">
+                        <div class="upload-zone-inner">
+                            <div class="upload-label">🎬 Video Dosyası</div>
+                            <div class="upload-hint">.mp4/.mov · 3–8 saniye · 9:16 veya 16:9 · max 200MB</div>
+                        </div>
+                        <span class="badge">Zorunlu</span>
                     </div>
                 </div>
                 <input type="text" id="create-elem-name" class="form-input" placeholder="Element ismi (örn. Elbise1)" style="margin-top:14px">
@@ -622,7 +636,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=24"></script>
+    <script src="app.js?v=25"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');
