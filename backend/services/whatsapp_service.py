@@ -189,8 +189,15 @@ async def _save_element_record(
     extra_urls: list[str],
     element_id: int,
     admin_user_id: str,
+    element_type: str = "image_refer",
 ) -> None:
-    """Başarılı element oluşturma sonrası library_items'e kaydet."""
+    """Başarılı element oluşturma sonrası library_items'e kaydet.
+
+    element_type: 'image_refer' (fotoğraflı) | 'video_refer' (video referanslı).
+    video_refer elementler sadece kling-video-o3+ modelleriyle kullanılabilir;
+    pipeline bu kolonu okuyup üretimde model seçimini otomatik yükseltir.
+    """
+    from datetime import datetime, timezone
     row = {
         "user_id": admin_user_id,       # admin'in user_id'si (library ownership için)
         "name": name,
@@ -200,12 +207,23 @@ async def _save_element_record(
         "extra_urls": extra_urls,
         "extra_storage_paths": [],
         "kling_element_id": element_id,
+        "kling_element_type": element_type,
+        "kling_element_created_at": datetime.now(timezone.utc).isoformat(),
         "whatsapp_code": code.strip().lower(),
     }
 
     def _insert():
         return _db().table("library_items").insert(row).execute()
-    await asyncio.to_thread(_insert)  # type: ignore[arg-type]
+    try:
+        await asyncio.to_thread(_insert)  # type: ignore[arg-type]
+    except Exception as exc:
+        # kling_element_type kolonu henüz migre edilmemişse legacy fallback
+        logger.warning("Insert with kling_element_type failed (%s); retrying without", exc)
+        row.pop("kling_element_type", None)
+        row.pop("kling_element_created_at", None)
+        def _insert_legacy():
+            return _db().table("library_items").insert(row).execute()
+        await asyncio.to_thread(_insert_legacy)  # type: ignore[arg-type]
 
 
 async def _run_element_creation(
@@ -240,6 +258,7 @@ async def _run_element_creation(
             )
             frontal = video_url
             refs: list[str] = []
+            element_type = "video_refer"
             logger.info("WA video element created: %s → id=%d", code, element_id)
         else:
             assert image_urls, "image_urls ya da video_url zorunlu"
@@ -263,6 +282,7 @@ async def _run_element_creation(
 
             frontal = image_urls[0]
             refs = image_urls[1:4]
+            element_type = "image_refer"
             element_id = await kling_service.create_element(
                 frontal_image_url=frontal,
                 reference_image_urls=refs,
@@ -274,6 +294,7 @@ async def _run_element_creation(
             code=code, name=name, front_url=frontal,
             extra_urls=refs, element_id=element_id,
             admin_user_id=admin_user_id,
+            element_type=element_type,
         )
 
         element_jobs[job_id] = {

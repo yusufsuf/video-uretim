@@ -25,6 +25,13 @@ MAX_ASPECT_RATIO = 2.5      # en geniş tolerans (5:2)
 MAX_FILE_BYTES = 10 * 1024 * 1024  # Kling max 10MB
 BLUR_EDGE_THRESHOLD = 8.0   # average edge intensity — altı büyük ihtimalle bulanık
 
+# Set içi renk tutarlılığı eşikleri — element fotoğrafları aynı ışıkta çekilmeli.
+# Farklı ışık sıcaklığı (gün ışığı vs tungsten) kimliği değiştirir ve Kling
+# elementi "farklı kıyafet" olarak algılar. Ortalama RGB Euclidean mesafesi
+# ile ölçüyoruz (0-441 arası; tipik uniform set < 25).
+COLOR_SET_MAX_MEAN_DISTANCE = 45.0   # set içindeki en büyük RGB farkı — üstü uyarı
+COLOR_SET_BLOCK_DISTANCE = 90.0      # bundan büyük fark = aşırı çakışma, bloke et
+
 
 async def _download(url: str, timeout: int = 15) -> bytes:
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
@@ -50,6 +57,26 @@ def _check_blur(img: Image.Image) -> tuple[bool, float]:
     return avg < BLUR_EDGE_THRESHOLD, avg
 
 
+def _mean_rgb(img: Image.Image) -> tuple[float, float, float]:
+    """Görselin ortalama RGB rengini döndür — ışık sıcaklığı imzası gibi davranır."""
+    small = img.copy()
+    small.thumbnail((256, 256))
+    rgb = small.convert("RGB")
+    hist_r = rgb.histogram()[0:256]
+    hist_g = rgb.histogram()[256:512]
+    hist_b = rgb.histogram()[512:768]
+    total = sum(hist_r) or 1
+    mean_r = sum(i * c for i, c in enumerate(hist_r)) / total
+    mean_g = sum(i * c for i, c in enumerate(hist_g)) / total
+    mean_b = sum(i * c for i, c in enumerate(hist_b)) / total
+    return mean_r, mean_g, mean_b
+
+
+def _rgb_distance(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
+    """3D renk uzayında Euclidean mesafe — ışık/WB farkının proxy ölçüsü."""
+    return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2) ** 0.5
+
+
 async def validate_image_url(url: str) -> dict:
     """Tek görsel doğrulaması. Döner:
     {
@@ -62,6 +89,7 @@ async def validate_image_url(url: str) -> dict:
     result: dict = {
         "ok": False, "error": None, "warnings": [],
         "width": 0, "height": 0, "bytes": 0, "blur_score": 0.0,
+        "mean_rgb": None,  # (r, g, b) — set içi renk tutarlılığı için
     }
     try:
         data = await _download(url)
@@ -114,6 +142,11 @@ async def validate_image_url(url: str) -> dict:
     except Exception as exc:
         logger.debug("Blur check failed for %s: %s", url[:80], exc)
 
+    try:
+        result["mean_rgb"] = _mean_rgb(img)
+    except Exception as exc:
+        logger.debug("Mean-RGB check failed for %s: %s", url[:80], exc)
+
     result["ok"] = True
     return result
 
@@ -137,6 +170,25 @@ async def validate_element_images(image_urls: list[str]) -> dict:
             errors.append(f"Görsel {i + 1}: {res['error']}")
         for w in res.get("warnings", []):
             warnings.append(f"Görsel {i + 1}: {w}")
+
+    # Set içi renk/ışık tutarlılığı — farklı ışık koşullarında çekilmiş fotoğraflar
+    # element kimliğini bozar (Kling "aynı kıyafet" güvenini kaybeder).
+    rgbs = [d.get("mean_rgb") for d in details if d.get("mean_rgb")]
+    if len(rgbs) >= 2:
+        max_dist = 0.0
+        for i in range(len(rgbs)):
+            for j in range(i + 1, len(rgbs)):
+                max_dist = max(max_dist, _rgb_distance(rgbs[i], rgbs[j]))
+        if max_dist >= COLOR_SET_BLOCK_DISTANCE:
+            errors.append(
+                f"Fotoğraflar farklı ışık koşullarında çekilmiş (renk farkı {max_dist:.0f} ≥ {COLOR_SET_BLOCK_DISTANCE:.0f}). "
+                f"Tümünü aynı mekan/ışıkta çekip yeniden yükleyin."
+            )
+        elif max_dist >= COLOR_SET_MAX_MEAN_DISTANCE:
+            warnings.append(
+                f"Fotoğraflar arasında ışık/renk tutarsızlığı var (fark {max_dist:.0f}). "
+                f"Kimlik tutarlılığı için aynı ışıkta çekilen fotoğraflar daha iyi sonuç verir."
+            )
 
     return {
         "ok": len(errors) == 0,

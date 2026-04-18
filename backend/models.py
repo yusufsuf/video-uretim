@@ -71,7 +71,7 @@ class GenerationRequest(BaseModel):
     """Video generation request used by studio pipeline."""
     model_config = {"protected_namespaces": ()}
 
-    generate_audio: bool = True
+    generate_audio: bool = False  # Fashion: sessiz video
     shots: Optional[List["ShotConfig"]] = None
 
 
@@ -114,7 +114,7 @@ class DefileCollectionRequest(BaseModel):
     runway_background_extra_urls: Optional[List[str]] = None
     start_frame_url: Optional[str] = None  # If provided, skip NB2 — use this as scene frame
     aspect_ratio: str = "9:16"
-    generate_audio: bool = True
+    generate_audio: bool = False  # Fashion: sessiz video
     provider: str = "fal"  # "fal" = fal.ai | "kling" = Kling Direct
     kling_model: str = "kling-v3"  # "kling-v3" | "kling-v3-omni"
     shot_arc: Optional[str] = None  # Narrative arc ID (e.g. "classic_approach"). None = random pick

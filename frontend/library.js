@@ -44,6 +44,11 @@ const SLOT_HINTS = {
     element:    "Ön görünüm zorunlu, farklı açılar opsiyonel",
 };
 
+// Kategoriye göre video element yükleme izni — Kling video_refer yalnızca
+// insan/kıyafet figürlerinde anlamlı (sahne/stil/efekt değil).
+const VIDEO_ENABLED_CATEGORIES = new Set(["character", "costume", "element"]);
+let uploadMode = "image"; // "image" | "video" — element/costume/character için toggle
+
 // ─── Load items ──────────────────────────────────────────────────
 async function loadItems(category) {
     currentCategory = category;
@@ -84,19 +89,24 @@ function renderGrid(items) {
     } else {
         grid.innerHTML = uploadCard + items.map(item => {
             const extras = item.extra_urls || [];
+            const isVideo = /\.(mp4|mov)(\?|$)/i.test(item.image_url || "");
             let thumbsHtml = "";
+
+            const primaryTag = isVideo
+                ? `<video src="${item.image_url}" class="primary" muted playsinline preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>`
+                : `<img src="${item.image_url}" alt="${item.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover">`;
 
             if (extras.length > 0) {
                 // Side-by-side: front + extras column
                 thumbsHtml = `
                     <div class="lib-item-views">
-                        <img src="${item.image_url}" class="primary" alt="">
+                        ${primaryTag}
                         <div class="extras">
                             ${extras.slice(0, 3).map(u => `<img src="${u}" alt="">`).join("")}
                         </div>
                     </div>`;
             } else {
-                thumbsHtml = `<img src="${item.image_url}" alt="${item.name}" loading="lazy" style="width:100%;height:100%;object-fit:cover">`;
+                thumbsHtml = primaryTag;
             }
 
             return `
@@ -133,6 +143,7 @@ window.deleteItem = deleteItem;
 // ─── Upload Modal ────────────────────────────────────────────────
 function openUploadModal() {
     uploadFiles = [null, null, null, null];
+    uploadMode = "image";
     document.getElementById("upload-name").value = "";
     const catSel = document.getElementById("upload-category");
     catSel.value = currentCategory || "character";
@@ -147,27 +158,67 @@ function closeUploadModal() {
 
 // ─── Upload Slots ─────────────────────────────────────────────────
 function renderUploadSlots(category) {
-    const defs = SLOT_DEFS[category] || SLOT_DEFS.style;
-    const cols = defs.length === 1 ? "cols-1" : defs.length === 2 ? "cols-2" : defs.length === 4 ? "cols-2" : "cols-3";
+    const videoAllowed = VIDEO_ENABLED_CATEGORIES.has(category);
+    if (!videoAllowed) uploadMode = "image"; // video-only toggle sıfırla
 
     const container = document.getElementById("upload-slots-container");
-    container.innerHTML = `
-        <div class="upload-slots-grid ${cols}">
-            ${defs.map((def, i) => `
-                <div class="upload-slot" id="slot-${i}" data-index="${i}">
-                    <div class="upload-slot-icon">+</div>
-                    <div class="upload-slot-label">${def.label}${def.required ? ' <span class="slot-required">*</span>' : ""}</div>
-                    <input type="file" accept="image/*" class="slot-file-input" style="display:none">
+
+    // Toggle: sadece video izinli kategorilerde gösterilir
+    const toggleHtml = videoAllowed ? `
+        <div class="upload-mode-toggle" style="display:flex;gap:6px;margin-bottom:10px;justify-content:center">
+            <button type="button" class="wizard-btn-ghost upload-mode-btn ${uploadMode === "image" ? "active" : ""}" data-mode="image" style="flex:1;padding:6px 10px;font-size:0.72rem">Fotoğraf (3–4 görsel)</button>
+            <button type="button" class="wizard-btn-ghost upload-mode-btn ${uploadMode === "video" ? "active" : ""}" data-mode="video" style="flex:1;padding:6px 10px;font-size:0.72rem">Video (.mp4/.mov, 3–8s)</button>
+        </div>` : "";
+
+    if (uploadMode === "video") {
+        container.innerHTML = `
+            ${toggleHtml}
+            <div class="upload-slots-grid cols-1">
+                <div class="upload-slot" id="slot-0" data-index="0">
+                    <div class="upload-slot-icon">🎬</div>
+                    <div class="upload-slot-label">Video Dosyası <span class="slot-required">*</span></div>
+                    <input type="file" accept="video/mp4,video/quicktime,.mp4,.mov" class="slot-file-input" style="display:none">
                 </div>
-            `).join("")}
-        </div>
-    `;
+            </div>
+        `;
+    } else {
+        const defs = SLOT_DEFS[category] || SLOT_DEFS.style;
+        const cols = defs.length === 1 ? "cols-1" : defs.length === 2 ? "cols-2" : defs.length === 4 ? "cols-2" : "cols-3";
+        container.innerHTML = `
+            ${toggleHtml}
+            <div class="upload-slots-grid ${cols}">
+                ${defs.map((def, i) => `
+                    <div class="upload-slot" id="slot-${i}" data-index="${i}">
+                        <div class="upload-slot-icon">+</div>
+                        <div class="upload-slot-label">${def.label}${def.required ? ' <span class="slot-required">*</span>' : ""}</div>
+                        <input type="file" accept="image/*" class="slot-file-input" style="display:none">
+                    </div>
+                `).join("")}
+            </div>
+        `;
+    }
 
     // Hint text
     const hint = document.getElementById("upload-hint");
-    if (hint) hint.textContent = SLOT_HINTS[category] || "";
+    if (hint) {
+        hint.textContent = uploadMode === "video"
+            ? "Tek .mp4/.mov · 3–8 saniye · 9:16 veya 16:9 · max 200MB — element oluşturma ~2-3 dakika sürebilir"
+            : (SLOT_HINTS[category] || "");
+    }
 
-    // Attach events
+    // Toggle handlers
+    container.querySelectorAll(".upload-mode-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const mode = btn.dataset.mode;
+            if (mode === uploadMode) return;
+            uploadMode = mode;
+            uploadFiles = [null, null, null, null];
+            renderUploadSlots(category);
+            updateConfirmBtn();
+        });
+    });
+
+    // Slot handlers
     container.querySelectorAll(".upload-slot").forEach(slot => {
         const idx = parseInt(slot.dataset.index);
         const input = slot.querySelector(".slot-file-input");
@@ -186,17 +237,29 @@ function handleSlotFile(idx, file) {
     const slot = document.getElementById(`slot-${idx}`);
     if (!slot) return;
 
+    const isVideoSlot = uploadMode === "video";
     const defs = SLOT_DEFS[document.getElementById("upload-category").value] || SLOT_DEFS.style;
-    const label = defs[idx]?.label || `Görsel ${idx + 1}`;
-    const objUrl = URL.createObjectURL(file);
+    const label = isVideoSlot ? "Video" : (defs[idx]?.label || `Görsel ${idx + 1}`);
+    const accept = isVideoSlot ? "video/mp4,video/quicktime,.mp4,.mov" : "image/*";
 
     slot.classList.add("has-file");
-    slot.innerHTML = `
-        <img src="${objUrl}" class="slot-preview" alt="">
-        <div class="slot-name-bar">${label}</div>
-        <button class="slot-clear-btn" onclick="clearSlot(event,${idx})">✕</button>
-        <input type="file" accept="image/*" class="slot-file-input" style="display:none">
-    `;
+    if (isVideoSlot) {
+        const objUrl = URL.createObjectURL(file);
+        slot.innerHTML = `
+            <video src="${objUrl}" class="slot-preview" muted playsinline style="width:100%;height:100%;object-fit:cover"></video>
+            <div class="slot-name-bar">${label} · ${file.name.slice(0,24)}</div>
+            <button class="slot-clear-btn" onclick="clearSlot(event,${idx})">✕</button>
+            <input type="file" accept="${accept}" class="slot-file-input" style="display:none">
+        `;
+    } else {
+        const objUrl = URL.createObjectURL(file);
+        slot.innerHTML = `
+            <img src="${objUrl}" class="slot-preview" alt="">
+            <div class="slot-name-bar">${label}</div>
+            <button class="slot-clear-btn" onclick="clearSlot(event,${idx})">✕</button>
+            <input type="file" accept="${accept}" class="slot-file-input" style="display:none">
+        `;
+    }
     // Re-attach input handler
     const newInput = slot.querySelector(".slot-file-input");
     newInput.addEventListener("change", () => {
@@ -215,13 +278,18 @@ function clearSlot(e, idx) {
     uploadFiles[idx] = null;
     const slot = document.getElementById(`slot-${idx}`);
     if (!slot) return;
+    const isVideoSlot = uploadMode === "video";
     const defs = SLOT_DEFS[document.getElementById("upload-category").value] || SLOT_DEFS.style;
     const def = defs[idx];
+    const label = isVideoSlot ? "Video Dosyası" : (def?.label || `Görsel ${idx + 1}`);
+    const required = isVideoSlot || def?.required;
+    const icon = isVideoSlot ? "🎬" : "+";
+    const accept = isVideoSlot ? "video/mp4,video/quicktime,.mp4,.mov" : "image/*";
     slot.classList.remove("has-file");
     slot.innerHTML = `
-        <div class="upload-slot-icon">+</div>
-        <div class="upload-slot-label">${def?.label || `Görsel ${idx + 1}`}${def?.required ? ' <span class="slot-required">*</span>' : ""}</div>
-        <input type="file" accept="image/*" class="slot-file-input" style="display:none">
+        <div class="upload-slot-icon">${icon}</div>
+        <div class="upload-slot-label">${label}${required ? ' <span class="slot-required">*</span>' : ""}</div>
+        <input type="file" accept="${accept}" class="slot-file-input" style="display:none">
     `;
     const input = slot.querySelector(".slot-file-input");
     input.addEventListener("change", () => {
@@ -259,16 +327,20 @@ document.getElementById("confirm-upload-btn")?.addEventListener("click", async (
     const name = document.getElementById("upload-name").value.trim() || uploadFiles[0].name;
     const category = document.getElementById("upload-category").value;
     const btn = document.getElementById("confirm-upload-btn");
+    const isVideo = uploadMode === "video";
     btn.disabled = true;
-    btn.textContent = "Yükleniyor...";
+    btn.textContent = isVideo ? "Element oluşturuluyor (~2-3 dk)..." : "Yükleniyor...";
 
     const formData = new FormData();
     formData.append("file",     uploadFiles[0]);
     formData.append("name",     name);
     formData.append("category", category);
-    if (uploadFiles[1]) formData.append("file2", uploadFiles[1]);
-    if (uploadFiles[2]) formData.append("file3", uploadFiles[2]);
-    if (uploadFiles[3]) formData.append("file4", uploadFiles[3]);
+    // Video modunda ekstra dosyalar gönderilmez — backend video tek kaynak alır.
+    if (!isVideo) {
+        if (uploadFiles[1]) formData.append("file2", uploadFiles[1]);
+        if (uploadFiles[2]) formData.append("file3", uploadFiles[2]);
+        if (uploadFiles[3]) formData.append("file4", uploadFiles[3]);
+    }
 
     try {
         const res = await fetch(`${API}/library/items`, {

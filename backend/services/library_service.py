@@ -43,6 +43,7 @@ async def add_item(
     extra_files: list = [],  # [(bytes, content_type, ext), ...]
     fabric: Optional[str] = None,
     description: Optional[str] = None,
+    is_video: bool = False,
 ) -> dict:
     """Upload images to Supabase Storage and insert a record into library_items.
 
@@ -54,6 +55,8 @@ async def add_item(
       drive fabric physics layer in prompt builder and fabric-specific negatives.
     description: optional free-text garment description (e.g. "thin straps, V-neck,
       ivory tone, matte finish"). Injected into garment anchor layer at render time.
+    is_video: primary file is an .mp4/.mov — upload as video, create Kling video_refer
+      element (native API), and persist kling_element_type='video_refer'.
     """
     primary_path = f"{user_id}/{uuid.uuid4().hex}{primary_ext}"
 
@@ -101,14 +104,55 @@ async def add_item(
     if description:
         _row["description"] = description.strip()[:500]
 
+    # Video path — Kling video_refer element oluştur ve tipini DB'ye yaz.
+    # Kling senkron değil; create_element_from_video kendi içinde polling yapıyor
+    # (birkaç dakika sürebilir). Bu sebeple upload endpoint bu bekleme süresince
+    # bloklu kalır — frontend uzun timeout göstermeli.
+    if is_video:
+        from services import kling_service
+        try:
+            element_id = await kling_service.create_element_from_video(
+                video_url=image_url,
+                name=(name or "garment")[:20],
+                description=(description or "fashion garment")[:100],
+            )
+            from datetime import datetime, timezone
+            _row["kling_element_id"] = element_id
+            _row["kling_element_type"] = "video_refer"
+            _row["kling_element_created_at"] = datetime.now(timezone.utc).isoformat()
+            logger.info("Video element created: id=%d name=%s", element_id, name)
+        except Exception as exc:
+            # Element üretimi başarısızsa yüklenen videoyu temizle — kütüphanede
+            # kullanılamaz yetim bir kayıt bırakmak istemiyoruz.
+            logger.error("Kling video element failed: %s — rolling back storage", exc)
+            try:
+                await asyncio.to_thread(lambda: _db().storage.from_(BUCKET).remove([primary_path]))  # type: ignore[arg-type]
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=400,
+                detail=f"Kling video element oluşturulamadı: {exc}",
+            )
+
     def _insert():
         return _db().table("library_items").insert(_row).execute()
 
     try:
         res = await asyncio.to_thread(_insert)  # type: ignore[arg-type]
     except Exception as exc:
-        logger.error("library_service add_item INSERT failed: %s", exc, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"DB insert failed: {exc}")
+        # kling_element_type kolonu migre edilmemişse legacy fallback
+        if is_video and "kling_element_type" in str(exc):
+            logger.warning("Insert with kling_element_type failed (%s); retrying without", exc)
+            _row.pop("kling_element_type", None)
+            _row.pop("kling_element_created_at", None)
+            try:
+                res = await asyncio.to_thread(_insert)  # type: ignore[arg-type]
+            except Exception as exc2:
+                logger.error("library_service add_item INSERT failed: %s", exc2, exc_info=True)
+                raise HTTPException(status_code=500, detail=f"DB insert failed: {exc2}")
+        else:
+            logger.error("library_service add_item INSERT failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=f"DB insert failed: {exc}")
     if not res.data:
         logger.error("library_service add_item INSERT returned no data: %s", res)
         raise HTTPException(status_code=500, detail="DB insert returned no data")

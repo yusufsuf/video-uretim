@@ -38,6 +38,7 @@ from services.video_service import (
     generate_multishot_video,
     upload_to_fal,
     concatenate_clips,
+    extract_last_frame,
 )
 import io
 import shutil
@@ -423,6 +424,22 @@ def _get_camera_guide(complexity: str) -> str:
     return _CAMERA_GUIDE.get(complexity, _CAMERA_GUIDE["medium"])
 
 
+# 5e. ASPECT-AWARE FRAMING — portrait/landscape composition rules.
+# 9:16 portrait'ta "full body at distance" çerçeveleme yaparsa model başı kesilir
+# veya çok küçük kalır. Aspect-aware kısa bir framing cümlesi prompt'a ilavesi
+# Kling'in model pozisyonlamasını kadraja optimize etmesini sağlar.
+_ASPECT_FRAMING: dict[str, str] = {
+    "9:16":  "Vertical framing: model centered, waist-up to knee-up visible, head in upper third, full silhouette readable without crop.",
+    "16:9":  "Widescreen framing: model centered with environmental context, full body visible, rule-of-thirds composition.",
+    "1:1":   "Square framing: model centered, medium shot from mid-thigh up, balanced headroom and foot-room.",
+}
+
+
+def _get_aspect_framing(aspect_ratio: str) -> str:
+    """Return aspect-aware framing guidance — empty if unknown ratio."""
+    return _ASPECT_FRAMING.get((aspect_ratio or "").strip(), "")
+
+
 # 5e. UNIFIED GARMENT META RESOLVER ────────────────────────────────────────
 # Consolidates fabric/description/color info from either DressAnalysisResult
 # or a library_items row dict. Library metadata (user-authored) takes
@@ -563,6 +580,7 @@ def _apply_quality_layers(
     core_prompt: str,
     meta: Optional[dict] = None,
     max_len: int = 512,
+    aspect_ratio: Optional[str] = None,
 ) -> str:
     """Layer quality anchors onto an existing shot prompt without truncating
     the core mid-sentence.
@@ -586,10 +604,11 @@ def _apply_quality_layers(
     anchor = _build_meta_anchor(meta, max_len=100) if meta else ""
     fabric_val = (meta or {}).get("fabric", "")
     physics = _get_fabric_physics_str(fabric_val) if fabric_val else ""
+    framing = _get_aspect_framing(aspect_ratio or "")
 
     # Pick the longest style bible that will plausibly fit.
     # If core alone is already tight, prefer the short version.
-    core_budget_pressure = len(core) + len(anchor) + 2
+    core_budget_pressure = len(core) + len(anchor) + len(framing) + 2
     preferred_style = _STYLE_BIBLE if core_budget_pressure < 350 else _STYLE_BIBLE_SHORT
 
     # Build the layer stack in priority order (drop from tail when over budget)
@@ -598,6 +617,9 @@ def _apply_quality_layers(
     ]
     if anchor:
         layers.insert(0, ("anchor", anchor))  # prepend
+    # Framing, core'dan hemen sonra — aspect-aware composition rehberi
+    if framing:
+        layers.append(("framing", framing))
     if preferred_style:
         layers.append(("style_bible", preferred_style))
     if physics:
@@ -985,7 +1007,7 @@ async def run_pipeline(
     custom_scene_count: Optional[int] = None,
     custom_total_duration: Optional[int] = None,
     aspect_ratio: str = "9:16",
-    generate_audio: bool = True,
+    generate_audio: bool = False,  # Fashion mode: audio disabled by default
     library_style_url: Optional[str] = None,
     background_extra_urls: Optional[list] = None,
     watermark_path: Optional[str] = None,
@@ -995,29 +1017,34 @@ async def run_pipeline(
     elements_json: Optional[str] = None,  # JSON array of {front_url, extra_urls, name}
     provider: str = "fal",  # "fal" = fal.ai proxy | "kling" = Kling Direct API
     kling_model: str = "kling-v3",  # "kling-v3" | "kling-v3-omni"
+    enable_upscale: bool = False,     # Opt-in: Topaz 2x upscale post-process
+    enable_interpolation: bool = False,  # Opt-in: 60fps frame interpolation
 ):
     """Execute the full pipeline asynchronously."""
 
     import re as _re_elem
 
-    async def _gen_video(**kwargs) -> str:
-        """Route to Kling Direct or fal.ai based on provider param."""
+    async def _gen_video_single(**kwargs) -> str:
+        """Single Kling/fal.ai call — caller guarantees total shot duration ≤ 15s."""
         if provider == "kling":
             from services.kling_service import (  # type: ignore[import]
                 generate_multishot_video as _kling_gen,
                 generate_omni_video as _omni_gen,
             )
+            from services.library_service import get_item_by_url
 
             # Pop fal.ai-style elements list and create real Kling elements (with cache)
             fal_elements = kwargs.pop("elements", []) or []
             element_list = []
+            has_video_refer = False
             if fal_elements:
                 logger.info("[%s] Creating %d Kling element(s)...", job_id, len(fal_elements))
                 for i, e in enumerate(fal_elements):
                     if i >= 3:
                         break
+                    _orig_url = e.get("original_front_url", e["frontal_image_url"])
                     eid = await get_or_create_kling_element(
-                        front_url=e.get("original_front_url", e["frontal_image_url"]),
+                        front_url=_orig_url,
                         frontal_image_url=e["frontal_image_url"],
                         reference_image_urls=e.get("reference_image_urls", []),
                         name=f"garment{i + 1}",
@@ -1025,7 +1052,15 @@ async def run_pipeline(
                     )
                     if eid is not None:
                         element_list.append({"element_id": int(eid)})
-                logger.info("[%s] Kling elements ready: %s", job_id, element_list)
+                        # video_refer element tespiti → model otomatik yükseltilecek
+                        try:
+                            _item = await get_item_by_url(_orig_url)
+                            if _item and _item.get("kling_element_type") == "video_refer":
+                                has_video_refer = True
+                        except Exception:
+                            pass
+                logger.info("[%s] Kling elements ready: %s (video_refer=%s)",
+                            job_id, element_list, has_video_refer)
 
             # Replace @ElementN → <<<element_N>>> (Kling native token format)
             if "multi_prompt" in kwargs:
@@ -1040,20 +1075,88 @@ async def run_pipeline(
 
             kwargs["element_list"] = element_list if element_list else None
 
-            if kling_model == "kling-v3-omni":
-                # Omni uses separate endpoint — strip unsupported params
+            # video_refer element varsa model zorunlu olarak kling-video-o3+ olmalı
+            # (Kling API kısıtı: video-customized elementler sadece o3+ modellerde)
+            effective_model = kling_model
+            if has_video_refer and kling_model not in ("kling-video-o3", "kling-video-o1"):
+                logger.info("[%s] video_refer element detected → upgrading model %s → kling-video-o3",
+                            job_id, kling_model)
+                effective_model = "kling-video-o3"
+
+            if effective_model in ("kling-v3-omni", "kling-video-o1", "kling-video-o3"):
+                # Omni endpoint (element-aware) — strip params Omni desteklemez
                 kwargs.pop("negative_prompt", None)
                 kwargs.pop("cfg_scale", None)  # Omni kendi iç tuning'ini kullanıyor
-                kwargs["model_name"] = kling_model
+                kwargs["model_name"] = effective_model
                 return await _omni_gen(**kwargs)
 
-            kwargs["model_name"] = kling_model
+            kwargs["model_name"] = effective_model
             return await _kling_gen(**kwargs)
         return await generate_multishot_video(**kwargs)
 
+    async def _gen_video(**kwargs) -> str:
+        """Generate video — auto-chains via last-frame if total duration > 15s.
+
+        Kling hard-caps single render at 15s. Bu wrapper shot'ları ≤15s
+        chunk'lara böler, her chunk'ın son karesini bir sonraki chunk'ın
+        start_image_url'i olarak kullanır, nihayetinde FFmpeg concat ile
+        tek dosyaya birleştirir. Chain noktası görsel olarak dikişsizdir
+        çünkü son kare = sonraki ilk kare.
+        """
+        _shots = kwargs.get("multi_prompt") or []
+        _total = sum(int(s.get("duration", 0)) for s in _shots)
+        if _total <= 15 or len(_shots) == 0:
+            return await _gen_video_single(**kwargs)
+
+        # Shot'ları ≤15s chunk'lara böl (greedy packing — shot atomic)
+        chunks: list[list[dict]] = []
+        current: list[dict] = []
+        current_dur = 0
+        for s in _shots:
+            d = int(s.get("duration", 0))
+            if d > 15:
+                # Tek shot 15s'yi aşıyor — split edemeyiz, clamp
+                s = {**s, "duration": 15}
+                d = 15
+            if current_dur + d > 15 and current:
+                chunks.append(current)
+                current = [s]
+                current_dur = d
+            else:
+                current.append(s)
+                current_dur += d
+        if current:
+            chunks.append(current)
+
+        logger.info("[%s] Chaining %ds into %d chunks (≤15s each)", job_id, _total, len(chunks))
+
+        current_start = kwargs.get("start_image_url")
+        clip_paths: list[str] = []
+        for idx, chunk in enumerate(chunks):
+            chunk_dur = sum(int(s["duration"]) for s in chunk)
+            _kwargs = {**kwargs, "multi_prompt": chunk,
+                       "start_image_url": current_start,
+                       "duration": str(chunk_dur)}
+            logger.info("[%s] Chunk %d/%d: %ds, %d shots", job_id, idx + 1, len(chunks), chunk_dur, len(chunk))
+            clip_url = await _gen_video_single(**_kwargs)
+            clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
+            clip_paths.append(clip_path)
+            if idx < len(chunks) - 1:
+                # Chain: son kareyi çıkar ve sonraki chunk'ın start'ı yap
+                frame_path = extract_last_frame(clip_path, settings.TEMP_DIR)
+                current_start = await upload_to_fal(frame_path)
+                logger.info("[%s] Chain frame uploaded: %s", job_id, current_start[:80])
+
+        output_path = os.path.join(settings.TEMP_DIR, f"{uuid.uuid4().hex}_chained.mp4")
+        concatenate_clips(clip_paths, output_path)
+        chained_url = await upload_to_fal(output_path)
+        logger.info("[%s] Chained %d clips → %s", job_id, len(clip_paths), chained_url[:80])
+        return chained_url
+
     try:
-        # Clamp values
-        duration = max(3, min(15, duration))
+        # Clamp values — 60s üst sınırı last-frame chaining ile sağlanıyor
+        # (her chunk ≤15s, 4 chunk toplam 60s). Üstü kullanıcı-hataları için bloke.
+        duration = max(3, min(60, duration))
         scene_count = max(1, min(8, scene_count))
 
         # ── STUDIO MODE: kullanıcı tanımlı çekimler + elements, NB Pro/GPT yok ──
@@ -1187,6 +1290,7 @@ async def run_pipeline(
                     core_prompt=_core_raw,
                     meta=_studio_meta,
                     max_len=512,
+                    aspect_ratio=aspect_ratio,
                 )
                 _locked.append({"duration": _s["duration"], "prompt": _enhanced})  # type: ignore[index]
             studio_shots = _locked
@@ -1235,16 +1339,44 @@ async def run_pipeline(
             logger.info("[%s] Studio cfg_scale=%.2f (complexity=%s)",
                         job_id, _studio_cfg, _studio_complexity)
 
-            clip_url_studio = await _gen_video(
-                start_image_url=fal_studio_start,
-                multi_prompt=studio_shots,
-                duration=str(total_studio_dur),
-                aspect_ratio=aspect_ratio,
-                generate_audio=generate_audio,
-                elements=kling_elements,
-                negative_prompt=_studio_negative,
-                cfg_scale=_studio_cfg,
-            )
+            # Motion-control: kullanıcı referans video verdiyse multi-shot yerine
+            # Kling Motion Control endpoint'ine route et. Referans videodaki
+            # hareket (yürüyüş/dönme/dans) aynen kopyalanır, görünüm ilk kareden
+            # gelir. Fashion için dans/catwalk referansları için ideal.
+            if reference_video_url:
+                logger.info("[%s] Motion Control mode — using reference video: %s",
+                            job_id, reference_video_url[:80])
+                _update_job(job_id, progress=60, message="Motion Control video üretiliyor...")
+                from services.video_service import generate_motion_control_video
+                _mc_prompt = (studio_shots[0]["prompt"] if studio_shots else "")[:480]
+                _mc_elements = [
+                    {
+                        "frontal_image_url": e["frontal_image_url"],
+                        "reference_image_urls": e.get("reference_image_urls", []),
+                    }
+                    for e in kling_elements
+                ][:3]
+                clip_url_studio = await generate_motion_control_video(
+                    image_url=fal_studio_start,
+                    video_url=reference_video_url,
+                    prompt=_mc_prompt,
+                    elements=_mc_elements if _mc_elements else None,
+                    aspect_ratio=aspect_ratio,
+                    generate_audio=False,  # fashion için ses kapalı
+                    negative_prompt=_studio_negative[:2500],
+                    character_orientation="video",
+                )
+            else:
+                clip_url_studio = await _gen_video(
+                    start_image_url=fal_studio_start,
+                    multi_prompt=studio_shots,
+                    duration=str(total_studio_dur),
+                    aspect_ratio=aspect_ratio,
+                    generate_audio=False,  # fashion için ses kapalı
+                    elements=kling_elements,
+                    negative_prompt=_studio_negative,
+                    cfg_scale=_studio_cfg,
+                )
 
             _update_job(job_id, progress=85, message="Video indiriliyor...")
             final_path = os.path.join(settings.OUTPUT_DIR, f"{uuid.uuid4().hex}.mp4")
@@ -1253,6 +1385,31 @@ async def run_pipeline(
             logger.info("[%s] Studio video ready: %s", job_id, final_path)
 
             logger.info("[%s] Final video: %s", job_id, final_path)
+
+        # ── Step 4.5 (opt-in): Post-processing (upscale + interpolation) ──
+        # Fashion video kalitesi için: Kling çıkışı native 1080p 24-30fps ama
+        # kumaş dokusu ve saç telleri yumuşak kalıyor; catwalk hareketi hafif
+        # titreşimli görünüyor. Topaz 2x + 60fps interpolation bu ikisini
+        # profesyonel kaliteye yaklaştırır. Maliyet yüzünden opt-in.
+        if enable_upscale or enable_interpolation:
+            _update_job(job_id, progress=88, message="Post-processing başlıyor...")
+            try:
+                from services.video_service import upscale_video_2x, interpolate_video_60fps
+                _final_url = await upload_to_fal(final_path)
+                if enable_upscale:
+                    logger.info("[%s] Post-processing: 2x upscale", job_id)
+                    _update_job(job_id, progress=90, message="Video 2x upscale ediliyor...")
+                    _final_url = await upscale_video_2x(_final_url)
+                if enable_interpolation:
+                    logger.info("[%s] Post-processing: 60fps interpolation", job_id)
+                    _update_job(job_id, progress=91, message="60 FPS interpolation...")
+                    _final_url = await interpolate_video_60fps(_final_url)
+                processed_path = await download_file(_final_url, settings.TEMP_DIR, extension=".mp4")
+                shutil.move(processed_path, final_path)
+                logger.info("[%s] Post-processing done", job_id)
+            except Exception as pp_err:
+                logger.warning("[%s] Post-processing failed (continuing with base video): %s",
+                               job_id, pp_err)
 
         # ── Step 5 (optional): Watermark overlay ─────────────────
         if watermark_path and os.path.isfile(watermark_path):
@@ -1684,6 +1841,7 @@ async def run_defile_collection_pipeline(
                         core_prompt=str(p["prompt"]),  # type: ignore[index]
                         meta=_defile_meta,
                         max_len=512,
+                        aspect_ratio=request.aspect_ratio,
                     ),
                 }
                 for p in multi_prompt

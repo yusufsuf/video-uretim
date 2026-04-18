@@ -22,6 +22,9 @@ os.environ["FAL_KEY"] = settings.FAL_KEY
 
 _FAL_KLING_ENDPOINT = "fal-ai/kling-video/v3/pro/image-to-video"
 _FAL_KLING_MOTION_ENDPOINT = "fal-ai/kling-video/v3/pro/motion-control"
+# Post-processing endpoints (opt-in via pipeline param)
+_FAL_UPSCALE_ENDPOINT = "fal-ai/topaz/upscale/video"       # 2x upscale — Topaz
+_FAL_INTERPOLATE_ENDPOINT = "fal-ai/amt-interpolation"      # frame interpolation 24→60fps
 
 
 async def generate_multishot_video(
@@ -30,7 +33,7 @@ async def generate_multishot_video(
     elements: Optional[List[dict]] = None,
     duration: str = "10",
     aspect_ratio: str = "9:16",
-    generate_audio: bool = True,
+    generate_audio: bool = False,  # Fashion: sessiz video
     cfg_scale: float = 0.7,
     negative_prompt: str = "blur, distort, low quality, deformed hands, deformed face, changed outfit, different dress, altered silhouette, different fabric, costume change, wardrobe change, morphing clothes, feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, floating hem, lifted skirt, hem above ground, gap between dress and floor, short dress, mini dress, midi dress, knee-length dress, calf-length dress, cropped skirt, raised hemline, above-ankle hem, shortened dress",
 ) -> str:
@@ -106,7 +109,7 @@ async def generate_motion_control_video(
     prompt: str = "",
     elements: Optional[List[dict]] = None,
     aspect_ratio: str = "9:16",
-    generate_audio: bool = True,
+    generate_audio: bool = False,  # Fashion: sessiz video
     negative_prompt: str = "blur, distort, low quality, deformed hands, deformed face, changed outfit, different dress, altered silhouette, different fabric, costume change, wardrobe change, morphing clothes, feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, floating hem, lifted skirt, hem above ground, gap between dress and floor, short dress, mini dress, midi dress, knee-length dress, calf-length dress, cropped skirt, raised hemline, above-ankle hem, shortened dress",
     character_orientation: str = "video",
 ) -> str:
@@ -178,6 +181,47 @@ def concatenate_clips(clip_paths: list, output_path: str) -> str:
     os.remove(list_file)
     logger.info("Concatenated %d clips → %s", len(clip_paths), output_path)
     return output_path
+
+
+# ─── Post-processing (opt-in) ────────────────────────────────────
+
+async def upscale_video_2x(video_url: str) -> str:
+    """Topaz ile 2x video upscale. Kling 1080p çıkışını 4K'ya çıkarır.
+
+    Fashion video kalitesi için kritik — Kling native output detayları yumuşak,
+    upscale sonrası kumaş dokusu, takı parıltısı, saç teli gibi detaylar
+    belirgin hale gelir. Maliyet: fal.ai'nin tarifeleri üzerinden fatura.
+    """
+    logger.info("Topaz upscale starting: %s", video_url[:80])
+    result = await fal_client.run_async(
+        _FAL_UPSCALE_ENDPOINT,
+        arguments={
+            "video_url": video_url,
+            "upscale_factor": 2,
+        },
+    )
+    out_url: str = str(result["video"]["url"])
+    logger.info("Topaz upscale done: %s", out_url[:80])
+    return out_url
+
+
+async def interpolate_video_60fps(video_url: str) -> str:
+    """AMT frame interpolation ile 24/30fps → 60fps. Akışkan hareket için.
+
+    Fashion video'da yürüyüş, dönme, kumaş dalgalanması daha smooth görünür.
+    Kling default ~24-30fps ürettiği için TV/web oynatımında hafif titreşimli.
+    """
+    logger.info("AMT interpolation starting: %s", video_url[:80])
+    result = await fal_client.run_async(
+        _FAL_INTERPOLATE_ENDPOINT,
+        arguments={
+            "video_url": video_url,
+            "target_fps": 60,
+        },
+    )
+    out_url: str = str(result["video"]["url"])
+    logger.info("AMT interpolation done: %s", out_url[:80])
+    return out_url
 
 
 # ─── Download helper ──────────────────────────────────────────────

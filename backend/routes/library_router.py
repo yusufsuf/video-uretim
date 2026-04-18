@@ -21,7 +21,12 @@ ALLOWED_CATEGORIES = {
     # New element sub-categories
     "element", "costume", "scene", "effect", "item", "other",
 }
-ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+ALLOWED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+ALLOWED_VIDEO_EXTS = {".mp4", ".mov"}
+ALLOWED_EXTS = ALLOWED_IMAGE_EXTS  # backwards-compat alias for venue endpoint
+# Kling video_refer elementi sadece insan/kıyafet benzeri figürler için
+# (karakter + kostüm + element tutarlılığı). Mekan/stil/efekt fotolarına kapalı.
+VIDEO_ALLOWED_CATEGORIES = {"character", "costume", "element"}
 
 
 @router.get("/items")
@@ -42,35 +47,47 @@ async def upload_item(
     user: dict = Depends(get_current_user),
 ):
     if category not in ALLOWED_CATEGORIES:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Geçersiz kategori.")
 
     ext = os.path.splitext(file.filename or "img.jpg")[1].lower()
-    if ext not in ALLOWED_EXTS:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail="Sadece JPG, PNG veya WebP yükleyebilirsiniz.")
+    is_video = ext in ALLOWED_VIDEO_EXTS
+
+    if is_video:
+        if category not in VIDEO_ALLOWED_CATEGORIES:
+            raise HTTPException(
+                status_code=400,
+                detail="Video yalnızca karakter / kostüm / element kategorisine yüklenebilir.",
+            )
+    elif ext not in ALLOWED_IMAGE_EXTS:
+        raise HTTPException(
+            status_code=400,
+            detail="Sadece JPG, PNG, WebP veya (element için) MP4/MOV yükleyebilirsiniz.",
+        )
 
     primary_bytes = await file.read()
 
-    # Collect extra files (side/back for character; additional views for background)
+    # Collect extra files (side/back for character; additional views for background).
+    # Video path: extra görseller yok sayılır — Kling video_refer tek kaynak alır.
     extra_files = []
-    for uf in [file2, file3, file4]:
-        if uf and uf.filename:
-            extra_ext = os.path.splitext(uf.filename)[1].lower()
-            if extra_ext not in ALLOWED_EXTS:
-                continue
-            extra_files.append((await uf.read(), uf.content_type or "image/jpeg", extra_ext))
+    if not is_video:
+        for uf in [file2, file3, file4]:
+            if uf and uf.filename:
+                extra_ext = os.path.splitext(uf.filename)[1].lower()
+                if extra_ext not in ALLOWED_IMAGE_EXTS:
+                    continue
+                extra_files.append((await uf.read(), uf.content_type or "image/jpeg", extra_ext))
 
     return await add_item(
         user_id=user["id"],
         name=name,
         category=category,
         primary_bytes=primary_bytes,
-        primary_content_type=file.content_type or "image/jpeg",
+        primary_content_type=file.content_type or ("video/mp4" if is_video else "image/jpeg"),
         primary_ext=ext,
         extra_files=extra_files,
         fabric=fabric,
         description=description,
+        is_video=is_video,
     )
 
 
@@ -91,7 +108,7 @@ async def generate_venue_variants_endpoint(
     """Generate N angle variants of a venue photo via NB2 and save to library."""
     count = max(1, min(4, count))
     ext = os.path.splitext(file.filename or "venue.jpg")[1].lower() or ".jpg"
-    if ext not in ALLOWED_EXTS:
+    if ext not in ALLOWED_IMAGE_EXTS:
         raise HTTPException(status_code=400, detail="Sadece JPG, PNG veya WebP yükleyebilirsiniz.")
 
     file_bytes = await file.read()

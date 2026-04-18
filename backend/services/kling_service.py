@@ -314,11 +314,12 @@ async def generate_omni_video(
     aspect_ratio: str = "9:16",
     generate_audio: bool = False,
     element_list: Optional[List[dict]] = None,
-    model_name: str = "kling-v3-omni",  # "kling-v3-omni" | "kling-video-o1"
+    model_name: str = "kling-v3-omni",  # "kling-v3-omni" | "kling-video-o1" | "kling-video-o3"
 ) -> str:
     """Generate a video via Kling Omni endpoint (/v1/videos/omni-video).
 
-    Used for kling-v3-omni and kling-video-o1 models.
+    Used for kling-v3-omni, kling-video-o1 and kling-video-o3 models.
+    Not: video_refer elementleri SADECE kling-video-o3+ ile çalışır.
     Start frame passed via image_list with type=first_frame.
     Element tokens use <<<element_N>>> format in prompts.
     """

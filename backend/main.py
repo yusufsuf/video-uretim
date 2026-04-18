@@ -191,7 +191,7 @@ async def generate_video_endpoint(
     back_image: Optional[UploadFile] = File(None, description="Elbise arka fotoğrafı (opsiyonel)"),
     reference_image: Optional[UploadFile] = File(None, description="Referans stil/poz resmi (opsiyonel)"),
     reference_video: Optional[UploadFile] = File(None, description="Referans hareket videosu (opsiyonel)"),
-    generate_audio: str = Form("true"),
+    generate_audio: str = Form("false"),  # Fashion: sessiz video default
     duration: str = Form("10"),
     scene_count: str = Form("2"),
     aspect_ratio: str = Form("9:16"),
