@@ -144,6 +144,7 @@ async def generate_multishot_video(
     generate_audio: bool = False,
     element_list: Optional[List[dict]] = None,  # [{"element_id": int}, ...]
     model_name: str = "kling-v3",  # "kling-v3" | "kling-v3-omni"
+    cfg_scale: float = 0.7,  # dinamik — arayan tarafından karmaşıklığa göre ayarlanır
     negative_prompt: str = (
         "blur, distort, low quality, deformed hands, deformed face, "
         "changed outfit, different dress, altered silhouette, different fabric, "
@@ -192,9 +193,9 @@ async def generate_multishot_video(
         "sound": "on" if generate_audio else "off",
         "mode": "pro",
         # cfg_scale: how strictly the model follows the prompt.
-        # 0.7 is the sweet spot for fashion + element binding per Kling docs —
-        # high enough to lock garment/shot semantics, low enough to keep motion natural.
-        "cfg_scale": 0.7,
+        # 0.7 is baseline; karmaşık süslü kıyafetler için 0.85'e çıkarılır (daha sıkı
+        # element binding), basit kıyafetler için 0.55'e düşürülür (daha doğal hareket).
+        "cfg_scale": max(0.3, min(1.0, float(cfg_scale))),
     }
 
     if element_list:

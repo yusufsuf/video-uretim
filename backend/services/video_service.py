@@ -31,6 +31,7 @@ async def generate_multishot_video(
     duration: str = "10",
     aspect_ratio: str = "9:16",
     generate_audio: bool = True,
+    cfg_scale: float = 0.7,
     negative_prompt: str = "blur, distort, low quality, deformed hands, deformed face, changed outfit, different dress, altered silhouette, different fabric, costume change, wardrobe change, morphing clothes, feet, bare feet, shoes, heels, boots, footwear, visible ankles, visible toes, floating hem, lifted skirt, hem above ground, gap between dress and floor, short dress, mini dress, midi dress, knee-length dress, calf-length dress, cropped skirt, raised hemline, above-ankle hem, shortened dress",
 ) -> str:
     """Generate a fashion video using Kling 3.0 Pro via fal.ai.
@@ -64,7 +65,7 @@ async def generate_multishot_video(
             "shot_type": "customize",
             "duration": str(total_duration),
             "aspect_ratio": aspect_ratio,
-            "cfg_scale": 0.7,
+            "cfg_scale": max(0.3, min(1.0, float(cfg_scale))),
             "generate_audio": generate_audio,
             "negative_prompt": negative_prompt,
         }
@@ -81,7 +82,7 @@ async def generate_multishot_video(
             "prompt": prompt,
             "duration": shot_duration,
             "aspect_ratio": aspect_ratio,
-            "cfg_scale": 0.7,
+            "cfg_scale": max(0.3, min(1.0, float(cfg_scale))),
             "generate_audio": generate_audio,
             "negative_prompt": negative_prompt,
         }

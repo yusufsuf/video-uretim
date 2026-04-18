@@ -217,11 +217,29 @@ async def _run_element_creation(
 ) -> None:
     """Arka planda Kling element oluştur + DB'ye kaydet."""
     from services import telegram_service
+    from services.image_quality import validate_element_images
     try:
         # Mevcut kod kontrolü
         existing = await get_element_by_code(code)
         if existing:
             raise RuntimeError(f"Element kodu zaten kullanımda: {code}")
+
+        # Görsel kalite pre-check — düşük çözünürlük / format hatası varsa dur
+        quality = await validate_element_images(image_urls)
+        if not quality["ok"]:
+            err_msg = "; ".join(quality["errors"])
+            raise RuntimeError(f"Görsel kalite hatası: {err_msg}")
+        if quality["warnings"]:
+            logger.warning("WA element %s quality warnings: %s", code, quality["warnings"])
+
+        # Element görsel hizalama — 4 görsel aynı kıyafet mi? (GPT-4o Vision)
+        from services.analysis_service import validate_element_alignment
+        alignment = await validate_element_alignment(image_urls)
+        if not alignment["aligned"] and alignment.get("confidence", 0) >= 0.6:
+            raise RuntimeError(
+                f"Görseller aynı kıyafeti göstermiyor: {alignment['reason']}. "
+                f"Lütfen aynı kıyafetin farklı açılardan fotoğraflarını gönderin."
+            )
 
         frontal = image_urls[0]
         refs = image_urls[1:4]
@@ -269,8 +287,11 @@ async def create_element_async(
     requester_phone: str = "",
 ) -> str:
     """Element oluşturma task'ını başlatır, job_id döner."""
-    if not code or not name or len(image_urls) < 2:
-        raise ValueError("code, name ve en az 2 görsel gereklidir (1 frontal + 1 refer)")
+    if not code or not name or len(image_urls) < 3:
+        raise ValueError(
+            "code, name ve en az 3 görsel gereklidir (ön + 2 farklı açı). "
+            "Tutarlılık için 4 görsel önerilir: ön, 3/4 sol, 3/4 sağ, arka."
+        )
     if len(image_urls) > 4:
         image_urls = image_urls[:4]
 

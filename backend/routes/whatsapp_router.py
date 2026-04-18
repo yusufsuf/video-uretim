@@ -43,7 +43,9 @@ class RegisterUserReq(BaseModel):
 class CreateElementReq(BaseModel):
     code: str = Field(min_length=2, max_length=40, pattern=r"^[A-Za-z0-9_-]+$")
     name: str = Field(min_length=1, max_length=40)
-    image_urls: list[str] = Field(min_length=2, max_length=4)
+    # Kling 3.0 Omni: 4 açı (ön, 3/4 sol, 3/4 sağ, arka) kimlik tutarlılığı için
+    # optimal; 3 açı minimum kabul edilir, 2 veya daha azı identity drift yaratır.
+    image_urls: list[str] = Field(min_length=3, max_length=4)
     requester_phone: Optional[str] = Field(default=None, max_length=32)
 
 

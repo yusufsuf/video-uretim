@@ -128,17 +128,33 @@ async def get_item_by_url(image_url: str) -> Optional[dict]:
 
 
 async def set_kling_element_id(item_id: str, element_id: int) -> None:
-    """Cache a Kling element_id on a library item."""
+    """Cache a Kling element_id on a library item. Timestamps for TTL check."""
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     def _update():
         _db().table("library_items").update(
-            {"kling_element_id": element_id}
+            {
+                "kling_element_id": element_id,
+                "kling_element_created_at": now_iso,
+            }
         ).eq("id", item_id).execute()
 
     try:
         await asyncio.to_thread(_update)  # type: ignore[arg-type]
         logger.info("Cached kling_element_id=%d for item %s", element_id, item_id)
     except Exception as exc:
-        logger.warning("Failed to cache kling_element_id for %s: %s", item_id, exc)
+        # kling_element_created_at kolonu henüz migre edilmemişse fallback: sadece id yaz
+        logger.warning("Failed to cache kling_element with timestamp (%s); retrying without timestamp", exc)
+        def _update_legacy():
+            _db().table("library_items").update(
+                {"kling_element_id": element_id}
+            ).eq("id", item_id).execute()
+        try:
+            await asyncio.to_thread(_update_legacy)  # type: ignore[arg-type]
+            logger.info("Cached kling_element_id=%d for item %s (legacy, no timestamp)", element_id, item_id)
+        except Exception as exc2:
+            logger.warning("Failed to cache kling_element_id for %s: %s", item_id, exc2)
 
 
 async def delete_item(user_id: str, item_id: str) -> None:

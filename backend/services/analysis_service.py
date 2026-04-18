@@ -1194,10 +1194,18 @@ async def translate_studio_shot_description(
     system = (
         "You are a Kling AI video prompt specialist for fashion films. "
         "Convert the user's description into a precise English video generation prompt. "
-        "Focus on: model movement, walking direction, camera angle, shot framing, body language, pace. "
-        "The setting/location is already handled separately — do NOT include location details. "
-        "Do NOT include @Element tokens. Do NOT include garment constraint text. "
-        "Output only the motion/camera description, maximum 120 words, plain text."
+        "Focus ONLY on: model movement, walking direction, camera angle, shot framing, "
+        "body language, pace, gesture, expression tone.\n\n"
+        "CRITICAL — the model and outfit are already locked in via an Element reference. "
+        "You MUST strip from the output any mention of:\n"
+        "  • garment color, fabric, texture, pattern, silhouette, length, cut, neckline, sleeves\n"
+        "  • model's hair color, hairstyle, skin tone, makeup, body shape, age, ethnicity\n"
+        "  • accessories that belong to the outfit (shoes, bag, jewelry) unless user explicitly adds NEW ones\n"
+        "  • location/setting details (those come from the scene anchor, not you)\n"
+        "If the user wrote 'siyah elbiseli sarışın kadın dönüp yürüyor', output only 'turns and walks forward'. "
+        "Never describe WHAT the model wears or looks like — only WHAT SHE DOES and HOW THE CAMERA MOVES.\n\n"
+        "Do NOT include @Element tokens. Output only the motion/camera description, "
+        "maximum 120 words, plain text, no quotes, no lists."
     )
     user_msg = (
         f"Scene context: {scene_anchor}\n"
@@ -1362,4 +1370,57 @@ async def analyse_garment_slits(
     except Exception as e:
         logger.warning("analyse_garment_slits failed: %s", e)
         return ""
+
+
+async def validate_element_alignment(image_urls: list[str]) -> dict:
+    """GPT-4o Vision ile 4 element görselinin aynı outfit olup olmadığını kontrol et.
+
+    Hedef: kullanıcı yanlışlıkla farklı kıyafetlerin görsellerini yüklediğinde
+    element yaratımını durdur — aksi halde Kling kimliksiz bir element üretir.
+
+    Döner: {
+        "aligned": bool,
+        "confidence": float 0-1,
+        "reason": str,        # neden farklı/aynı (TR açıklama)
+    }
+    """
+    if len(image_urls) < 2:
+        # Tek görsel = kıyaslayacak bir şey yok, skip
+        return {"aligned": True, "confidence": 1.0, "reason": "tek görsel"}
+
+    image_blocks: list[dict] = []
+    for i, url in enumerate(image_urls[:4]):
+        image_blocks.append({"type": "text", "text": f"Görsel {i + 1}:"})
+        image_blocks.append({"type": "image_url", "image_url": _image_content(url, detail="low")})
+
+    image_blocks.append({"type": "text", "text": (
+        "Bu görseller aynı kişinin AYNI kıyafetinin farklı açılarından çekilmiş fotoğrafları "
+        "olmalı (ön, 3/4 sol, 3/4 sağ, arka gibi). "
+        "Görsellerin arasında kıyafet TAM AYNI mı kontrol et: kumaş/renk/silüet/süsleme "
+        "değişmemeli. Aynı kişinin farklı bir kıyafet giydiği fotoğrafı VARSA 'aligned' false olmalı. "
+        "Farklı kişiler varsa da false. "
+        "Ufak ışık/poz farkları normal, onları gözardı et.\n\n"
+        "JSON dön: {\"aligned\": true|false, \"confidence\": 0-1 arası ondalık, "
+        "\"reason\": \"kısa TR açıklama — aynı mı farklı mı, niye\"}"
+    )})
+
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-5.4",
+            messages=[{"role": "user", "content": image_blocks}],
+            response_format={"type": "json_object"},
+            max_completion_tokens=200,
+            temperature=0,
+        )
+        data = json.loads(resp.choices[0].message.content or "{}")
+        result = {
+            "aligned": bool(data.get("aligned", True)),
+            "confidence": float(data.get("confidence", 0.5)),
+            "reason": str(data.get("reason", ""))[:200],
+        }
+        logger.info("Element alignment check: %s", result)
+        return result
+    except Exception as e:
+        logger.warning("validate_element_alignment failed: %s — allowing by default", e)
+        return {"aligned": True, "confidence": 0.0, "reason": f"kontrol başarısız: {e}"}
 

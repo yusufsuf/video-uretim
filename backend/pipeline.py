@@ -316,25 +316,44 @@ _MICRO_ACTIONS_SHORT = "Subtle breathing, fabric settles naturally with gravity.
 
 # 5d. FABRIC-SPECIFIC NEGATIVE PROMPTS — injected when fabric is known
 # to prevent Kling from drifting toward the wrong texture/finish.
+# Kumaş tipine göre tersten (negatif) yasaklar — her kumaşın kendine has
+# fiziksel imzasını kopmaktan korur. Anahtar prensipler:
+#   • Parlak kumaşlar (silk, satin, velvet) → plastik/vinyl/rubber sahte parıltıyı yasakla
+#   • Akıcı kumaşlar (chiffon, organza, crepe) → sert/rigid/blok heykel tavrını yasakla
+#   • Strüktürlü kumaşlar (denim, leather, wool, tweed) → akışkan silk drape'i yasakla
+#   • Şeffaf kumaşlar (tulle, lace, organza) → opak/kalın görünümü yasakla
+#   • Parlak süslemeli (sequin, brocade, metallic) → düz mat / tek tonu yasakla
 _FABRIC_NEGATIVES: dict[str, str] = {
-    "silk":    "satin sheen, plastic-looking fabric, rubber texture, vinyl finish",
-    "satin":   "matte cotton finish, dull fabric, chalky texture",
-    "chiffon": "stiff fabric, heavy drape, opaque thick fabric, rigid cloth",
-    "organza": "soft flowy drape, matte fabric, thick weave",
-    "tulle":   "heavy fabric, opaque cloth, rigid structure",
-    "velvet":  "shiny synthetic fabric, plastic sheen, smooth satin finish",
-    "denim":   "soft silk-like drape, shiny fabric, fluid flow, satin sheen",
-    "leather": "soft fabric drape, cotton texture, matte cloth finish",
-    "cotton":  "synthetic plastic sheen, satin shine, vinyl finish",
-    "linen":   "shiny synthetic fabric, silk-like drape, plastic finish",
-    "wool":    "shiny synthetic fabric, plastic sheen, satin finish",
-    "tweed":   "smooth fabric, silk drape, shiny finish",
-    "lace":    "solid opaque fabric, thick weave, heavy cloth",
-    "crepe":   "shiny glossy surface, plastic sheen, satin finish",
-    "jersey":  "rigid stiff fabric, structured drape, heavy cloth",
-    "sequin":  "matte dull surface, flat fabric, no reflections",
-    "brocade": "plain flat fabric, smooth surface, no texture",
-    "polyester": "heavy matte drape, rigid cloth",
+    "silk":      "satin sheen, plastic-looking fabric, rubber texture, vinyl finish, wet-look gloss, shrink-wrap plastic",
+    "satin":     "matte cotton finish, dull fabric, chalky texture, linen roughness, sandpaper surface",
+    "chiffon":   "stiff fabric, heavy drape, opaque thick fabric, rigid cloth, cardboard edges, frozen folds",
+    "organza":   "soft flowy drape, matte fabric, thick weave, cotton softness, sheer-to-opaque shift",
+    "tulle":     "heavy fabric, opaque cloth, rigid structure, vinyl shine, wet-look tulle",
+    "velvet":    "shiny synthetic fabric, plastic sheen, smooth satin finish, flat painted look, metallic glitter",
+    "denim":     "soft silk-like drape, shiny fabric, fluid flow, satin sheen, wet-look jeans, stretched elastic",
+    "leather":   "soft fabric drape, cotton texture, matte cloth finish, wrinkled paper look, rubber balloon skin",
+    "cotton":    "synthetic plastic sheen, satin shine, vinyl finish, wet-look cotton, shrink-wrap plastic",
+    "linen":     "shiny synthetic fabric, silk-like drape, plastic finish, wet-look linen, smooth satin flow",
+    "wool":      "shiny synthetic fabric, plastic sheen, satin finish, silk flow, wet-look wool",
+    "tweed":     "smooth fabric, silk drape, shiny finish, wet-look tweed, plastic coating",
+    "lace":      "solid opaque fabric, thick weave, heavy cloth, plastic mesh, rubber netting",
+    "crepe":     "shiny glossy surface, plastic sheen, satin finish, wet-look crepe, rigid cardboard",
+    "jersey":    "rigid stiff fabric, structured drape, heavy cloth, plastic wrap, wet-look jersey",
+    "sequin":    "matte dull surface, flat fabric, no reflections, chalky texture, painted-on dots",
+    "brocade":   "plain flat fabric, smooth surface, no texture, blurred pattern, melted embroidery",
+    "polyester": "heavy matte drape, rigid cloth, wool-like texture",
+    # Yeni eklenen — sık kullanılan kumaşlar:
+    "tulle skirt": "compressed plastic mesh, rubber netting, wet-look layering",
+    "mesh":       "solid opaque fabric, thick weave, rubber netting, wet-look mesh",
+    "neoprene":   "soft silk drape, loose fluid flow, wet-look slick, plastic wrap",
+    "cashmere":   "shiny synthetic fabric, plastic sheen, satin finish, wet-look cashmere",
+    "taffeta":    "matte cotton finish, dull drape, rubber-like stiffness",
+    "suede":      "shiny finish, plastic coating, wet-look suede, satin sheen",
+    "fur":        "flat painted look, plastic strands, wet-look fur, rubber bristles",
+    "faux fur":   "flat painted look, plastic strands, wet-look fur, rubber bristles",
+    "knit":       "smooth satin flow, plastic sheen, silk drape, wet-look knit",
+    "metallic":   "flat matte paint, dull chalky surface, single-tone fabric, no reflections",
+    "sequined":   "matte dull surface, flat fabric, no reflections, chalky texture, painted-on dots",
 }
 
 def _get_fabric_negative(fabric: Optional[str]) -> str:
@@ -346,6 +365,62 @@ def _get_fabric_negative(fabric: Optional[str]) -> str:
         if key in f:
             return neg
     return ""
+
+
+# ─── Garment-complexity → camera guidance mapping ───────────────────────
+# Prensip (sistem-detayları.txt): ağır/süslü kıyafet → statik kamera, sade kıyafet →
+# dinamik kamera. Süsleme/kütle fazla olduğunda orbit/tracking micro-detayı bulandırır.
+
+# Yüksek karmaşıklık işaretçileri (fabric/description/name içinde geçerse)
+_HIGH_COMPLEXITY_KEYS = (
+    "sequin", "sequined", "payet", "beaded", "beading", "boncuk",
+    "embroider", "nakış", "brocade", "lace", "dantel", "metallic",
+    "metalik", "fur", "faux fur", "kürk", "feather", "tüy",
+    "ruffle", "ruffled", "fırfır", "volan", "layered", "katmanlı",
+    "train", "uzun kuyruk", "crystal", "kristal", "pearl", "inci",
+    "applique", "aplik", "velvet", "kadife",
+)
+
+# Orta karmaşıklık — akıcı ama büyük hacimli (silüet kontrolü önemli)
+_MEDIUM_COMPLEXITY_KEYS = (
+    "silk", "ipek", "satin", "saten", "chiffon", "şifon",
+    "organza", "crepe", "krep", "tulle", "tül",
+    "ballgown", "prenses", "a-line", "mermaid", "balık etek",
+    "long gown", "uzun elbise", "trailing", "flowing skirt",
+)
+
+
+def _classify_garment_complexity(meta: dict, shot_desc: str = "") -> str:
+    """Returns 'high' | 'medium' | 'low' based on fabric, name, description, and shot text."""
+    haystack_parts = []
+    for k in ("fabric", "name", "description"):
+        v = meta.get(k)
+        if v:
+            haystack_parts.append(str(v).lower())
+    if shot_desc:
+        haystack_parts.append(shot_desc.lower())
+    haystack = " ".join(haystack_parts)
+
+    if not haystack:
+        return "medium"  # varsayılan: orta
+
+    if any(k in haystack for k in _HIGH_COMPLEXITY_KEYS):
+        return "high"
+    if any(k in haystack for k in _MEDIUM_COMPLEXITY_KEYS):
+        return "medium"
+    return "low"
+
+
+# Kamera direktifi — shot prompt'un sonuna eklenir
+_CAMERA_GUIDE: dict[str, str] = {
+    "high":   "static locked camera, no parallax, subject holds center frame so intricate surface detail and beadwork read sharply",
+    "medium": "subtle slow dolly-in or gentle pan at eye level, minimal parallax to preserve silhouette",
+    "low":    "dynamic framing allowed — slow orbit, tracking walk, or arc permitted; keep motion smooth and model centered",
+}
+
+
+def _get_camera_guide(complexity: str) -> str:
+    return _CAMERA_GUIDE.get(complexity, _CAMERA_GUIDE["medium"])
 
 
 # 5e. UNIFIED GARMENT META RESOLVER ────────────────────────────────────────
@@ -832,12 +907,29 @@ async def get_or_create_kling_element(
     from services.kling_service import create_element  # type: ignore[import]
     from services.library_service import get_item_by_url, set_kling_element_id
 
-    # Check cache
+    # Check cache (with 25-day TTL — Kling silences elements ~30 gün sonra)
     item = await get_item_by_url(front_url)
     if item and item.get("kling_element_id"):
-        logger.info("Kling element cache HIT: item=%s, element_id=%d",
-                     item["id"], item["kling_element_id"])
-        return int(item["kling_element_id"])
+        _cache_fresh = True
+        _created_at_str = item.get("kling_element_created_at")
+        if _created_at_str:
+            try:
+                from datetime import datetime, timezone, timedelta
+                _created_at = datetime.fromisoformat(_created_at_str.replace("Z", "+00:00"))
+                _age_days = (datetime.now(timezone.utc) - _created_at).days
+                if _age_days >= 25:
+                    _cache_fresh = False
+                    logger.info(
+                        "Kling element cache STALE (%d days old): item=%s, element_id=%d — recreating",
+                        _age_days, item["id"], item["kling_element_id"],
+                    )
+            except Exception as _exc:
+                logger.debug("Could not parse kling_element_created_at (%s): %s — treating as fresh",
+                             _created_at_str, _exc)
+        if _cache_fresh:
+            logger.info("Kling element cache HIT: item=%s, element_id=%d",
+                         item["id"], item["kling_element_id"])
+            return int(item["kling_element_id"])
 
     # Create new element — may fail if only the frontal image was provided
     try:
@@ -951,6 +1043,7 @@ async def run_pipeline(
             if kling_model == "kling-v3-omni":
                 # Omni uses separate endpoint — strip unsupported params
                 kwargs.pop("negative_prompt", None)
+                kwargs.pop("cfg_scale", None)  # Omni kendi iç tuning'ini kullanıyor
                 kwargs["model_name"] = kling_model
                 return await _omni_gen(**kwargs)
 
@@ -1024,28 +1117,21 @@ async def run_pipeline(
             logger.info("[%s] Garment constraint: %s", job_id, garment_constraint)
 
             # Kullanıcı çekimlerini @Element tokenlarına dönüştür (1..N elementi için)
-            # GPT-4o-mini ile kullanıcının açıklamasını Kling-optimized İngilizce prompt'a çevir
+            # Her kullanıcı açıklaması GPT ile sanitize edilir: garment/appearance
+            # artıkları temizlenir, sadece hareket/kamera kalır. Element'in 3D kimliği
+            # böylece prompt metniyle çatışmaz.
             if request.shots:
                 import re as _re
-                # Check if ALL shots have user-provided descriptions → skip GPT translate
-                _all_have_desc = all((s.description or "").strip() for s in request.shots)
                 studio_shots = []
                 for shot in request.shots:
                     desc = (shot.description or "").strip()
                     if desc:
-                        if _all_have_desc:
-                            # User provided prompts — use directly without GPT translation
-                            desc_stripped = _re.sub(r'^(@[Ee]lement\d+\s*)+', '', desc).strip()
-                            prompt = f"{_element_prefix} {desc_stripped}"
-                            logger.info("[%s] Studio shot: using user prompt directly (GPT skipped)", job_id)
-                        else:
-                            # Mixed — translate via GPT
-                            desc_stripped = _re.sub(r'^(@[Ee]lement\d+\s*)+', '', desc).strip()
-                            translated = await translate_studio_shot_description(
-                                user_description=desc_stripped,
-                                scene_anchor=scene_anchor,
-                            )
-                            prompt = f"{_element_prefix} {translated}"
+                        desc_stripped = _re.sub(r'^(@[Ee]lement\d+\s*)+', '', desc).strip()
+                        translated = await translate_studio_shot_description(
+                            user_description=desc_stripped,
+                            scene_anchor=scene_anchor,
+                        )
+                        prompt = f"{_element_prefix} {translated}"
                     else:
                         prompt = f"{_element_prefix} In the {scene_anchor}, model walks elegantly with tiny concealed steps, sealed skirt moves as one piece, showcasing the garment"
                     studio_shots.append({"duration": shot.duration, "prompt": prompt[:480]})
@@ -1074,16 +1160,29 @@ async def run_pipeline(
             # so no positive-text hem/slit enforcement is injected here. An optional
             # user-provided garment_constraint is the only shape hint kept.
             _gc_short = (str(garment_constraint)[:80]).strip() if garment_constraint else ""
+
+            # Garment complexity → camera guidance. Süslü/ağır kıyafet statik kamera,
+            # sade kıyafet dinamik kamera kullanır — element detaylarının okunaklı
+            # kalmasını sağlar.
+            _studio_complexity = _classify_garment_complexity(_studio_meta)
+            _studio_camera_guide = _get_camera_guide(_studio_complexity)
+            logger.info("[%s] Studio complexity=%s → camera=%s",
+                        job_id, _studio_complexity, _studio_camera_guide[:60])
+
             _locked: list = []
             for _s in studio_shots:
                 desc = str(_s["prompt"])
                 # desc = "@Element1 [@Element2 ...] <shot description>"
                 _after_elem = desc[len(_element_prefix):].strip()  # type: ignore[index]
-                # Core: element tokens + (optional garment constraint) + shot description
+                # Per-shot complexity — kullanıcı açıklamasında da süsleme anahtar
+                # kelimeleri varsa yükseltilmiş olur
+                _shot_complexity = _classify_garment_complexity(_studio_meta, shot_desc=_after_elem)
+                _shot_camera = _get_camera_guide(_shot_complexity)
+                # Core: element tokens + (optional garment constraint) + shot description + camera guide
                 if _gc_short:
-                    _core_raw = f"{_element_prefix} {_gc_short} {_after_elem}".strip()
+                    _core_raw = f"{_element_prefix} {_gc_short} {_after_elem}. {_shot_camera}".strip()
                 else:
-                    _core_raw = f"{_element_prefix} {_after_elem}".strip()
+                    _core_raw = f"{_element_prefix} {_after_elem}. {_shot_camera}".strip()
                 _enhanced = _apply_quality_layers(
                     core_prompt=_core_raw,
                     meta=_studio_meta,
@@ -1131,6 +1230,11 @@ async def run_pipeline(
             logger.info("[%s] Studio shots to send:\n%s", job_id,
                         "\n".join(f"  [{i+1}] ({s['duration']}s) {s['prompt']}" for i, s in enumerate(studio_shots)))
 
+            # Dinamik cfg_scale — karmaşık kıyafet daha sıkı prompt adherence gerektirir
+            _studio_cfg = {"high": 0.85, "medium": 0.7, "low": 0.55}.get(_studio_complexity, 0.7)
+            logger.info("[%s] Studio cfg_scale=%.2f (complexity=%s)",
+                        job_id, _studio_cfg, _studio_complexity)
+
             clip_url_studio = await _gen_video(
                 start_image_url=fal_studio_start,
                 multi_prompt=studio_shots,
@@ -1139,6 +1243,7 @@ async def run_pipeline(
                 generate_audio=generate_audio,
                 elements=kling_elements,
                 negative_prompt=_studio_negative,
+                cfg_scale=_studio_cfg,
             )
 
             _update_job(job_id, progress=85, message="Video indiriliyor...")
