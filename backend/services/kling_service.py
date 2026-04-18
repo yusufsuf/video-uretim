@@ -102,6 +102,55 @@ async def create_element(
     return await _poll_element(task_id)
 
 
+async def create_element_from_video(
+    video_url: str,
+    name: str = "garment",
+    description: str = "fashion garment",
+) -> int:
+    """Kling video-refer element yaratımı. Native API özelliği.
+
+    Kling docs kısıtları:
+      - .mp4 / .mov formatları
+      - Süre: 3-8s
+      - 1080P çözünürlük
+      - Aspect ratio: 16:9 veya 9:16
+      - Max 200MB, max 1 video
+      - Üretilen element yalnızca kling-video-o3+ modelleriyle kullanılabilir
+
+    Sadece gerçekçi insan figürleri video ile özelleştirilebilir (elbise giyen
+    model bu kategoriye girer).
+    """
+    if not video_url:
+        raise RuntimeError("video_url zorunludur")
+
+    body = {
+        "element_name": name[:20],  # type: ignore[index]
+        "element_description": description[:100],  # type: ignore[index]
+        "reference_type": "video_refer",
+        "element_video_list": {
+            "refer_videos": [{"video_url": video_url}],
+        },
+        "tag_list": [{"tag_id": "o_102"}],  # Character — video_refer insan figürü için
+    }
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{_BASE_URL}/v1/general/advanced-custom-elements",
+            json=body,
+            headers=_headers(),
+        )
+        if resp.status_code != 200:
+            _err = resp.text
+            raise RuntimeError(f"Kling video element HTTP {resp.status_code}: {_err[:300]}")
+        data = resp.json()
+        if data.get("code") != 0:
+            raise RuntimeError(f"Kling video element error {data.get('code')}: {data.get('message')}")
+        task_id: str = data["data"]["task_id"]
+
+    logger.info("Kling VIDEO element task created: %s (name=%s)", task_id, name[:20])
+    return await _poll_element(task_id)
+
+
 async def _poll_element(task_id: str) -> int:
     """Poll element creation task until complete. Returns element_id."""
     elapsed = 0

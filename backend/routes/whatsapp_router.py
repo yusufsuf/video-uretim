@@ -127,35 +127,11 @@ async def create_element_endpoint(body: CreateElementReq):
     if existing:
         raise HTTPException(status_code=409, detail="Bu element kodu zaten kullanımda.")
 
-    # Video verilmişse 4 frame çıkar → image_urls'ye çevir
-    final_image_urls: list[str]
-    if body.video_url:
-        from services.video_frame_extractor import extract_rotation_frames
-        from config import settings as _settings
-        try:
-            frame_paths = await extract_rotation_frames(
-                video_url=body.video_url,
-                output_dir=_settings.UPLOAD_DIR,
-                count=4,
-            )
-        except Exception as exc:
-            logger.exception("Video frame extraction failed")
-            raise HTTPException(
-                status_code=400,
-                detail=f"Video işlenemedi: {exc}. 360° dönüş videosu olduğundan emin olun."
-            )
-        # Local path → public URL
-        import os as _os
-        base = _settings.BASE_URL.rstrip("/")
-        final_image_urls = [f"{base}/uploads/{_os.path.basename(p)}" for p in frame_paths]
-        logger.info("Video → %d frame URL: %s", len(final_image_urls), final_image_urls)
-    else:
-        final_image_urls = body.image_urls or []
-
     try:
         job_id = await whatsapp_service.create_element_async(
             code=body.code, name=body.name,
-            image_urls=final_image_urls,
+            image_urls=body.image_urls,
+            video_url=body.video_url,
             admin_user_id=admin_user_id,
             requester_phone=body.requester_phone or "",
         )

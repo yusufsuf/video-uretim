@@ -212,43 +212,63 @@ async def _run_element_creation(
     job_id: str,
     code: str,
     name: str,
-    image_urls: list[str],
+    image_urls: Optional[list[str]],
+    video_url: Optional[str],
     admin_user_id: str,
 ) -> None:
-    """Arka planda Kling element oluştur + DB'ye kaydet."""
+    """Arka planda Kling element oluştur + DB'ye kaydet.
+
+    İki kaynak desteklenir:
+      1. image_urls (3-4 görsel) → reference_type=image_refer
+      2. video_url (tek .mp4/.mov) → reference_type=video_refer (sadece kling-video-o3+
+         modelleriyle kullanılabilir)
+    """
     from services import telegram_service
-    from services.image_quality import validate_element_images
     try:
         # Mevcut kod kontrolü
         existing = await get_element_by_code(code)
         if existing:
             raise RuntimeError(f"Element kodu zaten kullanımda: {code}")
 
-        # Görsel kalite pre-check — düşük çözünürlük / format hatası varsa dur
-        quality = await validate_element_images(image_urls)
-        if not quality["ok"]:
-            err_msg = "; ".join(quality["errors"])
-            raise RuntimeError(f"Görsel kalite hatası: {err_msg}")
-        if quality["warnings"]:
-            logger.warning("WA element %s quality warnings: %s", code, quality["warnings"])
-
-        # Element görsel hizalama — 4 görsel aynı kıyafet mi? (GPT-4o Vision)
-        from services.analysis_service import validate_element_alignment
-        alignment = await validate_element_alignment(image_urls)
-        if not alignment["aligned"] and alignment.get("confidence", 0) >= 0.6:
-            raise RuntimeError(
-                f"Görseller aynı kıyafeti göstermiyor: {alignment['reason']}. "
-                f"Lütfen aynı kıyafetin farklı açılardan fotoğraflarını gönderin."
+        if video_url:
+            # Video-refer element (native Kling) — pre-check atla, Kling kendisi
+            # format/duration/aspect validate ediyor
+            element_id = await kling_service.create_element_from_video(
+                video_url=video_url,
+                name=name[:20] or code[:20],
+                description=f"WhatsApp element {code}"[:100],
             )
+            frontal = video_url
+            refs: list[str] = []
+            logger.info("WA video element created: %s → id=%d", code, element_id)
+        else:
+            assert image_urls, "image_urls ya da video_url zorunlu"
+            # Görsel kalite pre-check — düşük çözünürlük / format hatası varsa dur
+            from services.image_quality import validate_element_images
+            quality = await validate_element_images(image_urls)
+            if not quality["ok"]:
+                err_msg = "; ".join(quality["errors"])
+                raise RuntimeError(f"Görsel kalite hatası: {err_msg}")
+            if quality["warnings"]:
+                logger.warning("WA element %s quality warnings: %s", code, quality["warnings"])
 
-        frontal = image_urls[0]
-        refs = image_urls[1:4]
-        element_id = await kling_service.create_element(
-            frontal_image_url=frontal,
-            reference_image_urls=refs,
-            name=name[:20] or code[:20],
-            description=f"WhatsApp element {code}"[:100],
-        )
+            # Element görsel hizalama — 4 görsel aynı kıyafet mi? (GPT-4o Vision)
+            from services.analysis_service import validate_element_alignment
+            alignment = await validate_element_alignment(image_urls)
+            if not alignment["aligned"] and alignment.get("confidence", 0) >= 0.6:
+                raise RuntimeError(
+                    f"Görseller aynı kıyafeti göstermiyor: {alignment['reason']}. "
+                    f"Lütfen aynı kıyafetin farklı açılardan fotoğraflarını gönderin."
+                )
+
+            frontal = image_urls[0]
+            refs = image_urls[1:4]
+            element_id = await kling_service.create_element(
+                frontal_image_url=frontal,
+                reference_image_urls=refs,
+                name=name[:20] or code[:20],
+                description=f"WhatsApp element {code}"[:100],
+            )
 
         await _save_element_record(
             code=code, name=name, front_url=frontal,
@@ -282,18 +302,32 @@ async def _run_element_creation(
 async def create_element_async(
     code: str,
     name: str,
-    image_urls: list[str],
+    image_urls: Optional[list[str]],
     admin_user_id: str,
+    video_url: Optional[str] = None,
     requester_phone: str = "",
 ) -> str:
-    """Element oluşturma task'ını başlatır, job_id döner."""
-    if not code or not name or len(image_urls) < 3:
-        raise ValueError(
-            "code, name ve en az 3 görsel gereklidir (ön + 2 farklı açı). "
-            "Tutarlılık için 4 görsel önerilir: ön, 3/4 sol, 3/4 sağ, arka."
-        )
-    if len(image_urls) > 4:
-        image_urls = image_urls[:4]
+    """Element oluşturma task'ını başlatır, job_id döner.
+
+    image_urls VEYA video_url verilmelidir (ikisi değil):
+      - image_urls: 3-4 görsel (ön + farklı açılar)
+      - video_url: 360° dönüş videosu (.mp4/.mov, 3-8s, 1080P, 16:9 veya 9:16)
+    """
+    if not code or not name:
+        raise ValueError("code ve name zorunludur")
+
+    if video_url:
+        if image_urls:
+            raise ValueError("image_urls ile video_url aynı anda verilemez")
+    else:
+        if not image_urls or len(image_urls) < 3:
+            raise ValueError(
+                "image_urls için en az 3 görsel gereklidir (ön + 2 farklı açı). "
+                "Tutarlılık için 4 görsel önerilir: ön, 3/4 sol, 3/4 sağ, arka. "
+                "Ya da video_url yollayın (360° dönüş)."
+            )
+        if len(image_urls) > 4:
+            image_urls = image_urls[:4]
 
     job_id = uuid.uuid4().hex
     element_jobs[job_id] = {
@@ -301,7 +335,7 @@ async def create_element_async(
         "error": None, "code": code, "phone": requester_phone,
     }
     asyncio.create_task(
-        _run_element_creation(job_id, code, name, image_urls, admin_user_id)
+        _run_element_creation(job_id, code, name, image_urls, video_url, admin_user_id)
     )
     return job_id
 
