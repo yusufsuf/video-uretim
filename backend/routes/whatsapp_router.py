@@ -45,7 +45,10 @@ class CreateElementReq(BaseModel):
     name: str = Field(min_length=1, max_length=40)
     # Kling 3.0 Omni: 4 açı (ön, 3/4 sol, 3/4 sağ, arka) kimlik tutarlılığı için
     # optimal; 3 açı minimum kabul edilir, 2 veya daha azı identity drift yaratır.
-    image_urls: list[str] = Field(min_length=3, max_length=4)
+    image_urls: Optional[list[str]] = Field(default=None, min_length=3, max_length=4)
+    # 360° dönüş videosu — verilirse 4 frame çıkarılır, image_urls'ye gerek yok.
+    # Foto setinden daha tutarlı (aynı ışık/model/kıyafet).
+    video_url: Optional[str] = Field(default=None, max_length=500)
     requester_phone: Optional[str] = Field(default=None, max_length=32)
 
 
@@ -89,7 +92,11 @@ async def get_element_endpoint(code: str):
 async def create_element_endpoint(body: CreateElementReq):
     """Element oluşturma task'ı başlatır, async çalışır.
 
-    Admin user_id gereklidir (library_items.user_id için). ADMIN_EMAIL'den alınır.
+    İki kaynak desteklenir:
+      1. image_urls: 3-4 ayrı görsel URL'i (ön / 3/4 / arka)
+      2. video_url: 360° dönüş videosu — backend 4 frame çıkarıp kullanır
+
+    Admin user_id gereklidir (library_items.user_id için).
     """
     from services.auth_service import _admin_client
     db = _admin_client()
@@ -103,15 +110,52 @@ async def create_element_endpoint(body: CreateElementReq):
         raise HTTPException(status_code=500, detail="Admin profili bulunamadı.")
     admin_user_id = rows[0]["id"]
 
+    # Kaynak validasyonu — en az bir tane zorunlu, ikisi aynı anda verilmemeli
+    if not body.image_urls and not body.video_url:
+        raise HTTPException(
+            status_code=400,
+            detail="image_urls ya da video_url'den biri zorunludur."
+        )
+    if body.image_urls and body.video_url:
+        raise HTTPException(
+            status_code=400,
+            detail="image_urls ile video_url aynı anda verilemez."
+        )
+
     # Aynı kod var mı?
     existing = await whatsapp_service.get_element_by_code(body.code)
     if existing:
         raise HTTPException(status_code=409, detail="Bu element kodu zaten kullanımda.")
 
+    # Video verilmişse 4 frame çıkar → image_urls'ye çevir
+    final_image_urls: list[str]
+    if body.video_url:
+        from services.video_frame_extractor import extract_rotation_frames
+        from config import settings as _settings
+        try:
+            frame_paths = await extract_rotation_frames(
+                video_url=body.video_url,
+                output_dir=_settings.UPLOAD_DIR,
+                count=4,
+            )
+        except Exception as exc:
+            logger.exception("Video frame extraction failed")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Video işlenemedi: {exc}. 360° dönüş videosu olduğundan emin olun."
+            )
+        # Local path → public URL
+        import os as _os
+        base = _settings.BASE_URL.rstrip("/")
+        final_image_urls = [f"{base}/uploads/{_os.path.basename(p)}" for p in frame_paths]
+        logger.info("Video → %d frame URL: %s", len(final_image_urls), final_image_urls)
+    else:
+        final_image_urls = body.image_urls or []
+
     try:
         job_id = await whatsapp_service.create_element_async(
             code=body.code, name=body.name,
-            image_urls=body.image_urls,
+            image_urls=final_image_urls,
             admin_user_id=admin_user_id,
             requester_phone=body.requester_phone or "",
         )
