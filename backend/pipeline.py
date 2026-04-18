@@ -775,10 +775,16 @@ def _build_nb_pro_compose_prompt(
 async def _to_fal_url_compressed(url: str) -> str:
     """Like _to_fal_url but also resizes/compresses the image to stay under Kling's
     10 MB elements limit. Returns a fal.ai CDN URL pointing to the compressed image.
+
+    Video URL'leri (.mp4/.mov) sıkıştırma yapılmadan olduğu gibi aktarılır —
+    video_refer elementleri için kaynak video URL'siyle çalışır.
     """
     clean_url: str = url.split("?")[0]
     if not _is_ssrf_safe(clean_url):
         raise ValueError(f"SSRF blocked: {clean_url}")
+    # Video ise sıkıştırma atlanır — doğrudan orijinal URL döndürülür.
+    if clean_url.lower().endswith((".mp4", ".mov")):
+        return url
     try:
         local = await download_file(clean_url, settings.TEMP_DIR, extension=".jpg")
         # Compress with Pillow
@@ -1075,15 +1081,17 @@ async def run_pipeline(
 
             kwargs["element_list"] = element_list if element_list else None
 
-            # video_refer element varsa model zorunlu olarak kling-video-o3+ olmalı
-            # (Kling API kısıtı: video-customized elementler sadece o3+ modellerde)
+            # video_refer element varsa model zorunlu olarak Omni olmalı — Kling
+            # "VIDEO O1 has been upgraded to VIDEO 3.0 Omni" (bkz. docs Feb 2026);
+            # API'de 'kling-video-o3' diye bir isim yok, video element desteği
+            # kling-v3-omni'de.
             effective_model = kling_model
-            if has_video_refer and kling_model not in ("kling-video-o3", "kling-video-o1"):
-                logger.info("[%s] video_refer element detected → upgrading model %s → kling-video-o3",
+            if has_video_refer and kling_model != "kling-v3-omni":
+                logger.info("[%s] video_refer element detected → upgrading model %s → kling-v3-omni",
                             job_id, kling_model)
-                effective_model = "kling-video-o3"
+                effective_model = "kling-v3-omni"
 
-            if effective_model in ("kling-v3-omni", "kling-video-o1", "kling-video-o3"):
+            if effective_model == "kling-v3-omni":
                 # Omni endpoint (element-aware) — strip params Omni desteklemez
                 kwargs.pop("negative_prompt", None)
                 kwargs.pop("cfg_scale", None)  # Omni kendi iç tuning'ini kullanıyor

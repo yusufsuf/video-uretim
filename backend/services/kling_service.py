@@ -115,7 +115,7 @@ async def create_element_from_video(
       - 1080P çözünürlük
       - Aspect ratio: 16:9 veya 9:16
       - Max 200MB, max 1 video
-      - Üretilen element yalnızca kling-video-o3+ modelleriyle kullanılabilir
+      - Üretilen element yalnızca kling-v3-omni modeliyle kullanılabilir
 
     Sadece gerçekçi insan figürleri video ile özelleştirilebilir (elbise giyen
     model bu kategoriye girer).
@@ -314,12 +314,12 @@ async def generate_omni_video(
     aspect_ratio: str = "9:16",
     generate_audio: bool = False,
     element_list: Optional[List[dict]] = None,
-    model_name: str = "kling-v3-omni",  # "kling-v3-omni" | "kling-video-o1" | "kling-video-o3"
+    model_name: str = "kling-v3-omni",  # only "kling-v3-omni" is valid on this endpoint
 ) -> str:
     """Generate a video via Kling Omni endpoint (/v1/videos/omni-video).
 
-    Used for kling-v3-omni, kling-video-o1 and kling-video-o3 models.
-    Not: video_refer elementleri SADECE kling-video-o3+ ile çalışır.
+    Model = kling-v3-omni (VIDEO O1 → upgraded to VIDEO 3.0 Omni per Feb 2026 docs).
+    video_refer elementleri bu modelde destekleniyor.
     Start frame passed via image_list with type=first_frame.
     Element tokens use <<<element_N>>> format in prompts.
     """
