@@ -15,8 +15,6 @@ Aspect: 1:1 / 4:3 / 3:4 / 16:9 / 9:16 / 21:9 / adaptive
 Resolution: 480p / 720p / 1080p
 """
 
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
