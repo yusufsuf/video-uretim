@@ -566,68 +566,233 @@ def _pick_defile_shot_arc() -> dict:
 # editorial, couture dramatic. The shot planner counts how many shots the user
 # will get (based on total_duration + rhythm), then GPT adapts the beat list to
 # match the shot count.
+# Master camera-type pool — each entry is a distinct, non-interchangeable shot style.
+# Every shot in a sequence MUST receive a unique camera type (strict no-repeat rule).
+_MASTER_CAMERA_POOL: list[str] = [
+    "wide_establishing",         # wide full-body static, environment context
+    "medium_tracking",           # medium framing, parallel tracking as model walks
+    "close_up_fabric",           # tight close-up on fabric/seam/embellishment, slow push-in
+    "low_angle_hero",            # low angle looking upward, heroic silhouette
+    "side_tracking_profile",     # strict profile, lateral tracking alongside
+    "hem_to_head_tilt_up",       # camera starts at hem/feet and tilts upward all the way to face
+    "over_shoulder_back",        # over-the-shoulder from behind, back construction + environment ahead
+    "back_detail_close",         # tight close-up on back construction/closure/shoulder-blade geometry
+    "descending_follow",         # follow shot as model descends (stairs/steps/slope)
+    "three_quarter_turn_orbit",  # camera orbits as model performs a slow 3/4 turn
+    "dolly_in_face",             # slow dolly-in to face/chest, eye-level
+    "final_back_walk",           # follow from behind as model walks away, hem trailing
+]
+
+_CAMERA_TYPE_GUIDANCE: dict[str, str] = {
+    "wide_establishing":        "wide static full-body shot, model centered, environment context visible, camera still",
+    "medium_tracking":          "medium framing, camera parallel-tracks the model as she walks naturally",
+    "close_up_fabric":          "tight close-up on a garment detail (fabric drape, neckline, seam, embellishment), slow push-in",
+    "low_angle_hero":           "low angle looking upward at the model, heroic stance, sky/ceiling above",
+    "side_tracking_profile":    "strict profile / side view, camera tracks laterally alongside the model",
+    "hem_to_head_tilt_up":      "camera starts tight at hem/feet and tilts upward all the way to the face, revealing the garment vertically",
+    "over_shoulder_back":       "over-the-shoulder framing from behind the model, partial back construction visible, environment ahead",
+    "back_detail_close":        "tight close-up on back construction — closure, opening, drape, or shoulder-blade geometry",
+    "descending_follow":        "follow shot as the model descends (stairs, steps, or slope), camera matches downward motion",
+    "three_quarter_turn_orbit": "camera orbits around the model as she performs a slow three-quarter turn, revealing side then back",
+    "dolly_in_face":            "slow dolly-in to the model's face/chest, eye-level, shallow focus",
+    "final_back_walk":          "follow from behind as model walks away slowly, hem trailing, cinematic fade-out feel",
+}
+
+
 _WORKFLOW_ARC_TEMPLATES: list[dict] = [
     {
         "id": "editorial",
         "name": "Editorial",
-        "description": "Klasik fashion film: establishing → walk → hero → detail → landmark → closing",
+        "description": "Klasik fashion film: wide → profile → walk → tilt-up → hero → detail → low angle → back detail → turn → back walk",
         "mood": "luxury editorial Vogue aesthetic, calm cinematic rhythm, high-fashion stillness",
-        "camera_style": "smooth tripod or slow dolly moves, shallow depth of field, still controlled framing",
+        "camera_style": "smooth tripod or slow dolly moves, shallow depth of field, controlled framing",
         "beats": [
-            "ESTABLISHING WIDE — wide static frame showing model centered in the environment, contextual architecture visible, still confident pose",
-            "WALK — medium tracking as model walks naturally through the space, fabric/hem responding to motion, camera glides parallel",
-            "HERO POSE — eye-level medium shot of model in a strong composed pose, garment silhouette clean, editorial gaze",
+            "ESTABLISHING WIDE — wide static frame, model centered in the environment, contextual architecture visible, still confident pose",
+            "SIDE PROFILE TRACKING — lateral tracking from the side as model moves, garment silhouette in strict profile",
+            "MEDIUM TRACKING WALK — medium parallel-tracking as model walks naturally, fabric/hem responding to motion",
+            "HEM-TO-HEAD TILT UP — camera starts tight at hem/feet and tilts upward all the way to face, revealing the garment vertically",
+            "HERO POSE EYE-LEVEL — slow dolly-in to eye-level medium shot, strong composed pose, garment silhouette clean, editorial gaze",
             "DETAIL CLOSE-UP — tight framing on a key construction element: fabric drape, neckline, embellishment, or hand on waist — slow push-in",
-            "LANDMARK FRAMING — wide cinematic composition where the model is balanced against an iconic architectural element in the background",
+            "LOW ANGLE HERO — low angle looking upward, model towers above camera, confident stance against background",
+            "BACK DETAIL CLOSE — tight close on back construction: closure, opening, drape, or shoulder-blade geometry",
+            "THREE-QUARTER TURN ORBIT — camera orbits around model as she executes a slow 3/4 turn, revealing side then back",
             "CLOSING BACK WALK — follow shot from behind as model walks away slowly, hem trailing, cinematic fade-out feel",
+        ],
+        "camera_types": [
+            "wide_establishing",
+            "side_tracking_profile",
+            "medium_tracking",
+            "hem_to_head_tilt_up",
+            "dolly_in_face",
+            "close_up_fabric",
+            "low_angle_hero",
+            "back_detail_close",
+            "three_quarter_turn_orbit",
+            "final_back_walk",
         ],
     },
     {
         "id": "runway",
         "name": "Runway",
-        "description": "Defile ritmi: entrance → approach → pivot → turn → walk back → exit",
+        "description": "Defile ritmi: entrance → low approach → tracking → profile → hero → fabric close → tilt-up → turn → walk back → exit",
         "mood": "catwalk energy, confident forward stride, runway show lighting and rhythm",
-        "camera_style": "locked frontal tripod + axial dolly, occasional low angle, no handheld feel",
+        "camera_style": "locked frontal tripod + axial dolly, motivated low angles, no handheld feel",
         "beats": [
             "ENTRANCE WIDE — model appears at far end of runway/space, begins to walk forward with full-body stride visible",
-            "APPROACH MEDIUM — camera holds as model approaches, fabric motion becomes pronounced, garment silhouette fills frame",
-            "CENTER POSE — model reaches center mark, pauses with a sharp confident pose, front facing, strong stance",
-            "PIVOT TURN — low angle as model executes a runway pivot/turn, fabric fans outward",
-            "WALK BACK — follow from front three-quarter as she walks back toward the runway end",
-            "EXIT BACK — rear-view follow shot retreating into the space, back construction visible, silhouette against light",
+            "LOW ANGLE APPROACH — low angle as she approaches, heroic silhouette, catwalk authority",
+            "MEDIUM FRONTAL TRACKING — medium parallel-tracking locked to her front as she advances, garment filling frame",
+            "SIDE PROFILE TRACKING — lateral tracking from the side mid-walk, fabric motion visible in strict profile",
+            "CENTER HERO POSE — slow dolly-in as model reaches center mark, pauses with a sharp confident pose, front-facing",
+            "FABRIC CLOSE-UP IN MOTION — close-up on fabric section catching runway light during motion or pose",
+            "HEM-TO-HEAD TILT UP — camera tilts up from hem to face as she holds the pose, revealing the garment vertically",
+            "THREE-QUARTER ORBIT — camera orbits slightly as she begins a 3/4 turn, side then back revealed",
+            "OVER-SHOULDER WALK BACK — follow from behind over her shoulder as she walks back toward runway end",
+            "EXIT BACK SHOT — rear-view follow shot retreating into the space, back construction visible, silhouette against light",
+        ],
+        "camera_types": [
+            "wide_establishing",
+            "low_angle_hero",
+            "medium_tracking",
+            "side_tracking_profile",
+            "dolly_in_face",
+            "close_up_fabric",
+            "hem_to_head_tilt_up",
+            "three_quarter_turn_orbit",
+            "over_shoulder_back",
+            "final_back_walk",
         ],
     },
     {
         "id": "street_style",
         "name": "Street Style",
-        "description": "Urban dinamik: arrival → candid walk → attitude → detail → turn → departure",
+        "description": "Urban dinamik: arrival → descending → side walk → tilt-up → attitude → detail → over-shoulder → turn → back detail → departure",
         "mood": "urban editorial, candid off-duty energy, natural light and street texture",
-        "camera_style": "slight handheld feel, quick framing shifts, motivated angles, natural depth",
+        "camera_style": "slight handheld feel, motivated angles, natural depth, quick framing shifts",
         "beats": [
-            "ARRIVAL — model arrives into the frame from off-camera or around a corner, urban backdrop visible (street, plaza, stairs)",
-            "CANDID WALK — natural stride through the street environment, camera slightly handheld, looking forward",
-            "ATTITUDE POSE — model turns to camera with confident street-style attitude, hand on hip or subtle interaction with garment",
-            "ACCESSORY / DETAIL — tight framing on styling element: bag, jewelry, sunglasses, or fabric detail at shoulder/sleeve",
-            "TURN AND LOOK — three-quarter turn as model glances over shoulder, playful attitude, urban environment behind",
-            "DEPARTURE — model walks away from camera into the street scene, back construction visible, natural environment envelops the silhouette",
+            "ARRIVAL WIDE — model arrives into the frame, urban backdrop visible (street, plaza, stairs, arcade)",
+            "DESCENDING FOLLOW — follow shot as model descends steps/slope/curb, camera matching her downward motion; if flat, ground-level tracking instead",
+            "SIDE CANDID WALK — lateral tracking alongside, natural stride, street texture blurring past",
+            "HEM-TO-HEAD TILT UP — camera starts at shoes/hem and tilts upward to face, revealing the silhouette vertically",
+            "ATTITUDE POSE MEDIUM — model turns to camera with confident street-style attitude, hand on hip or subtle garment interaction",
+            "ACCESSORY / DETAIL CLOSE-UP — tight framing on styling element: bag, jewelry, sunglasses, or fabric at shoulder/sleeve",
+            "OVER-SHOULDER WALK — from behind over her shoulder as she walks forward, partial back construction framed with environment ahead",
+            "TURN AND LOOK LOW ANGLE — low angle three-quarter turn as she glances over shoulder, playful attitude",
+            "BACK DETAIL CLOSE — tight close on back construction element or closure",
+            "DEPARTURE BACK WALK — model walks away from camera into the street scene, natural environment envelops the silhouette",
+        ],
+        "camera_types": [
+            "wide_establishing",
+            "descending_follow",
+            "side_tracking_profile",
+            "hem_to_head_tilt_up",
+            "medium_tracking",
+            "close_up_fabric",
+            "over_shoulder_back",
+            "low_angle_hero",
+            "back_detail_close",
+            "final_back_walk",
         ],
     },
     {
         "id": "couture_reveal",
         "name": "Couture Reveal",
-        "description": "Dramatik yüksek moda: silüet reveal → slow walk → dramatic pose → fabric detail → turn → final reveal",
+        "description": "Dramatik yüksek moda: silhouette → low rise → tilt-up → dolly-in → profile → hero → fabric macro → back close → turn → final reveal",
         "mood": "high couture drama, slow controlled reveal, sculptural garment celebration, operatic stillness",
         "camera_style": "slow dolly, controlled crane or tilt, deliberate framing, dramatic lighting contrast",
         "beats": [
-            "SILHOUETTE REVEAL — model is introduced as a silhouette against a bright or dramatic light source, only outline visible, slowly emerges into light",
-            "SLOW WALK FORWARD — deliberate slow walk toward camera, garment architecture progressively reveals itself as light shifts",
-            "DRAMATIC POSE — full-body hero pose at camera mark, garment at its fullest expression, sculptural silhouette, still grandeur",
-            "FABRIC DETAIL — extreme close-up on couture craftsmanship: embroidery, beading, fabric texture, structural seam — reverential framing",
-            "THREE-QUARTER TURN — slow 3/4 turn revealing the back construction, camera orbits slightly to follow",
-            "FINAL REVEAL HOLD — back view retreating slowly, then a last pause where model holds still, garment train/back structure fully displayed",
+            "SILHOUETTE REVEAL — wide shot, model introduced as silhouette against bright or dramatic light, outline slowly emerging into light",
+            "LOW ANGLE RISE — very low angle looking up, sculptural silhouette looms, crane-like slow rise begins",
+            "HEM-TO-HEAD TILT UP — camera starts tight at hem and deliberately tilts upward all the way to face, couture detail revealed vertically",
+            "SLOW DOLLY-IN MEDIUM — deliberate slow dolly forward from medium to medium-close, garment architecture progressively reveals",
+            "SIDE PROFILE ORBIT — camera tracks around the profile side, sculptural silhouette in strict side view",
+            "DRAMATIC HERO POSE — full-body hero pose at camera mark, garment at its fullest expression, still grandeur",
+            "FABRIC EXTREME CLOSE-UP — extreme close-up on couture craftsmanship: embroidery, beading, fabric texture, structural seam — reverential framing",
+            "BACK CONSTRUCTION CLOSE — tight close on back structure: closure, train attachment, opening, or shoulder-blade seaming",
+            "THREE-QUARTER TURN ORBIT — slow 3/4 turn, camera orbits revealing back construction",
+            "FINAL BACK REVEAL — back view retreating slowly, final pause where model holds still, garment train/back structure fully displayed",
+        ],
+        "camera_types": [
+            "wide_establishing",
+            "low_angle_hero",
+            "hem_to_head_tilt_up",
+            "dolly_in_face",
+            "side_tracking_profile",
+            "medium_tracking",
+            "close_up_fabric",
+            "back_detail_close",
+            "three_quarter_turn_orbit",
+            "final_back_walk",
         ],
     },
 ]
+
+
+def _assign_beats_and_cameras(template: dict, n_shots: int) -> list[tuple[str, str]]:
+    """Assign (beat_label, camera_type) pairs for each shot.
+
+    Guarantees: camera types never repeat within the sequence as long as
+    n_shots <= len(_MASTER_CAMERA_POOL). If n_shots exceeds the pool, the
+    pool cycles (rare — would require 13+ shots).
+
+    Beat order is preserved: first shot uses beat 0, last shot uses final beat.
+    For n_shots > len(beats), middle beats are cycled in-between.
+    For n_shots < len(beats), the first and last beats are kept and middles
+    are evenly sampled.
+    """
+    beats = template["beats"]
+    arc_cams = template.get("camera_types", [])
+    n_beats = len(beats)
+
+    if n_shots >= n_beats:
+        # Use each beat in order (except final); cycle middles for extras; always end on final beat
+        beat_indices = list(range(n_beats - 1))
+        while len(beat_indices) < n_shots - 1:
+            for m in range(1, n_beats - 1):
+                if len(beat_indices) < n_shots - 1:
+                    beat_indices.append(m)
+        beat_indices.append(n_beats - 1)
+    else:
+        # Evenly sample: always include first and last
+        selected: list[int] = [0]
+        if n_shots > 2:
+            step = (n_beats - 1) / (n_shots - 1)
+            for k in range(1, n_shots - 1):
+                selected.append(round(k * step))
+        if n_shots >= 2:
+            selected.append(n_beats - 1)
+        seen: set[int] = set()
+        uniq: list[int] = []
+        for idx in selected:
+            if idx not in seen:
+                seen.add(idx)
+                uniq.append(idx)
+        while len(uniq) < n_shots:
+            uniq.append(uniq[-1])
+        beat_indices = uniq[:n_shots]
+
+    used_cameras: set[str] = set()
+
+    def pick_camera(preferred: Optional[str], is_last: bool) -> str:
+        # Final shot gets priority on final_back_walk
+        if is_last and "final_back_walk" not in used_cameras:
+            return "final_back_walk"
+        if preferred and preferred not in used_cameras:
+            return preferred
+        for cam in _MASTER_CAMERA_POOL:
+            if cam not in used_cameras:
+                return cam
+        # Pool exhausted — reset (very rare path)
+        used_cameras.clear()
+        return preferred or _MASTER_CAMERA_POOL[0]
+
+    assignments: list[tuple[str, str]] = []
+    for i, bi in enumerate(beat_indices):
+        preferred = arc_cams[bi] if bi < len(arc_cams) else None
+        cam = pick_camera(preferred, is_last=(i == n_shots - 1))
+        used_cameras.add(cam)
+        assignments.append((beats[bi], cam))
+
+    return assignments
 
 
 def list_workflow_arc_templates() -> list[dict]:
@@ -857,9 +1022,9 @@ async def generate_defile_multishot_prompt(
 # ─── Workflow multishot prompter ─────────────────────────────────────────────
 _WORKFLOW_MULTISHOT_SYSTEM = """You are a fashion film director writing cinematic shot prompts for Kling 3.0 Omni multishot video generation.
 
-You receive a scene/start image showing a fashion model wearing a garment, a chosen TEMPLATE with mood + beats, and a list of shots (each with a duration and an assigned beat role).
+You receive a scene/start image showing a fashion model wearing a garment, a chosen TEMPLATE with mood, and a list of shots. Each shot carries BOTH a BEAT ROLE (narrative function) AND a CAMERA TYPE (exact shot form — angle, distance, motion).
 
-Your task: Write one cinematic English prompt per shot, following the template's beats in order.
+Your task: Write one cinematic English prompt per shot, in the order listed.
 
 ABSOLUTE CONTINUITY RULES:
 - The sequence must feel like ONE continuous fashion film, chained shot-to-shot
@@ -868,17 +1033,24 @@ ABSOLUTE CONTINUITY RULES:
 - For back-view shots: explicitly describe the back structure visible in the image
 - Never invent garment details not in the image — color, cut, openings, hem length are locked by the reference
 
+CAMERA TYPE DISCIPLINE — MOST IMPORTANT RULE:
+- Every shot has an assigned CAMERA TYPE with a precise definition provided in the user message
+- The prompt MUST literally enact that camera type — its angle, distance, and motion
+- Camera types DO NOT REPEAT anywhere in the sequence — not adjacent, not separated, NEVER twice
+- If a shot says `hem_to_head_tilt_up`, the camera must literally start at the hem/feet and tilt upward — not a "medium shot that happens to show hem"
+- If a shot says `low_angle_hero`, the camera must be clearly BELOW eye level looking up — not a frontal medium
+- If a shot says `back_detail_close`, the framing must be from behind, tight on back construction — not a 3/4 view
+- Variety of angle and distance across the 10+ shots is the point; treat the assignment as a hard contract
+
+BEAT ROLE DISCIPLINE:
+- Each shot also has a BEAT ROLE (e.g. "HERO POSE", "DETAIL CLOSE-UP") — this is the narrative function
+- The prompt must fulfill both the beat role AND the camera type — they are complementary, not interchangeable
+
 SHOT-BY-SHOT RULES:
 - Each prompt: 30-50 words, HARD LIMIT 480 characters, English only
 - Every prompt ends with a short depth-of-field phrase (e.g. "shallow depth of field", "soft background bokeh", "creamy background separation")
 - Every prompt includes a brief 3-5 word location reminder (e.g. "within the stone courtyard", "on the illuminated runway", "against the Parisian arcade")
-- Never repeat the exact same camera angle/movement twice in a row
-- Vary from the camera vocabulary: Wide, Medium, Close-Up, Extreme Close-Up, Low Angle, High Angle, Tracking, Dolly In, Dolly Out, Arc, Tilt Up, Follow, Steadicam, Overhead
-
-BEAT ROLE DISCIPLINE:
-- Each shot is labeled with a BEAT ROLE from the template (e.g. "ESTABLISHING WIDE", "HERO POSE", "DETAIL CLOSE-UP")
-- The prompt for that shot MUST fulfill the beat's framing/angle intent — do not swap roles between shots
-- If two consecutive shots share the same beat role (expanded arc), change camera angle/distance between them so they feel distinct
+- Open each prompt with an explicit camera-motion phrase matching the CAMERA TYPE (e.g. "Low angle looking up as...", "Tilt-up from hem to face as...", "Lateral side tracking as...", "Rear follow shot as...")
 
 STRICT NEGATIVES:
 - NEVER add spectators, audience, crowd, seated guests, photographers, crew, children, or additional people
@@ -925,43 +1097,29 @@ async def generate_workflow_multishot_prompt(
     n_shots = len(shot_plan)
     arc_block = _format_workflow_arc(template, n_shots)
 
-    # Per-shot description with assigned beat role so GPT knows which beat this shot serves
-    beats = template["beats"]
-    beat_assignments = []
-    if n_shots >= len(beats):
-        # Expand: re-use beats cyclically in order, but each shot still tagged
-        for i in range(n_shots):
-            idx = min(i, len(beats) - 1) if i < len(beats) else (i % len(beats))
-            beat_assignments.append(beats[idx])
-    else:
-        # Merge: always include first and last beat, pick evenly spaced middles
-        selected_indices = [0]
-        if n_shots > 2:
-            step = (len(beats) - 1) / (n_shots - 1)
-            for k in range(1, n_shots - 1):
-                selected_indices.append(round(k * step))
-        if n_shots >= 2:
-            selected_indices.append(len(beats) - 1)
-        # De-duplicate while preserving order
-        seen = set()
-        uniq = []
-        for idx in selected_indices:
-            if idx not in seen:
-                seen.add(idx)
-                uniq.append(idx)
-        # Pad if dedup shrank it
-        while len(uniq) < n_shots:
-            uniq.append(uniq[-1])
-        beat_assignments = [beats[i] for i in uniq[:n_shots]]
+    # Assign (beat, camera_type) per shot — camera types never repeat
+    assignments = _assign_beats_and_cameras(template, n_shots)
+    beat_assignments = [a[0] for a in assignments]
+    camera_assignments = [a[1] for a in assignments]
 
-    # Build the shot description block with durations and beat roles
+    # Build the shot description block with durations, beat roles, and camera types
     shot_desc_lines = []
     for i, shot in enumerate(shot_plan):
-        beat_label = beat_assignments[i] if i < len(beat_assignments) else beats[-1]
+        beat_label = beat_assignments[i]
+        cam = camera_assignments[i]
+        cam_guidance = _CAMERA_TYPE_GUIDANCE.get(cam, cam)
         shot_desc_lines.append(
-            f"  Shot {i + 1} — duration: {shot['duration']}s — beat role: {beat_label}"
+            f"  Shot {i + 1} — duration: {shot['duration']}s\n"
+            f"      BEAT ROLE: {beat_label}\n"
+            f"      CAMERA TYPE: `{cam}` → {cam_guidance}"
         )
     shots_description = "\n".join(shot_desc_lines)
+
+    # Summary line reminding GPT that every camera type is unique
+    unique_cams = ", ".join(f"`{c}`" for c in camera_assignments)
+    camera_contract = (
+        f"CAMERA TYPE ASSIGNMENTS (each appears ONCE, no repetition): {unique_cams}"
+    )
 
     tempo_label = (rhythm or "normal").lower()
     total_dur_label = f"{total_duration}s" if total_duration else "not specified"
@@ -972,7 +1130,9 @@ async def generate_workflow_multishot_prompt(
         f"Rhythm: {tempo_label}",
         f"Number of shots: {n_shots}",
         "",
-        "Shots with beat roles:",
+        camera_contract,
+        "",
+        "Shots with beat roles AND camera types:",
         shots_description,
         "",
         arc_block,
@@ -980,13 +1140,14 @@ async def generate_workflow_multishot_prompt(
     if director_note:
         user_text_parts.extend([
             "",
-            "USER DIRECTOR NOTE (highest priority — blend with template):",
+            "USER DIRECTOR NOTE (highest priority — blend with template + camera types, do not override camera type assignments):",
             director_note,
         ])
     user_text_parts.extend([
         "",
         "Analyze the scene image and write one cinematic prompt per shot in the order listed. "
-        "Each shot must fulfill its assigned beat role while preserving the template's mood and camera style. "
+        "Each shot MUST literally enact its assigned CAMERA TYPE (angle, distance, motion) and fulfill its BEAT ROLE. "
+        "Camera types never repeat across the sequence. "
         "Return exactly N shot objects in the JSON wrapper, in order.",
     ])
     user_text = "\n".join(user_text_parts)
@@ -1038,6 +1199,7 @@ async def generate_workflow_multishot_prompt(
             "seq_index": shot["seq_index"],
             "shot_index": shot["shot_index"],
             "beat": beat_assignments[i] if i < len(beat_assignments) else "",
+            "camera_type": camera_assignments[i] if i < len(camera_assignments) else "",
         })
 
     logger.info(
