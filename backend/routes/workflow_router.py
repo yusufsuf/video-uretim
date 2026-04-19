@@ -2,8 +2,10 @@
 
 Endpoints:
   POST /workflow/scenario     – Generate scenario (GPT) for a single outfit
-  POST /workflow/scene-frame  – Generate NB2 scene frame for approval
   POST /workflow/generate     – Start video generation with approved scenario + frame
+
+No NB Pro anywhere — user selects the start frame; scenarios are written
+from that image + arc template; videos chain Kling Omni calls.
 """
 
 import asyncio
@@ -13,12 +15,12 @@ import shutil
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from config import settings
 from dependencies import get_current_user
-from models import DefileShotConfig, JobResponse, JobStatus
+from models import JobResponse, JobStatus
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -34,30 +36,14 @@ class WfOutfit(BaseModel):
     name: Optional[str] = None
 
 
-class WfShotConfig(BaseModel):
-    duration: int = 5
-
-
 class ScenarioRequest(BaseModel):
     outfit: WfOutfit
-    # Legacy path: explicit per-shot configs (manual mode). Kept optional for backward compat.
-    shot_configs: Optional[List[WfShotConfig]] = None
-    # New path: total duration + rhythm + template. shot_planner derives sequences.
-    total_duration: Optional[int] = None   # 6-60 seconds; triggers new path when set
-    rhythm: Optional[str] = None           # "slow" | "normal" | "fast"
-    arc_template: Optional[str] = None     # "editorial" | "runway" | "street_style" | "couture_reveal"
-    start_frame_url: Optional[str] = None  # user-supplied start frame (bypasses NB2 scene)
-    background_url: Optional[str] = None
+    start_frame_url: str                    # required — user-selected start image
+    total_duration: int                     # 6-60 seconds
+    rhythm: Optional[str] = None            # "slow" | "normal" | "fast"
+    arc_template: Optional[str] = None      # "editorial" | "runway" | "street_style" | "couture_reveal"
     aspect_ratio: str = "9:16"
     director_note: Optional[str] = None
-    shot_arc: Optional[str] = None  # Legacy defile-arc picker (manual mode only)
-
-
-class SceneFrameRequest(BaseModel):
-    outfit: WfOutfit
-    background_url: Optional[str] = None
-    background_extra_urls: Optional[List[str]] = None
-    aspect_ratio: str = "9:16"
 
 
 class WfOutfitPayload(BaseModel):
@@ -120,63 +106,39 @@ async def generate_scenario(
     body: ScenarioRequest,
     _user: dict = Depends(get_current_user),
 ):
-    """Generate multishot prompts via GPT for a single outfit.
+    """Generate multishot prompts via GPT.
 
-    Two modes:
-      - New: body.total_duration is set → shot_planner derives sequences, GPT
-        writes arc-template-aware prompts (generate_workflow_multishot_prompt).
-      - Legacy: body.shot_configs is a plain list → defile-style prompter
-        (generate_defile_multishot_prompt) with optional shot_arc picker.
-
-    Scene frame resolution (no NB Pro compose — we skip scene generation):
-      - If body.start_frame_url is set → use that.
-      - Else → use body.outfit.front_url directly. If it's a video, extract
-        the first frame. Final image is always re-uploaded to fal.ai CDN.
+    Requires user-selected start_frame_url (image or video — videos get their
+    first frame extracted). Scenarios are written against that frame + the
+    chosen arc template.
     """
-    from services.analysis_service import (
-        generate_defile_multishot_prompt,
-        generate_workflow_multishot_prompt,
-    )
-    from services.shot_planner import plan_sequences, flat_shot_list, validate_rhythm
-    from pipeline import _to_fal_url
+    if not body.start_frame_url:
+        raise HTTPException(status_code=400, detail="start_frame_url gerekli")
 
-    scene_frame_url = await _resolve_scene_frame(
-        body.start_frame_url or body.outfit.front_url
-    )
-    logger.info("Workflow scenario: scene frame resolved %s",
+    from services.analysis_service import generate_workflow_multishot_prompt
+    from services.shot_planner import plan_sequences, flat_shot_list, validate_rhythm
+
+    scene_frame_url = await _resolve_scene_frame(body.start_frame_url)
+    logger.info("Workflow scenario: start frame resolved %s",
                 (scene_frame_url or "")[:80])
 
-    # 2. Shot generation — pick path based on payload
-    if body.total_duration is not None:
-        # New path: planner → workflow prompter
-        rhythm = validate_rhythm(body.rhythm)
-        sequences = plan_sequences(body.total_duration, rhythm)
-        shot_plan = flat_shot_list(sequences)
+    rhythm = validate_rhythm(body.rhythm)
+    sequences = plan_sequences(body.total_duration, rhythm)
+    shot_plan = flat_shot_list(sequences)
 
-        shots = await generate_workflow_multishot_prompt(
-            scene_frame_url=scene_frame_url,
-            shot_plan=shot_plan,
-            outfit_name=body.outfit.name or "garment",
-            template_id=body.arc_template,
-            total_duration=body.total_duration,
-            rhythm=rhythm,
-            director_note=body.director_note,
-        )
-        logger.info(
-            "Workflow scenario (planned): %d shots across %d sequence(s), rhythm=%s, template=%s",
-            len(shots), len(sequences), rhythm, body.arc_template or "editorial",
-        )
-    else:
-        # Legacy path: manual shot_configs + defile arc picker
-        shot_configs_typed = [DefileShotConfig(duration=s.duration) for s in (body.shot_configs or [])]
-        shots = await generate_defile_multishot_prompt(
-            scene_frame_url=scene_frame_url,
-            shot_configs=shot_configs_typed,
-            outfit_name=body.outfit.name or "garment",
-            video_description=body.director_note,
-            shot_arc_id=body.shot_arc,
-        )
-        logger.info("Workflow scenario (legacy): %d shots generated", len(shots))
+    shots = await generate_workflow_multishot_prompt(
+        scene_frame_url=scene_frame_url,
+        shot_plan=shot_plan,
+        outfit_name=body.outfit.name or "garment",
+        template_id=body.arc_template,
+        total_duration=body.total_duration,
+        rhythm=rhythm,
+        director_note=body.director_note,
+    )
+    logger.info(
+        "Workflow scenario: %d shots across %d sequence(s), rhythm=%s, template=%s",
+        len(shots), len(sequences), rhythm, body.arc_template or "editorial",
+    )
 
     return {
         "shots": shots,
@@ -193,50 +155,7 @@ async def workflow_arc_templates(_user: dict = Depends(get_current_user)):
     return {"templates": list_workflow_arc_templates()}
 
 
-# ─── Endpoint 2: Generate Scene Frame ───────────────────────────────
-
-@router.post("/scene-frame")
-async def generate_scene_frame_endpoint(
-    body: SceneFrameRequest,
-    _user: dict = Depends(get_current_user),
-):
-    """(Re)generate NB Pro scene frame for user approval."""
-    from services.nano_banana_service import generate_background, generate_scene_frame
-    from pipeline import _to_fal_url, _build_nb_pro_compose_prompt
-
-    if body.background_url:
-        bg_url = body.background_url
-    else:
-        bg_url = await generate_background(
-            prompt="high-end fashion runway, empty catwalk, dramatic stage lighting, luxury fashion show venue, no people, architectural interior",
-            aspect_ratio=body.aspect_ratio,
-        )
-
-    fal_front = await _to_fal_url(body.outfit.front_url)
-    garment_refs = [fal_front]
-    if body.outfit.side_url:
-        garment_refs.append(await _to_fal_url(body.outfit.side_url))
-    if body.outfit.back_url:
-        garment_refs.append(await _to_fal_url(body.outfit.back_url))
-    for eu in (body.outfit.extra_urls or []):
-        if eu and eu not in garment_refs:
-            garment_refs.append(await _to_fal_url(eu))
-
-    fal_bg = await _to_fal_url(bg_url)
-
-    nb_pro_prompt = _build_nb_pro_compose_prompt(analysis=None)
-
-    scene_frame_url = await generate_scene_frame(
-        image_urls=[fal_bg] + garment_refs,
-        prompt=nb_pro_prompt,
-        aspect_ratio=body.aspect_ratio,
-    )
-
-    logger.info("Workflow scene-frame: %s", scene_frame_url[:80] if scene_frame_url else "N/A")
-    return {"scene_frame_url": scene_frame_url}
-
-
-# ─── Endpoint 3: Generate Video ─────────────────────────────────────
+# ─── Endpoint 2: Generate Video ─────────────────────────────────────
 
 @router.post("/generate", response_model=JobResponse)
 async def generate_video(

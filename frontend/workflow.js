@@ -1,11 +1,6 @@
 /**
- * Workflow — Step-by-step video generation with approval gates.
- *
- * Steps:
- *   1. Select outfits + config
- *   2. Generate scenario (GPT) → user approves / edits / regenerates
- *   3. Generate scene frame (NB2) → user approves / regenerates
- *   4. Generate video (Kling/fal) → progress polling → result
+ * Workflow — element + arc + duration + start frame → scenario → video.
+ * No NB Pro anywhere.
  */
 
 const API = "";
@@ -17,77 +12,18 @@ function authHeaders() {
 }
 
 // ─── State ─────────────────────────────────────────────────────────
-let wfOutfits = [];           // [{front_url, side_url, back_url, extra_urls, name, id}]
-let wfSelectedOutfits = [];   // multi-select: array of selected outfits
-let wfShotConfigs = [{ duration: 5 }, { duration: 5 }, { duration: 5 }];
-let wfBgUrl = null;
-let wfBgExtraUrls = [];
-// Per-outfit data: wfOutfitData[i] = { outfit, shots: [...], scene_frame_url }
+let wfOutfits = [];
+let wfSelectedOutfits = [];
 let wfOutfitData = [];
 let wfJobId = null;
 let wfPollInterval = null;
 let wfDebugPayload = null;
-let wfShotArc = null;           // null = random, or arc ID (manual mode)
-let wfShotArcs = [];            // fetched from /api/defile/shot-arcs
 
-// Planner mode state
-let wfMode = "planner";                 // "planner" | "manual"
-let wfTotalDuration = 30;               // 15 | 30 | 45 | 60
-let wfRhythm = "normal";                // "slow" | "normal" | "fast"
+let wfTotalDuration = 30;
+let wfRhythm = "normal";
 let wfArcTemplate = "editorial";
-let wfArcTemplates = [];                // fetched from /api/workflow/arc-templates
-let wfStartFrameUrl = null;             // optional user-supplied start frame
-
-// ─── Shot Arc Picker ──────────────────────────────────────────────
-async function fetchWfShotArcs() {
-    try {
-        const resp = await fetch(`${API}/api/defile/shot-arcs`, { headers: authHeaders() });
-        if (!resp.ok) return;
-        const data = await resp.json();
-        wfShotArcs = data.arcs || [];
-        renderWfArcPicker();
-    } catch (e) {
-        console.warn("Shot arcs fetch failed:", e);
-    }
-}
-
-function renderWfArcPicker() {
-    const grid = document.getElementById("wf-arc-grid");
-    if (!grid) return;
-    const cards = [
-        `<button class="defile-arc-card${wfShotArc === null ? ' active' : ''}"
-            onclick="selectWfShotArc(null)">
-            <span class="defile-arc-icon">🎲</span>
-            <span class="defile-arc-name">Otomatik</span>
-        </button>`,
-        ...wfShotArcs.map(a => `
-            <button class="defile-arc-card${wfShotArc === a.id ? ' active' : ''}"
-                onclick="selectWfShotArc('${a.id}')">
-                <span class="defile-arc-name">${a.name}</span>
-            </button>
-        `),
-    ];
-    grid.innerHTML = cards.join("");
-}
-
-function selectWfShotArc(arcId) {
-    wfShotArc = arcId;
-    renderWfArcPicker();
-    const beatsBox = document.getElementById("wf-arc-beats");
-    if (!arcId) {
-        if (beatsBox) beatsBox.style.display = "none";
-        return;
-    }
-    const arc = wfShotArcs.find(a => a.id === arcId);
-    if (!arc) return;
-    if (beatsBox) {
-        beatsBox.style.display = "block";
-        beatsBox.innerHTML = arc.beats
-            .map((b, i) => `<div style="margin-bottom:4px"><strong style="color:var(--text-primary)">${i + 1}.</strong> ${b}</div>`)
-            .join("");
-    }
-}
-window.selectWfShotArc = selectWfShotArc;
+let wfArcTemplates = [];
+let wfStartFrameUrl = null;
 
 // ─── Planner UI ───────────────────────────────────────────────────
 
@@ -119,16 +55,6 @@ function wfRenderPlanSummary() {
     const box = document.getElementById("wf-plan-summary");
     if (box) box.textContent = wfPlanSummary(wfTotalDuration, wfRhythm);
 }
-
-function wfSetMode(mode) {
-    wfMode = mode;
-    document.querySelectorAll(".wf-mode-btn").forEach(b => {
-        b.classList.toggle("active", b.dataset.mode === mode);
-    });
-    document.getElementById("wf-planner-block").style.display = (mode === "planner") ? "" : "none";
-    document.getElementById("wf-manual-block").style.display = (mode === "manual") ? "" : "none";
-}
-window.wfSetMode = wfSetMode;
 
 function wfBindDurationChips() {
     document.querySelectorAll("#wf-duration-grid .wf-chip").forEach(chip => {
@@ -236,8 +162,6 @@ window.wfClearStartFrame = () => {
 // ─── Init ──────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
     loadOutfits();
-    renderShotConfigs();
-    fetchWfShotArcs();
     wfFetchArcTemplates();
 
     wfBindDurationChips();
@@ -247,7 +171,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("wf-btn-scenario").addEventListener("click", generateScenario);
     document.getElementById("wf-btn-approve-scenario").addEventListener("click", approveScenario);
-    document.getElementById("wf-bg-pick-btn").addEventListener("click", () => openWfLibPicker("background"));
 });
 
 // ─── Step 1: Outfit Loading ────────────────────────────────────────
@@ -303,42 +226,6 @@ async function loadOutfits() {
     }
 }
 
-// ─── Shot Config UI ────────────────────────────────────────────────
-function renderShotConfigs() {
-    const container = document.getElementById("wf-shot-configs");
-    container.innerHTML = wfShotConfigs.map((cfg, idx) => `
-        <div class="wf-shot-config">
-            Sahne ${idx + 1}:
-            <input type="number" min="3" max="10" value="${cfg.duration}"
-                   onchange="wfUpdateShot(${idx}, this.value)">s
-            ${wfShotConfigs.length > 1 ? `<button onclick="wfRemoveShot(${idx})" style="background:none;border:none;color:var(--accent-error);cursor:pointer;font-size:0.7rem">✕</button>` : ""}
-        </div>
-    `).join("");
-}
-
-window.wfUpdateShot = (idx, val) => {
-    wfShotConfigs[idx].duration = Math.max(3, Math.min(10, parseInt(val) || 5));
-    renderShotConfigs();
-};
-
-window.wfRemoveShot = (idx) => {
-    if (wfShotConfigs.length <= 1) return;
-    wfShotConfigs.splice(idx, 1);
-    renderShotConfigs();
-};
-
-window.wfAddShot = () => {
-    if (wfShotConfigs.length >= 6) return;
-    wfShotConfigs.push({ duration: 5 });
-    renderShotConfigs();
-};
-
-window.wfClearBg = () => {
-    wfBgUrl = null;
-    wfBgExtraUrls = [];
-    document.getElementById("wf-bg-preview").style.display = "none";
-};
-
 // ─── Step Transitions ──────────────────────────────────────────────
 function activateStep(num) {
     document.querySelectorAll(".wf-step").forEach((el, idx) => {
@@ -359,6 +246,10 @@ function activateStep(num) {
 // ─── Step 2: Generate Scenario ─────────────────────────────────────
 async function generateScenario() {
     if (!wfSelectedOutfits.length) return;
+    if (!wfStartFrameUrl) {
+        alert("Başlangıç karesi yüklemelisiniz.");
+        return;
+    }
 
     const btn = document.getElementById("wf-btn-scenario");
     btn.disabled = true;
@@ -370,29 +261,15 @@ async function generateScenario() {
         for (let i = 0; i < wfSelectedOutfits.length; i++) {
             btn.innerHTML = `<span class="wf-spinner"></span>Senaryo üretiliyor (${i + 1}/${wfSelectedOutfits.length})...`;
 
-            const basePayload = {
+            const payload = {
                 outfit: wfSelectedOutfits[i],
-                background_url: wfBgUrl,
+                start_frame_url: wfStartFrameUrl,
+                total_duration: wfTotalDuration,
+                rhythm: wfRhythm,
+                arc_template: wfArcTemplate,
                 aspect_ratio: document.getElementById("wf-aspect").value,
                 director_note: document.getElementById("wf-director-note").value.trim() || null,
             };
-
-            let payload;
-            if (wfMode === "planner") {
-                payload = {
-                    ...basePayload,
-                    total_duration: wfTotalDuration,
-                    rhythm: wfRhythm,
-                    arc_template: wfArcTemplate,
-                    start_frame_url: wfStartFrameUrl,
-                };
-            } else {
-                payload = {
-                    ...basePayload,
-                    shot_configs: wfShotConfigs,
-                    shot_arc: wfShotArc,
-                };
-            }
 
             const resp = await fetch(`${API}/api/workflow/scenario`, {
                 method: "POST",
@@ -573,61 +450,3 @@ function showResult(url) {
 }
 
 
-// ─── Library Picker ───────────────────────────────────────────────
-let _wfLibTarget = null; // "background" | "outfit"
-
-async function openWfLibPicker(target) {
-    _wfLibTarget = target;
-    const modal = document.getElementById("wf-lib-modal");
-    const title = document.getElementById("wf-lib-title");
-    const grid  = document.getElementById("wf-lib-grid");
-    const close = document.getElementById("wf-lib-close");
-
-    title.textContent = target === "background" ? "Arka Plan Seç" : "Kıyafet Seç";
-    modal.style.display = "flex";
-
-    close.onclick = () => { modal.style.display = "none"; };
-    modal.onclick = (e) => { if (e.target === modal) modal.style.display = "none"; };
-
-    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:0.8rem;padding:32px">Yükleniyor...</div>`;
-
-    try {
-        const resp = await fetch(`/library/items?category=${target}`, { headers: authHeaders() });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const items = await resp.json();
-
-        if (!items.length) {
-            grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:0.8rem;padding:32px">Bu kategoride öğe yok. <a href="/library" target="_blank">Kütüphaneye git →</a></div>`;
-            return;
-        }
-
-        grid.innerHTML = items.map(it => `
-            <div class="wf-lib-item" data-id="${it.id}" style="cursor:pointer;border:2px solid transparent;border-radius:8px;overflow:hidden;transition:border-color 0.15s">
-                <img src="${it.image_url}" alt="${it.name}" loading="lazy" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block">
-                <div style="font-size:0.68rem;padding:4px 6px;text-align:center;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${it.name}</div>
-            </div>
-        `).join("");
-
-        const itemMap = Object.fromEntries(items.map(it => [it.id, it]));
-        grid.querySelectorAll(".wf-lib-item").forEach(el => {
-            el.addEventListener("click", () => {
-                const item = itemMap[el.dataset.id];
-                if (item) selectWfLibItem(item);
-            });
-        });
-    } catch (err) {
-        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:0.8rem;padding:32px">Yüklenemedi: ${err.message}</div>`;
-    }
-}
-
-function selectWfLibItem(item) {
-    if (_wfLibTarget === "background") {
-        wfBgUrl = item.image_url;
-        wfBgExtraUrls = item.extra_urls || [];
-        const preview = document.getElementById("wf-bg-preview");
-        const img = document.getElementById("wf-bg-img");
-        if (img) img.src = item.image_url;
-        if (preview) preview.style.display = "flex";
-    }
-    document.getElementById("wf-lib-modal").style.display = "none";
-}

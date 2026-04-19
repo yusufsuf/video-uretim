@@ -523,74 +523,46 @@
                     <div class="wf-outfit-grid" id="wf-outfit-grid"></div>
                     <div id="wf-outfit-empty" style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px">Yükleniyor...</div>
 
-                    <!-- Mod seçici: Akıllı Planlama (yeni) vs Manuel Sahne (legacy) -->
                     <div class="wf-field">
-                        <label class="wf-label">Kurgu Modu</label>
-                        <div style="display:flex;gap:8px">
-                            <button type="button" class="wf-mode-btn active" data-mode="planner" onclick="wfSetMode('planner')">Akıllı Planlama</button>
-                            <button type="button" class="wf-mode-btn" data-mode="manual" onclick="wfSetMode('manual')">Manuel Sahne Ayarı</button>
+                        <label class="wf-label">Toplam Süre</label>
+                        <div class="wf-duration-grid" id="wf-duration-grid">
+                            <button type="button" class="wf-chip" data-duration="15">15s</button>
+                            <button type="button" class="wf-chip active" data-duration="30">30s</button>
+                            <button type="button" class="wf-chip" data-duration="45">45s</button>
+                            <button type="button" class="wf-chip" data-duration="60">60s</button>
+                        </div>
+                        <div id="wf-plan-summary" style="margin-top:8px;font-size:0.7rem;color:var(--text-muted);line-height:1.6"></div>
+                    </div>
+
+                    <div class="wf-field">
+                        <label class="wf-label">Ritim</label>
+                        <div class="wf-rhythm-grid" id="wf-rhythm-grid">
+                            <button type="button" class="wf-chip" data-rhythm="slow">Yavaş</button>
+                            <button type="button" class="wf-chip active" data-rhythm="normal">Normal</button>
+                            <button type="button" class="wf-chip" data-rhythm="fast">Hızlı</button>
                         </div>
                     </div>
 
-                    <!-- Planner (new) mode ───────────────────────────── -->
-                    <div id="wf-planner-block">
-                        <div class="wf-field">
-                            <label class="wf-label">Toplam Süre</label>
-                            <div class="wf-duration-grid" id="wf-duration-grid">
-                                <button type="button" class="wf-chip" data-duration="15">15s</button>
-                                <button type="button" class="wf-chip active" data-duration="30">30s</button>
-                                <button type="button" class="wf-chip" data-duration="45">45s</button>
-                                <button type="button" class="wf-chip" data-duration="60">60s</button>
-                            </div>
-                            <div id="wf-plan-summary" style="margin-top:8px;font-size:0.7rem;color:var(--text-muted);line-height:1.6"></div>
-                        </div>
-
-                        <div class="wf-field">
-                            <label class="wf-label">Ritim</label>
-                            <div class="wf-rhythm-grid" id="wf-rhythm-grid">
-                                <button type="button" class="wf-chip" data-rhythm="slow">Yavaş</button>
-                                <button type="button" class="wf-chip active" data-rhythm="normal">Normal</button>
-                                <button type="button" class="wf-chip" data-rhythm="fast">Hızlı</button>
-                            </div>
-                        </div>
-
-                        <div class="wf-field">
-                            <label class="wf-label">Kurgu Şablonu</label>
-                            <div id="wf-template-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px"></div>
-                            <div id="wf-template-beats" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;font-size:0.68rem;color:var(--text-secondary);line-height:1.55"></div>
-                        </div>
-
-                        <div class="wf-field">
-                            <label class="wf-label">Başlangıç Karesi (opsiyonel)</label>
-                            <div id="wf-startframe-preview" style="display:none;margin-bottom:8px">
-                                <img id="wf-startframe-img" style="width:80px;border-radius:6px;vertical-align:middle">
-                                <button onclick="wfClearStartFrame()" style="font-size:0.65rem;color:var(--accent-error);background:none;border:none;cursor:pointer;margin-left:8px">Kaldır</button>
-                            </div>
-                            <label class="wf-btn wf-btn-secondary" style="font-size:0.72rem;padding:6px 14px;cursor:pointer;display:inline-block">
-                                <input type="file" id="wf-startframe-input" accept="image/*" style="display:none">
-                                Görsel Yükle
-                            </label>
-                            <div style="font-size:0.65rem;color:var(--text-muted);margin-top:6px">Yüklerseniz video bu kareden başlar, otomatik sahne oluşturma atlanır.</div>
-                        </div>
+                    <div class="wf-field">
+                        <label class="wf-label">Kurgu Şablonu</label>
+                        <div id="wf-template-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px"></div>
+                        <div id="wf-template-beats" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;font-size:0.68rem;color:var(--text-secondary);line-height:1.55"></div>
                     </div>
 
-                    <!-- Manual (legacy) mode ─────────────────────────── -->
-                    <div id="wf-manual-block" style="display:none">
-                        <div class="wf-field">
-                            <label class="wf-label">Sahne Sayısı ve Süreleri</label>
-                            <div class="wf-shot-configs" id="wf-shot-configs"></div>
-                            <button class="wf-btn wf-btn-secondary" style="font-size:0.7rem;padding:5px 12px" onclick="wfAddShot()">+ Sahne Ekle</button>
+                    <div class="wf-field">
+                        <label class="wf-label">Başlangıç Karesi <span style="color:var(--accent-error)">*</span></label>
+                        <div id="wf-startframe-preview" style="display:none;margin-bottom:8px">
+                            <img id="wf-startframe-img" style="width:80px;border-radius:6px;vertical-align:middle">
+                            <button onclick="wfClearStartFrame()" style="font-size:0.65rem;color:var(--accent-error);background:none;border:none;cursor:pointer;margin-left:8px">Kaldır</button>
                         </div>
+                        <label class="wf-btn wf-btn-secondary" style="font-size:0.72rem;padding:6px 14px;cursor:pointer;display:inline-block">
+                            <input type="file" id="wf-startframe-input" accept="image/*" style="display:none">
+                            Görsel Yükle
+                        </label>
+                        <div style="font-size:0.65rem;color:var(--text-muted);margin-top:6px">Video bu kareden başlar. Zorunludur.</div>
                     </div>
 
                     <div style="display:flex;gap:14px;flex-wrap:wrap">
-                        <div class="wf-field" style="flex:1;min-width:120px">
-                            <label class="wf-label">Video Motoru</label>
-                            <select class="wf-select" id="wf-provider">
-                                <option value="fal">fal.ai</option>
-                                <option value="kling" selected>Kling Direct</option>
-                            </select>
-                        </div>
                         <div class="wf-field" style="flex:1;min-width:120px">
                             <label class="wf-label">Oran</label>
                             <select class="wf-select" id="wf-aspect">
@@ -607,21 +579,7 @@
                             </select>
                         </div>
                     </div>
-
-                    <div class="wf-field">
-                        <label class="wf-label">Arka Plan (opsiyonel)</label>
-                        <div id="wf-bg-preview" style="display:none;margin-bottom:8px">
-                            <img id="wf-bg-img" style="width:80px;border-radius:6px">
-                            <button onclick="wfClearBg()" style="font-size:0.65rem;color:var(--accent-error);background:none;border:none;cursor:pointer;margin-left:8px">Kaldır</button>
-                        </div>
-                        <button class="wf-btn wf-btn-secondary" style="font-size:0.72rem;padding:6px 14px" id="wf-bg-pick-btn">Kütüphaneden Seç</button>
-                    </div>
-
-                    <div class="wf-field">
-                        <label class="wf-label">Çekim Akışı</label>
-                        <div id="wf-arc-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px"></div>
-                        <div id="wf-arc-beats" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;font-size:0.68rem;color:var(--text-secondary);line-height:1.55"></div>
-                    </div>
+                    <input type="hidden" id="wf-provider" value="kling">
 
                     <div class="wf-field">
                         <label class="wf-label">Yönetmen Notu (opsiyonel)</label>
@@ -680,21 +638,7 @@
         </div>
     </div>
 
-    <!-- Library Picker Modal -->
-    <div id="wf-lib-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center">
-        <div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:14px;width:90%;max-width:560px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border-subtle)">
-                <span id="wf-lib-title" style="font-weight:600;font-size:0.85rem">Seç</span>
-                <button id="wf-lib-close" style="background:none;border:none;color:var(--text-muted);font-size:1.1rem;cursor:pointer">✕</button>
-            </div>
-            <div id="wf-lib-tabs" style="display:flex;gap:4px;padding:10px 18px 0"></div>
-            <div id="wf-lib-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;padding:14px 18px;overflow-y:auto;flex:1;min-height:200px">
-                <div style="grid-column:1/-1;text-align:center;color:var(--text-muted);font-size:0.8rem;padding:32px">Yükleniyor...</div>
-            </div>
-        </div>
-    </div>
-
-    <script src="workflow.js?v=3"></script>
+    <script src="workflow.js?v=4"></script>
 </body>
 
 </html>
