@@ -556,6 +556,138 @@ def _pick_defile_shot_arc() -> dict:
     return random.choice(_DEFILE_SHOT_ARCS)
 
 
+# ─── Workflow arc templates ──────────────────────────────────────────────────
+# Fashion video templates for the Workflow mode. Each template defines a tone
+# (mood phrase fed to GPT), a camera direction style, and a beat sequence —
+# roles that each shot in the sequence will fulfill.
+#
+# Unlike _DEFILE_SHOT_ARCS (always a runway walk-forward journey), workflow
+# templates serve different video intents: lookbook, runway show, street
+# editorial, couture dramatic. The shot planner counts how many shots the user
+# will get (based on total_duration + rhythm), then GPT adapts the beat list to
+# match the shot count.
+_WORKFLOW_ARC_TEMPLATES: list[dict] = [
+    {
+        "id": "editorial",
+        "name": "Editorial",
+        "description": "Klasik fashion film: establishing → walk → hero → detail → landmark → closing",
+        "mood": "luxury editorial Vogue aesthetic, calm cinematic rhythm, high-fashion stillness",
+        "camera_style": "smooth tripod or slow dolly moves, shallow depth of field, still controlled framing",
+        "beats": [
+            "ESTABLISHING WIDE — wide static frame showing model centered in the environment, contextual architecture visible, still confident pose",
+            "WALK — medium tracking as model walks naturally through the space, fabric/hem responding to motion, camera glides parallel",
+            "HERO POSE — eye-level medium shot of model in a strong composed pose, garment silhouette clean, editorial gaze",
+            "DETAIL CLOSE-UP — tight framing on a key construction element: fabric drape, neckline, embellishment, or hand on waist — slow push-in",
+            "LANDMARK FRAMING — wide cinematic composition where the model is balanced against an iconic architectural element in the background",
+            "CLOSING BACK WALK — follow shot from behind as model walks away slowly, hem trailing, cinematic fade-out feel",
+        ],
+    },
+    {
+        "id": "runway",
+        "name": "Runway",
+        "description": "Defile ritmi: entrance → approach → pivot → turn → walk back → exit",
+        "mood": "catwalk energy, confident forward stride, runway show lighting and rhythm",
+        "camera_style": "locked frontal tripod + axial dolly, occasional low angle, no handheld feel",
+        "beats": [
+            "ENTRANCE WIDE — model appears at far end of runway/space, begins to walk forward with full-body stride visible",
+            "APPROACH MEDIUM — camera holds as model approaches, fabric motion becomes pronounced, garment silhouette fills frame",
+            "CENTER POSE — model reaches center mark, pauses with a sharp confident pose, front facing, strong stance",
+            "PIVOT TURN — low angle as model executes a runway pivot/turn, fabric fans outward",
+            "WALK BACK — follow from front three-quarter as she walks back toward the runway end",
+            "EXIT BACK — rear-view follow shot retreating into the space, back construction visible, silhouette against light",
+        ],
+    },
+    {
+        "id": "street_style",
+        "name": "Street Style",
+        "description": "Urban dinamik: arrival → candid walk → attitude → detail → turn → departure",
+        "mood": "urban editorial, candid off-duty energy, natural light and street texture",
+        "camera_style": "slight handheld feel, quick framing shifts, motivated angles, natural depth",
+        "beats": [
+            "ARRIVAL — model arrives into the frame from off-camera or around a corner, urban backdrop visible (street, plaza, stairs)",
+            "CANDID WALK — natural stride through the street environment, camera slightly handheld, looking forward",
+            "ATTITUDE POSE — model turns to camera with confident street-style attitude, hand on hip or subtle interaction with garment",
+            "ACCESSORY / DETAIL — tight framing on styling element: bag, jewelry, sunglasses, or fabric detail at shoulder/sleeve",
+            "TURN AND LOOK — three-quarter turn as model glances over shoulder, playful attitude, urban environment behind",
+            "DEPARTURE — model walks away from camera into the street scene, back construction visible, natural environment envelops the silhouette",
+        ],
+    },
+    {
+        "id": "couture_reveal",
+        "name": "Couture Reveal",
+        "description": "Dramatik yüksek moda: silüet reveal → slow walk → dramatic pose → fabric detail → turn → final reveal",
+        "mood": "high couture drama, slow controlled reveal, sculptural garment celebration, operatic stillness",
+        "camera_style": "slow dolly, controlled crane or tilt, deliberate framing, dramatic lighting contrast",
+        "beats": [
+            "SILHOUETTE REVEAL — model is introduced as a silhouette against a bright or dramatic light source, only outline visible, slowly emerges into light",
+            "SLOW WALK FORWARD — deliberate slow walk toward camera, garment architecture progressively reveals itself as light shifts",
+            "DRAMATIC POSE — full-body hero pose at camera mark, garment at its fullest expression, sculptural silhouette, still grandeur",
+            "FABRIC DETAIL — extreme close-up on couture craftsmanship: embroidery, beading, fabric texture, structural seam — reverential framing",
+            "THREE-QUARTER TURN — slow 3/4 turn revealing the back construction, camera orbits slightly to follow",
+            "FINAL REVEAL HOLD — back view retreating slowly, then a last pause where model holds still, garment train/back structure fully displayed",
+        ],
+    },
+]
+
+
+def list_workflow_arc_templates() -> list[dict]:
+    """Public list of workflow arc templates for frontend consumption."""
+    return [
+        {
+            "id": t["id"],
+            "name": t["name"],
+            "description": t["description"],
+            "mood": t["mood"],
+            "beats": t["beats"],
+        }
+        for t in _WORKFLOW_ARC_TEMPLATES
+    ]
+
+
+def _get_workflow_arc_template(template_id: Optional[str]) -> dict:
+    """Find a workflow arc template by id. Falls back to 'editorial' if not found."""
+    if template_id:
+        for t in _WORKFLOW_ARC_TEMPLATES:
+            if t["id"] == template_id:
+                return t
+    return _WORKFLOW_ARC_TEMPLATES[0]
+
+
+def _format_workflow_arc(template: dict, n_shots: int) -> str:
+    """Format a workflow arc template for GPT's user message.
+
+    Maps the template's beat list to the actual shot count. If n_shots equals
+    the beat count, it's 1-to-1. If n_shots differs, GPT is instructed to
+    expand (by subdividing beats into camera variations) or merge while
+    preserving the first/last beat roles.
+    """
+    beats = template["beats"]
+    lines = "\n".join(f"  Beat {i + 1}: {b}" for i, b in enumerate(beats))
+
+    if n_shots == len(beats):
+        adaptation = "Map each beat 1-to-1 to the requested shots in order."
+    elif n_shots < len(beats):
+        adaptation = (
+            f"You have {n_shots} shots but {len(beats)} beats. Merge or select beats to fit, "
+            "but ALWAYS preserve the first beat (opening) and the last beat (closing). "
+            "Keep at least one middle detail beat."
+        )
+    else:
+        adaptation = (
+            f"You have {n_shots} shots but only {len(beats)} beats. Expand by adding intermediate "
+            "camera variations (different angle, push-in, orbit, tilt) on the same beat role, "
+            "while preserving the beat order. Re-use beats if necessary but change camera/framing each time."
+        )
+
+    return (
+        f"TEMPLATE — '{template['name']}':\n"
+        f"Mood: {template['mood']}\n"
+        f"Camera style: {template['camera_style']}\n"
+        f"Beats (in order):\n{lines}\n\n"
+        f"ADAPTATION: {adaptation}"
+    )
+
+
 def _format_shot_arc(arc: dict, n_shots: int) -> str:
     """Format a shot arc for injection into the GPT user message."""
     beats = arc["beats"]
@@ -719,6 +851,199 @@ async def generate_defile_multishot_prompt(
     arc_label = selected_arc["name"] if selected_arc else "user-direction"
     logger.info("Defile multishot prompts for '%s': %d shots (arc: %s)",
                 outfit_name, len(result), arc_label)
+    return result
+
+
+# ─── Workflow multishot prompter ─────────────────────────────────────────────
+_WORKFLOW_MULTISHOT_SYSTEM = """You are a fashion film director writing cinematic shot prompts for Kling 3.0 Omni multishot video generation.
+
+You receive a scene/start image showing a fashion model wearing a garment, a chosen TEMPLATE with mood + beats, and a list of shots (each with a duration and an assigned beat role).
+
+Your task: Write one cinematic English prompt per shot, following the template's beats in order.
+
+ABSOLUTE CONTINUITY RULES:
+- The sequence must feel like ONE continuous fashion film, chained shot-to-shot
+- Lighting, garment color, garment silhouette, location, and model identity remain CONSTANT across all shots
+- Reference the garment color, key construction detail, and silhouette visible in the image
+- For back-view shots: explicitly describe the back structure visible in the image
+- Never invent garment details not in the image — color, cut, openings, hem length are locked by the reference
+
+SHOT-BY-SHOT RULES:
+- Each prompt: 30-50 words, HARD LIMIT 480 characters, English only
+- Every prompt ends with a short depth-of-field phrase (e.g. "shallow depth of field", "soft background bokeh", "creamy background separation")
+- Every prompt includes a brief 3-5 word location reminder (e.g. "within the stone courtyard", "on the illuminated runway", "against the Parisian arcade")
+- Never repeat the exact same camera angle/movement twice in a row
+- Vary from the camera vocabulary: Wide, Medium, Close-Up, Extreme Close-Up, Low Angle, High Angle, Tracking, Dolly In, Dolly Out, Arc, Tilt Up, Follow, Steadicam, Overhead
+
+BEAT ROLE DISCIPLINE:
+- Each shot is labeled with a BEAT ROLE from the template (e.g. "ESTABLISHING WIDE", "HERO POSE", "DETAIL CLOSE-UP")
+- The prompt for that shot MUST fulfill the beat's framing/angle intent — do not swap roles between shots
+- If two consecutive shots share the same beat role (expanded arc), change camera angle/distance between them so they feel distinct
+
+STRICT NEGATIVES:
+- NEVER add spectators, audience, crowd, seated guests, photographers, crew, children, or additional people
+- NEVER add trees, flowers, plants, decorative accessories, or any props not already in the scene image
+- NEVER override garment geometry with positive phrases like "closed skirt", "sealed gown", "no slit", "legs hidden"
+- The background/environment stays EXACTLY as in the scene image — do not invent new locations or elements
+
+Return a JSON object with a single key "shots" containing exactly N objects (N = number of shots requested), in order:
+{"shots": [
+  {"duration": "5", "prompt": "..."},
+  {"duration": "4", "prompt": "..."}
+]}"""
+
+
+async def generate_workflow_multishot_prompt(
+    scene_frame_url: str,
+    shot_plan: list,
+    outfit_name: str = "",
+    template_id: Optional[str] = None,
+    total_duration: Optional[int] = None,
+    rhythm: Optional[str] = None,
+    director_note: Optional[str] = None,
+) -> list[dict]:
+    """Generate workflow multishot prompts using a pre-planned shot list and arc template.
+
+    Args:
+        scene_frame_url: Start image URL (NB Pro composed scene frame or user-provided start frame).
+        shot_plan: Flat list of shot dicts from shot_planner — each has
+                   {duration, seq_index, shot_index, global_index}. GPT writes
+                   one prompt per shot in order.
+        outfit_name: Outfit name for logging.
+        template_id: Workflow arc template id (editorial/runway/street_style/couture_reveal).
+                     Falls back to 'editorial' if unknown.
+        total_duration: Total video duration in seconds — passed to GPT for pacing context.
+        rhythm: 'slow' | 'normal' | 'fast' — passed to GPT as tempo hint.
+        director_note: Optional user free-text direction, mixed in with the template.
+
+    Returns:
+        List of {"duration": str, "prompt": str} dicts, one per shot.
+    """
+    import re as _re
+
+    template = _get_workflow_arc_template(template_id)
+    n_shots = len(shot_plan)
+    arc_block = _format_workflow_arc(template, n_shots)
+
+    # Per-shot description with assigned beat role so GPT knows which beat this shot serves
+    beats = template["beats"]
+    beat_assignments = []
+    if n_shots >= len(beats):
+        # Expand: re-use beats cyclically in order, but each shot still tagged
+        for i in range(n_shots):
+            idx = min(i, len(beats) - 1) if i < len(beats) else (i % len(beats))
+            beat_assignments.append(beats[idx])
+    else:
+        # Merge: always include first and last beat, pick evenly spaced middles
+        selected_indices = [0]
+        if n_shots > 2:
+            step = (len(beats) - 1) / (n_shots - 1)
+            for k in range(1, n_shots - 1):
+                selected_indices.append(round(k * step))
+        if n_shots >= 2:
+            selected_indices.append(len(beats) - 1)
+        # De-duplicate while preserving order
+        seen = set()
+        uniq = []
+        for idx in selected_indices:
+            if idx not in seen:
+                seen.add(idx)
+                uniq.append(idx)
+        # Pad if dedup shrank it
+        while len(uniq) < n_shots:
+            uniq.append(uniq[-1])
+        beat_assignments = [beats[i] for i in uniq[:n_shots]]
+
+    # Build the shot description block with durations and beat roles
+    shot_desc_lines = []
+    for i, shot in enumerate(shot_plan):
+        beat_label = beat_assignments[i] if i < len(beat_assignments) else beats[-1]
+        shot_desc_lines.append(
+            f"  Shot {i + 1} — duration: {shot['duration']}s — beat role: {beat_label}"
+        )
+    shots_description = "\n".join(shot_desc_lines)
+
+    tempo_label = (rhythm or "normal").lower()
+    total_dur_label = f"{total_duration}s" if total_duration else "not specified"
+
+    user_text_parts = [
+        f"Outfit: {outfit_name or 'fashion garment'}",
+        f"Total video duration: {total_dur_label}",
+        f"Rhythm: {tempo_label}",
+        f"Number of shots: {n_shots}",
+        "",
+        "Shots with beat roles:",
+        shots_description,
+        "",
+        arc_block,
+    ]
+    if director_note:
+        user_text_parts.extend([
+            "",
+            "USER DIRECTOR NOTE (highest priority — blend with template):",
+            director_note,
+        ])
+    user_text_parts.extend([
+        "",
+        "Analyze the scene image and write one cinematic prompt per shot in the order listed. "
+        "Each shot must fulfill its assigned beat role while preserving the template's mood and camera style. "
+        "Return exactly N shot objects in the JSON wrapper, in order.",
+    ])
+    user_text = "\n".join(user_text_parts)
+
+    response = await client.chat.completions.create(
+        model="gpt-5.4",
+        messages=[
+            {"role": "system", "content": _WORKFLOW_MULTISHOT_SYSTEM},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_text},
+                    {"type": "image_url", "image_url": {"url": scene_frame_url, "detail": "high"}},
+                ],
+            },
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.75,
+        max_completion_tokens=1800,
+    )
+
+    raw = (response.choices[0].message.content or "").strip()
+
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict) and "shots" in parsed:
+            shots_out = parsed["shots"]
+        elif isinstance(parsed, list):
+            shots_out = parsed
+        else:
+            shots_out = next(v for v in parsed.values() if isinstance(v, list))
+    except Exception:
+        match = _re.search(r'\[.*\]', raw, _re.DOTALL)
+        if match:
+            shots_out = json.loads(match.group(0))
+        else:
+            raise ValueError(f"Could not parse workflow multishot prompts: {raw[:200]}")
+
+    # Enforce per-shot durations (GPT sometimes rewrites) and attach planner metadata
+    result = []
+    for i, shot in enumerate(shot_plan):
+        prompt_text = (
+            shots_out[i]["prompt"] if i < len(shots_out) and isinstance(shots_out[i], dict)
+            else f"Fashion model, cinematic shot {i + 1}, editorial luxury aesthetic"
+        )
+        result.append({
+            "duration": str(shot["duration"]),
+            "prompt": prompt_text,
+            "seq_index": shot["seq_index"],
+            "shot_index": shot["shot_index"],
+            "beat": beat_assignments[i] if i < len(beat_assignments) else "",
+        })
+
+    logger.info(
+        "Workflow multishot prompts: outfit=%s template=%s shots=%d (total=%ss rhythm=%s)",
+        outfit_name or "n/a", template["name"], len(result), total_dur_label, tempo_label,
+    )
     return result
 
 

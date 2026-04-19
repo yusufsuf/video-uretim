@@ -27,8 +27,16 @@ let wfOutfitData = [];
 let wfJobId = null;
 let wfPollInterval = null;
 let wfDebugPayload = null;
-let wfShotArc = null;           // null = random, or arc ID
+let wfShotArc = null;           // null = random, or arc ID (manual mode)
 let wfShotArcs = [];            // fetched from /api/defile/shot-arcs
+
+// Planner mode state
+let wfMode = "planner";                 // "planner" | "manual"
+let wfTotalDuration = 30;               // 15 | 30 | 45 | 60
+let wfRhythm = "normal";                // "slow" | "normal" | "fast"
+let wfArcTemplate = "editorial";
+let wfArcTemplates = [];                // fetched from /api/workflow/arc-templates
+let wfStartFrameUrl = null;             // optional user-supplied start frame
 
 // ─── Shot Arc Picker ──────────────────────────────────────────────
 async function fetchWfShotArcs() {
@@ -81,11 +89,155 @@ function selectWfShotArc(arcId) {
 }
 window.selectWfShotArc = selectWfShotArc;
 
+// ─── Planner UI ───────────────────────────────────────────────────
+
+// Estimate shot count / sequences for the summary line (mirrors backend shot_planner).
+function wfPlanSummary(total, rhythm) {
+    const shotLen = { slow: 6, normal: 4, fast: 3 }[rhythm] || 4;
+    const nSeq = Math.max(1, Math.ceil(total / 15));
+    const baseSeq = Math.floor(total / nSeq);
+    const extra = total - baseSeq * nSeq;
+    let totalShots = 0;
+    const seqLines = [];
+    for (let i = 0; i < nSeq; i++) {
+        const seqDur = baseSeq + (i < extra ? 1 : 0);
+        let nShots = Math.max(1, Math.round(seqDur / shotLen));
+        nShots = Math.min(nShots, Math.floor(seqDur / 3)) || 1;
+        totalShots += nShots;
+        seqLines.push(`${nShots} sahne (${seqDur}s)`);
+    }
+    return `${nSeq} sekans · ${totalShots} sahne toplam · ${seqLines.join(" + ")}`;
+}
+
+function wfRenderPlanSummary() {
+    const box = document.getElementById("wf-plan-summary");
+    if (box) box.textContent = wfPlanSummary(wfTotalDuration, wfRhythm);
+}
+
+function wfSetMode(mode) {
+    wfMode = mode;
+    document.querySelectorAll(".wf-mode-btn").forEach(b => {
+        b.classList.toggle("active", b.dataset.mode === mode);
+    });
+    document.getElementById("wf-planner-block").style.display = (mode === "planner") ? "" : "none";
+    document.getElementById("wf-manual-block").style.display = (mode === "manual") ? "" : "none";
+}
+window.wfSetMode = wfSetMode;
+
+function wfBindDurationChips() {
+    document.querySelectorAll("#wf-duration-grid .wf-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            wfTotalDuration = parseInt(chip.dataset.duration);
+            document.querySelectorAll("#wf-duration-grid .wf-chip").forEach(c =>
+                c.classList.toggle("active", c === chip));
+            wfRenderPlanSummary();
+        });
+    });
+}
+
+function wfBindRhythmChips() {
+    document.querySelectorAll("#wf-rhythm-grid .wf-chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+            wfRhythm = chip.dataset.rhythm;
+            document.querySelectorAll("#wf-rhythm-grid .wf-chip").forEach(c =>
+                c.classList.toggle("active", c === chip));
+            wfRenderPlanSummary();
+        });
+    });
+}
+
+async function wfFetchArcTemplates() {
+    try {
+        const resp = await fetch(`${API}/api/workflow/arc-templates`, { headers: authHeaders() });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        wfArcTemplates = data.templates || [];
+        wfRenderTemplatePicker();
+    } catch (e) {
+        console.warn("Workflow arc templates fetch failed:", e);
+    }
+}
+
+function wfRenderTemplatePicker() {
+    const grid = document.getElementById("wf-template-grid");
+    if (!grid) return;
+    grid.innerHTML = wfArcTemplates.map(t => `
+        <button type="button" class="wf-template-card${wfArcTemplate === t.id ? ' active' : ''}"
+                onclick="wfSelectTemplate('${t.id}')">
+            <div class="wf-template-name">${t.name}</div>
+            <div class="wf-template-desc">${t.description}</div>
+        </button>
+    `).join("");
+    wfRenderTemplateBeats();
+}
+
+function wfRenderTemplateBeats() {
+    const box = document.getElementById("wf-template-beats");
+    if (!box) return;
+    const t = wfArcTemplates.find(t => t.id === wfArcTemplate);
+    if (!t) { box.style.display = "none"; return; }
+    box.style.display = "block";
+    box.innerHTML = t.beats
+        .map((b, i) => `<div style="margin-bottom:4px"><strong style="color:var(--text-primary)">${i + 1}.</strong> ${b}</div>`)
+        .join("");
+}
+
+function wfSelectTemplate(id) {
+    wfArcTemplate = id;
+    wfRenderTemplatePicker();
+}
+window.wfSelectTemplate = wfSelectTemplate;
+
+async function wfUploadStartFrame(file) {
+    const fd = new FormData();
+    fd.append("file", file);
+    const resp = await fetch(`${API}/api/upload-temp`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: fd,
+    });
+    if (!resp.ok) throw new Error(`Upload HTTP ${resp.status}`);
+    const data = await resp.json();
+    return data.url;
+}
+
+function wfBindStartFrameUpload() {
+    const input = document.getElementById("wf-startframe-input");
+    if (!input) return;
+    input.addEventListener("change", async () => {
+        const f = input.files && input.files[0];
+        if (!f) return;
+        try {
+            const url = await wfUploadStartFrame(f);
+            wfStartFrameUrl = url;
+            const prev = document.getElementById("wf-startframe-preview");
+            const img = document.getElementById("wf-startframe-img");
+            img.src = url;
+            prev.style.display = "block";
+        } catch (e) {
+            alert("Başlangıç karesi yüklenemedi: " + e.message);
+        } finally {
+            input.value = "";
+        }
+    });
+}
+
+window.wfClearStartFrame = () => {
+    wfStartFrameUrl = null;
+    document.getElementById("wf-startframe-preview").style.display = "none";
+};
+
 // ─── Init ──────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
     loadOutfits();
     renderShotConfigs();
     fetchWfShotArcs();
+    wfFetchArcTemplates();
+
+    wfBindDurationChips();
+    wfBindRhythmChips();
+    wfBindStartFrameUpload();
+    wfRenderPlanSummary();
 
     document.getElementById("wf-btn-scenario").addEventListener("click", generateScenario);
     document.getElementById("wf-btn-approve-scenario").addEventListener("click", approveScenario);
@@ -213,17 +365,34 @@ async function generateScenario() {
         for (let i = 0; i < wfSelectedOutfits.length; i++) {
             btn.innerHTML = `<span class="wf-spinner"></span>Senaryo üretiliyor (${i + 1}/${wfSelectedOutfits.length})...`;
 
+            const basePayload = {
+                outfit: wfSelectedOutfits[i],
+                background_url: wfBgUrl,
+                aspect_ratio: document.getElementById("wf-aspect").value,
+                director_note: document.getElementById("wf-director-note").value.trim() || null,
+            };
+
+            let payload;
+            if (wfMode === "planner") {
+                payload = {
+                    ...basePayload,
+                    total_duration: wfTotalDuration,
+                    rhythm: wfRhythm,
+                    arc_template: wfArcTemplate,
+                    start_frame_url: wfStartFrameUrl,
+                };
+            } else {
+                payload = {
+                    ...basePayload,
+                    shot_configs: wfShotConfigs,
+                    shot_arc: wfShotArc,
+                };
+            }
+
             const resp = await fetch(`${API}/api/workflow/scenario`, {
                 method: "POST",
                 headers: { ...authHeaders(), "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    outfit: wfSelectedOutfits[i],
-                    shot_configs: wfShotConfigs,
-                    background_url: wfBgUrl,
-                    aspect_ratio: document.getElementById("wf-aspect").value,
-                    director_note: document.getElementById("wf-director-note").value.trim() || null,
-                    shot_arc: wfShotArc,
-                }),
+                body: JSON.stringify(payload),
             });
 
             if (!resp.ok) throw new Error(`HTTP ${resp.status} (kıyafet ${i + 1})`);
@@ -251,10 +420,20 @@ function renderScenario() {
     let html = "";
     wfOutfitData.forEach((od, oi) => {
         html += `<div style="font-weight:600;font-size:0.82rem;margin-top:${oi > 0 ? 16 : 0}px;margin-bottom:8px;color:var(--text-primary)">${od.outfit.name || `Kıyafet ${oi + 1}`}</div>`;
+        let lastSeqIdx = -1;
         od.shots.forEach((shot, si) => {
+            const seqIdx = (shot.seq_index !== undefined && shot.seq_index !== null) ? shot.seq_index : -1;
+            if (seqIdx >= 0 && seqIdx !== lastSeqIdx) {
+                html += `<div style="font-size:0.68rem;color:var(--text-muted);margin:10px 0 6px;letter-spacing:0.04em;text-transform:uppercase">Sekans ${seqIdx + 1}</div>`;
+                lastSeqIdx = seqIdx;
+            }
+            const beatLine = shot.beat
+                ? `<div style="font-size:0.62rem;color:var(--accent);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em">${shot.beat.split("—")[0].trim()}</div>`
+                : "";
             html += `
                 <div class="wf-scenario-card" data-outfit="${oi}" data-shot="${si}">
                     <div class="wf-shot-label">Sahne ${si + 1} (${shot.duration}s)</div>
+                    ${beatLine}
                     <div class="wf-shot-prompt">${shot.prompt}</div>
                     <textarea class="wf-scenario-edit" data-outfit="${oi}" data-shot="${si}">${shot.prompt}</textarea>
                 </div>`;

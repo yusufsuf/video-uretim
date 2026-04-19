@@ -40,11 +40,17 @@ class WfShotConfig(BaseModel):
 
 class ScenarioRequest(BaseModel):
     outfit: WfOutfit
-    shot_configs: List[WfShotConfig]
+    # Legacy path: explicit per-shot configs (manual mode). Kept optional for backward compat.
+    shot_configs: Optional[List[WfShotConfig]] = None
+    # New path: total duration + rhythm + template. shot_planner derives sequences.
+    total_duration: Optional[int] = None   # 6-60 seconds; triggers new path when set
+    rhythm: Optional[str] = None           # "slow" | "normal" | "fast"
+    arc_template: Optional[str] = None     # "editorial" | "runway" | "street_style" | "couture_reveal"
+    start_frame_url: Optional[str] = None  # user-supplied start frame (bypasses NB2 scene)
     background_url: Optional[str] = None
     aspect_ratio: str = "9:16"
     director_note: Optional[str] = None
-    shot_arc: Optional[str] = None  # Narrative arc ID — None = random
+    shot_arc: Optional[str] = None  # Legacy defile-arc picker (manual mode only)
 
 
 class SceneFrameRequest(BaseModel):
@@ -58,7 +64,7 @@ class WfOutfitPayload(BaseModel):
     """Per-outfit data: outfit + approved scene frame + approved shots."""
     outfit: WfOutfit
     scene_frame_url: str
-    shots: List[dict]   # [{duration, prompt}]
+    shots: List[dict]   # [{duration, prompt, seq_index?, shot_index?, beat?}]
 
 
 class GenerateRequest(BaseModel):
@@ -81,62 +87,104 @@ async def generate_scenario(
 ):
     """Generate multishot prompts via GPT for a single outfit.
 
-    Returns {shots: [{duration, prompt}], scene_frame_url: null}
+    Two modes:
+      - New: body.total_duration is set → shot_planner derives sequences, GPT
+        writes arc-template-aware prompts (generate_workflow_multishot_prompt).
+      - Legacy: body.shot_configs is a plain list → defile-style prompter
+        (generate_defile_multishot_prompt) with optional shot_arc picker.
+
+    If body.start_frame_url is set, it is used directly as the scene frame —
+    NB Pro composition is skipped entirely.
     """
-    from services.analysis_service import generate_defile_multishot_prompt
+    from services.analysis_service import (
+        generate_defile_multishot_prompt,
+        generate_workflow_multishot_prompt,
+    )
     from services.nano_banana_service import generate_background, generate_scene_frame
+    from services.shot_planner import plan_sequences, flat_shot_list, validate_rhythm
     from pipeline import _to_fal_url
 
-    # Build a simple NB Pro scene frame for GPT to analyze
-    # First, get background
-    if body.background_url:
-        bg_url = body.background_url
+    # 1. Scene frame: either user-provided start frame, or NB Pro composition
+    if body.start_frame_url:
+        scene_frame_url = await _to_fal_url(body.start_frame_url)
+        logger.info("Workflow scenario: using user-supplied start frame %s",
+                    (scene_frame_url or "")[:80])
     else:
-        bg_url = await generate_background(
-            prompt="high-end fashion runway, empty catwalk, dramatic stage lighting, luxury fashion show venue, no people, architectural interior",
+        if body.background_url:
+            bg_url = body.background_url
+        else:
+            bg_url = await generate_background(
+                prompt="high-end fashion runway, empty catwalk, dramatic stage lighting, luxury fashion show venue, no people, architectural interior",
+                aspect_ratio=body.aspect_ratio,
+            )
+
+        fal_front = await _to_fal_url(body.outfit.front_url)
+        garment_refs = [fal_front]
+        if body.outfit.side_url:
+            garment_refs.append(await _to_fal_url(body.outfit.side_url))
+        if body.outfit.back_url:
+            garment_refs.append(await _to_fal_url(body.outfit.back_url))
+        for eu in (body.outfit.extra_urls or []):
+            if eu and eu not in garment_refs:
+                garment_refs.append(await _to_fal_url(eu))
+
+        fal_bg = await _to_fal_url(bg_url)
+
+        from pipeline import _build_nb_pro_compose_prompt
+        nb_pro_prompt = _build_nb_pro_compose_prompt(analysis=None)
+
+        scene_frame_url = await generate_scene_frame(
+            image_urls=[fal_bg] + garment_refs,
+            prompt=nb_pro_prompt,
             aspect_ratio=body.aspect_ratio,
         )
+        logger.info("Workflow scenario: NB Pro scene frame: %s", scene_frame_url[:80] if scene_frame_url else "N/A")
 
-    # Upload outfit images to fal CDN
-    fal_front = await _to_fal_url(body.outfit.front_url)
-    garment_refs = [fal_front]
-    if body.outfit.side_url:
-        garment_refs.append(await _to_fal_url(body.outfit.side_url))
-    if body.outfit.back_url:
-        garment_refs.append(await _to_fal_url(body.outfit.back_url))
-    for eu in (body.outfit.extra_urls or []):
-        if eu and eu not in garment_refs:
-            garment_refs.append(await _to_fal_url(eu))
+    # 2. Shot generation — pick path based on payload
+    if body.total_duration is not None:
+        # New path: planner → workflow prompter
+        rhythm = validate_rhythm(body.rhythm)
+        sequences = plan_sequences(body.total_duration, rhythm)
+        shot_plan = flat_shot_list(sequences)
 
-    fal_bg = await _to_fal_url(bg_url)
-
-    # NB Pro compose
-    from pipeline import _build_nb_pro_compose_prompt
-    nb_pro_prompt = _build_nb_pro_compose_prompt(analysis=None)
-
-    scene_frame_url = await generate_scene_frame(
-        image_urls=[fal_bg] + garment_refs,
-        prompt=nb_pro_prompt,
-        aspect_ratio=body.aspect_ratio,
-    )
-    logger.info("Workflow scenario: NB Pro scene frame: %s", scene_frame_url[:80] if scene_frame_url else "N/A")
-
-    # GPT scenario generation
-    shot_configs_typed = [DefileShotConfig(duration=s.duration) for s in body.shot_configs]
-    shots = await generate_defile_multishot_prompt(
-        scene_frame_url=scene_frame_url,
-        shot_configs=shot_configs_typed,
-        outfit_name=body.outfit.name or "garment",
-        video_description=body.director_note,
-        shot_arc_id=body.shot_arc,
-    )
-
-    logger.info("Workflow scenario: %d shots generated", len(shots))
+        shots = await generate_workflow_multishot_prompt(
+            scene_frame_url=scene_frame_url,
+            shot_plan=shot_plan,
+            outfit_name=body.outfit.name or "garment",
+            template_id=body.arc_template,
+            total_duration=body.total_duration,
+            rhythm=rhythm,
+            director_note=body.director_note,
+        )
+        logger.info(
+            "Workflow scenario (planned): %d shots across %d sequence(s), rhythm=%s, template=%s",
+            len(shots), len(sequences), rhythm, body.arc_template or "editorial",
+        )
+    else:
+        # Legacy path: manual shot_configs + defile arc picker
+        shot_configs_typed = [DefileShotConfig(duration=s.duration) for s in (body.shot_configs or [])]
+        shots = await generate_defile_multishot_prompt(
+            scene_frame_url=scene_frame_url,
+            shot_configs=shot_configs_typed,
+            outfit_name=body.outfit.name or "garment",
+            video_description=body.director_note,
+            shot_arc_id=body.shot_arc,
+        )
+        logger.info("Workflow scenario (legacy): %d shots generated", len(shots))
 
     return {
         "shots": shots,
         "scene_frame_url": scene_frame_url,
     }
+
+
+# ─── Endpoint: List workflow arc templates ──────────────────────────
+
+@router.get("/arc-templates")
+async def workflow_arc_templates(_user: dict = Depends(get_current_user)):
+    """Public list of workflow arc templates for the UI."""
+    from services.analysis_service import list_workflow_arc_templates
+    return {"templates": list_workflow_arc_templates()}
 
 
 # ─── Endpoint 2: Generate Scene Frame ───────────────────────────────
@@ -201,9 +249,47 @@ async def generate_video(
     return jobs[job_id]
 
 
+def _group_shots_by_sequence(shots: list) -> list:
+    """Group an outfit's approved shots by seq_index.
+
+    Returns a list of sequences, each sequence is a list of shots in shot_index
+    order. If shots have no seq_index (legacy manual mode), all shots land in a
+    single sequence — preserving the existing single-Kling-call behavior.
+    """
+    if not shots:
+        return []
+    # Detect legacy mode: no seq_index at all
+    if all("seq_index" not in s for s in shots):
+        return [list(shots)]
+
+    groups: dict = {}
+    for s in shots:
+        idx = int(s.get("seq_index") or 0)
+        groups.setdefault(idx, []).append(s)
+    ordered = []
+    for idx in sorted(groups.keys()):
+        seq_shots = groups[idx]
+        seq_shots.sort(key=lambda s: int(s.get("shot_index") or 0))
+        ordered.append(seq_shots)
+    return ordered
+
+
 async def _run_workflow_video(job_id: str, req: GenerateRequest):
-    """Execute video generation for workflow — supports multi-outfit with concat."""
-    from services.video_service import generate_multishot_video, download_file, concatenate_clips
+    """Execute workflow video generation.
+
+    Per outfit, we loop over sequences. Each sequence is exactly one Kling
+    Omni call (≤15s, 1-5 shots). The first sequence starts from the approved
+    scene_frame; subsequent sequences chain via last-frame extraction from the
+    previous clip. All sequence clips (across all outfits) are concatenated
+    losslessly at the end and uploaded to Supabase.
+    """
+    from services.video_service import (
+        generate_multishot_video,
+        download_file,
+        concatenate_clips,
+        extract_last_frame,
+        upload_to_fal,
+    )
     from pipeline import (
         _to_fal_url,
         _to_fal_url_compressed,
@@ -220,7 +306,8 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
 
         for oi, op in enumerate(req.outfits):
             outfit_name = op.outfit.name or f"Kıyafet {oi + 1}"
-            total_duration = sum(int(s["duration"]) for s in op.shots)
+            sequences = _group_shots_by_sequence(op.shots)
+            n_seq = len(sequences)
             base_progress = 10 + int((oi / n_outfits) * 75)
 
             _update_job(job_id, status=JobStatus.GENERATING_VIDEO,
@@ -229,10 +316,11 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
 
             # Resolve outfit garment meta from library (fabric + user description, translated)
             _wf_meta = await _resolve_garment_meta_from_url(op.outfit.front_url, analysis=None)
-            logger.info("[%s] Workflow outfit %d meta: fabric=%r desc=%s",
+            logger.info("[%s] Workflow outfit %d meta: fabric=%r desc=%s sequences=%d",
                         job_id, oi + 1,
                         _wf_meta.get("fabric"),
-                        (_wf_meta.get("description") or "")[:60])
+                        (_wf_meta.get("description") or "")[:60],
+                        n_seq)
 
             # Per-outfit dynamic negative prompt — base + fabric-specific additions
             _wf_negative = _DEFILE_NEGATIVE
@@ -240,23 +328,7 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
             if _wf_fabric_neg:
                 _wf_negative = _wf_negative + ", " + _wf_fabric_neg
 
-            # Wrap each approved shot with quality layers (FABRIC LOCK anchor +
-            # fabric physics + Style Bible + micro actions). Garment silhouette
-            # is preserved by Kling element references — no positive-text hem
-            # enforcement is injected.
-            multi_prompt = [
-                {
-                    "duration": s["duration"],
-                    "prompt": _apply_quality_layers(
-                        core_prompt=str(s["prompt"]),
-                        meta=_wf_meta,
-                        max_len=512,
-                    ),
-                }
-                for s in op.shots
-            ]
-
-            # Build element data
+            # Build Kling element data once per outfit (element_id is reusable across sequences)
             elem_front = await _to_fal_url_compressed(op.outfit.front_url)
             elem_refs: list = []
             if op.outfit.side_url:
@@ -274,27 +346,11 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
                 "reference_image_urls": elem_refs,
             }
 
-            scene_frame_fal = await _to_fal_url(op.scene_frame_url)
-
-            # Build debug_payload for this outfit
-            _debug_payload = {
-                "outfit": outfit_name,
-                "start_image_url": scene_frame_fal,
-                "multi_prompt": [{"prompt": p["prompt"], "duration": p["duration"]} for p in multi_prompt],
-                "duration": str(total_duration),
-                "aspect_ratio": req.aspect_ratio,
-                "generate_audio": req.generate_audio,
-                "elements": [outfit_element],
-                "provider": req.provider,
-            }
-
+            # Resolve Kling element ID once per outfit (reused for every sequence)
+            kling_eid = None
             if req.provider == "kling":
-                from services.kling_service import (  # type: ignore[import]
-                    generate_multishot_video as kling_gen,
-                )
                 from pipeline import get_or_create_kling_element
-
-                _update_job(job_id, progress=base_progress + int(15 / n_outfits),
+                _update_job(job_id, progress=base_progress + int(8 / n_outfits),
                             message=f"{outfit_name} — Kling element oluşturuluyor ({oi + 1}/{n_outfits})...")
                 kling_eid = await get_or_create_kling_element(
                     front_url=op.outfit.front_url,
@@ -303,54 +359,103 @@ async def _run_workflow_video(job_id: str, req: GenerateRequest):
                     name=f"workflow{oi + 1}",
                     description=f"workflow garment {oi + 1}",
                 )
-
                 if kling_eid is not None:
                     logger.info("[%s] Workflow outfit %d: Kling element_id=%d", job_id, oi + 1, kling_eid)
-                    kling_prompts = [
-                        {"duration": p["duration"], "prompt": f"<<<element_1>>> {p['prompt']}"}
-                        for p in multi_prompt
-                    ]
-                    element_list_param: list = [{"element_id": int(kling_eid)}]
+
+            # Starting frame for sequence 0 is the approved scene frame. Later
+            # sequences are chained via last-frame extraction.
+            current_start_fal = await _to_fal_url(op.scene_frame_url)
+
+            for si, seq_shots in enumerate(sequences):
+                seq_total_duration = sum(int(s["duration"]) for s in seq_shots)
+
+                # Apply quality layers to each shot prompt (FABRIC LOCK anchor +
+                # fabric physics + Style Bible + micro actions). Garment
+                # silhouette is preserved by Kling element reference.
+                multi_prompt = [
+                    {
+                        "duration": int(s["duration"]),
+                        "prompt": _apply_quality_layers(
+                            core_prompt=str(s["prompt"]),
+                            meta=_wf_meta,
+                            max_len=512,
+                        ),
+                    }
+                    for s in seq_shots
+                ]
+
+                _debug_payload = {
+                    "outfit": outfit_name,
+                    "sequence": f"{si + 1}/{n_seq}",
+                    "start_image_url": current_start_fal,
+                    "multi_prompt": [{"prompt": p["prompt"], "duration": p["duration"]} for p in multi_prompt],
+                    "duration": str(seq_total_duration),
+                    "aspect_ratio": req.aspect_ratio,
+                    "generate_audio": req.generate_audio,
+                    "elements": [outfit_element],
+                    "provider": req.provider,
+                }
+
+                seq_progress = base_progress + int(((si + 1) / max(1, n_seq * 2)) * (75 / n_outfits))
+                _update_job(job_id, progress=seq_progress,
+                            debug_payload=_debug_payload,
+                            message=f"{outfit_name} — sekans {si + 1}/{n_seq} üretiliyor ({oi + 1}/{n_outfits})...")
+
+                if req.provider == "kling":
+                    from services.kling_service import (  # type: ignore[import]
+                        generate_multishot_video as kling_gen,
+                    )
+
+                    if kling_eid is not None:
+                        kling_prompts = [
+                            {"duration": p["duration"], "prompt": f"<<<element_1>>> {p['prompt']}"}
+                            for p in multi_prompt
+                        ]
+                        element_list_param: list = [{"element_id": int(kling_eid)}]
+                    else:
+                        kling_prompts = [
+                            {"duration": p["duration"], "prompt": p["prompt"]}
+                            for p in multi_prompt
+                        ]
+                        element_list_param = []
+
+                    _debug_payload["element_list"] = element_list_param
+
+                    clip_url = await kling_gen(
+                        start_image_url=current_start_fal,
+                        multi_prompt=kling_prompts,
+                        duration=str(seq_total_duration),
+                        aspect_ratio=req.aspect_ratio,
+                        generate_audio=req.generate_audio,
+                        element_list=element_list_param,
+                        negative_prompt=_wf_negative,
+                    )
                 else:
-                    logger.info("[%s] Workflow outfit %d: no Kling element (single image) — using start frame only",
-                                job_id, oi + 1)
-                    kling_prompts = [
-                        {"duration": p["duration"], "prompt": p["prompt"]}
-                        for p in multi_prompt
-                    ]
-                    element_list_param = []
+                    clip_url = await generate_multishot_video(
+                        start_image_url=current_start_fal,
+                        multi_prompt=multi_prompt,
+                        duration=str(seq_total_duration),
+                        aspect_ratio=req.aspect_ratio,
+                        generate_audio=req.generate_audio,
+                        elements=[outfit_element],
+                        negative_prompt=_wf_negative,
+                    )
 
-                _debug_payload["element_list"] = element_list_param
+                clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
+                clip_paths.append(clip_path)
+                logger.info("[%s] Workflow outfit %d/%d seq %d/%d clip: %s",
+                            job_id, oi + 1, n_outfits, si + 1, n_seq, clip_path)
 
-                _update_job(job_id, progress=base_progress + int(35 / n_outfits),
-                            debug_payload=_debug_payload,
-                            message=f"{outfit_name} — video üretiliyor ({oi + 1}/{n_outfits})...")
-                clip_url = await kling_gen(
-                    start_image_url=scene_frame_fal,
-                    multi_prompt=kling_prompts,
-                    duration=str(total_duration),
-                    aspect_ratio=req.aspect_ratio,
-                    generate_audio=req.generate_audio,
-                    element_list=element_list_param,
-                    negative_prompt=_wf_negative,
-                )
-            else:
-                _update_job(job_id, progress=base_progress + int(35 / n_outfits),
-                            debug_payload=_debug_payload,
-                            message=f"{outfit_name} — video üretiliyor ({oi + 1}/{n_outfits})...")
-                clip_url = await generate_multishot_video(
-                    start_image_url=scene_frame_fal,
-                    multi_prompt=multi_prompt,
-                    duration=str(total_duration),
-                    aspect_ratio=req.aspect_ratio,
-                    generate_audio=req.generate_audio,
-                    elements=[outfit_element],
-                    negative_prompt=_wf_negative,
-                )
-
-            clip_path = await download_file(clip_url, settings.TEMP_DIR, extension=".mp4")
-            clip_paths.append(clip_path)
-            logger.info("[%s] Workflow outfit %d/%d clip: %s", job_id, oi + 1, n_outfits, clip_path)
+                # Chain: if there's another sequence for this outfit, extract last frame
+                # of the just-generated clip and use it as the next sequence's start frame.
+                if si < n_seq - 1:
+                    _update_job(job_id, message=f"{outfit_name} — son kare çıkarılıyor (sekans {si + 1})...")
+                    frame_path = extract_last_frame(clip_path, settings.TEMP_DIR)
+                    current_start_fal = await upload_to_fal(frame_path)
+                    try:
+                        os.remove(frame_path)
+                    except OSError:
+                        pass
 
         # Concatenate if multiple outfits
         _update_job(job_id, progress=88, message="Video birleştiriliyor...")

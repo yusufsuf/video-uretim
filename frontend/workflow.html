@@ -394,6 +394,97 @@
             font-size: 0.72rem;
             text-align: center;
         }
+
+        /* ── Planner mode controls ── */
+        .wf-mode-btn {
+            flex: 1;
+            padding: 8px 14px;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-family: var(--font-body);
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .wf-mode-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--border-strong, var(--accent));
+        }
+
+        .wf-mode-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        .wf-duration-grid,
+        .wf-rhythm-grid {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .wf-chip {
+            padding: 7px 14px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 999px;
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-family: var(--font-body);
+            font-size: 0.72rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+
+        .wf-chip:hover {
+            color: var(--text-primary);
+        }
+
+        .wf-chip.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        .wf-template-card {
+            padding: 10px 12px;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-family: var(--font-body);
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            text-align: left;
+        }
+
+        .wf-template-card:hover {
+            color: var(--text-primary);
+            border-color: var(--accent);
+        }
+
+        .wf-template-card.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        .wf-template-card .wf-template-name {
+            font-size: 0.78rem;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .wf-template-card .wf-template-desc {
+            font-size: 0.66rem;
+            opacity: 0.85;
+            line-height: 1.5;
+        }
     </style>
 </head>
 
@@ -430,10 +521,64 @@
                     <div class="wf-outfit-grid" id="wf-outfit-grid"></div>
                     <div id="wf-outfit-empty" style="font-size:0.75rem;color:var(--text-muted);margin-bottom:12px">Yükleniyor...</div>
 
+                    <!-- Mod seçici: Akıllı Planlama (yeni) vs Manuel Sahne (legacy) -->
                     <div class="wf-field">
-                        <label class="wf-label">Sahne Sayısı ve Süreleri</label>
-                        <div class="wf-shot-configs" id="wf-shot-configs"></div>
-                        <button class="wf-btn wf-btn-secondary" style="font-size:0.7rem;padding:5px 12px" onclick="wfAddShot()">+ Sahne Ekle</button>
+                        <label class="wf-label">Kurgu Modu</label>
+                        <div style="display:flex;gap:8px">
+                            <button type="button" class="wf-mode-btn active" data-mode="planner" onclick="wfSetMode('planner')">Akıllı Planlama</button>
+                            <button type="button" class="wf-mode-btn" data-mode="manual" onclick="wfSetMode('manual')">Manuel Sahne Ayarı</button>
+                        </div>
+                    </div>
+
+                    <!-- Planner (new) mode ───────────────────────────── -->
+                    <div id="wf-planner-block">
+                        <div class="wf-field">
+                            <label class="wf-label">Toplam Süre</label>
+                            <div class="wf-duration-grid" id="wf-duration-grid">
+                                <button type="button" class="wf-chip" data-duration="15">15s</button>
+                                <button type="button" class="wf-chip active" data-duration="30">30s</button>
+                                <button type="button" class="wf-chip" data-duration="45">45s</button>
+                                <button type="button" class="wf-chip" data-duration="60">60s</button>
+                            </div>
+                            <div id="wf-plan-summary" style="margin-top:8px;font-size:0.7rem;color:var(--text-muted);line-height:1.6"></div>
+                        </div>
+
+                        <div class="wf-field">
+                            <label class="wf-label">Ritim</label>
+                            <div class="wf-rhythm-grid" id="wf-rhythm-grid">
+                                <button type="button" class="wf-chip" data-rhythm="slow">Yavaş</button>
+                                <button type="button" class="wf-chip active" data-rhythm="normal">Normal</button>
+                                <button type="button" class="wf-chip" data-rhythm="fast">Hızlı</button>
+                            </div>
+                        </div>
+
+                        <div class="wf-field">
+                            <label class="wf-label">Kurgu Şablonu</label>
+                            <div id="wf-template-grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px"></div>
+                            <div id="wf-template-beats" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:8px;font-size:0.68rem;color:var(--text-secondary);line-height:1.55"></div>
+                        </div>
+
+                        <div class="wf-field">
+                            <label class="wf-label">Başlangıç Karesi (opsiyonel)</label>
+                            <div id="wf-startframe-preview" style="display:none;margin-bottom:8px">
+                                <img id="wf-startframe-img" style="width:80px;border-radius:6px;vertical-align:middle">
+                                <button onclick="wfClearStartFrame()" style="font-size:0.65rem;color:var(--accent-error);background:none;border:none;cursor:pointer;margin-left:8px">Kaldır</button>
+                            </div>
+                            <label class="wf-btn wf-btn-secondary" style="font-size:0.72rem;padding:6px 14px;cursor:pointer;display:inline-block">
+                                <input type="file" id="wf-startframe-input" accept="image/*" style="display:none">
+                                Görsel Yükle
+                            </label>
+                            <div style="font-size:0.65rem;color:var(--text-muted);margin-top:6px">Yüklerseniz video bu kareden başlar, otomatik sahne oluşturma atlanır.</div>
+                        </div>
+                    </div>
+
+                    <!-- Manual (legacy) mode ─────────────────────────── -->
+                    <div id="wf-manual-block" style="display:none">
+                        <div class="wf-field">
+                            <label class="wf-label">Sahne Sayısı ve Süreleri</label>
+                            <div class="wf-shot-configs" id="wf-shot-configs"></div>
+                            <button class="wf-btn wf-btn-secondary" style="font-size:0.7rem;padding:5px 12px" onclick="wfAddShot()">+ Sahne Ekle</button>
+                        </div>
                     </div>
 
                     <div style="display:flex;gap:14px;flex-wrap:wrap">
@@ -565,7 +710,7 @@
         </div>
     </div>
 
-    <script src="workflow.js"></script>
+    <script src="workflow.js?v=2"></script>
 </body>
 
 </html>
