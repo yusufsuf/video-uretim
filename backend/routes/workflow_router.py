@@ -78,6 +78,41 @@ class GenerateRequest(BaseModel):
 from pipeline import jobs, _update_job
 
 
+def _is_video_url(url: str) -> bool:
+    clean = (url or "").split("?")[0].lower()
+    return clean.endswith((".mp4", ".mov", ".webm", ".m4v"))
+
+
+async def _resolve_scene_frame(url: str) -> str:
+    """Return a fal.ai image URL usable as Kling start_image.
+
+    If the input is a video, download it, extract the first frame, and
+    re-upload to fal.ai CDN as an image. Otherwise, re-upload as-is.
+    """
+    from services.video_service import download_file, extract_first_frame, upload_to_fal
+    from pipeline import _to_fal_url
+
+    if not _is_video_url(url):
+        return await _to_fal_url(url)
+
+    video_path = await download_file(url, settings.TEMP_DIR, extension=".mp4")
+    try:
+        frame_path = extract_first_frame(video_path, settings.TEMP_DIR)
+    finally:
+        try:
+            os.remove(video_path)
+        except OSError:
+            pass
+    try:
+        fal_url = await upload_to_fal(frame_path)
+    finally:
+        try:
+            os.remove(frame_path)
+        except OSError:
+            pass
+    return fal_url
+
+
 # ─── Endpoint 1: Generate Scenario ──────────────────────────────────
 
 @router.post("/scenario")
@@ -93,52 +128,23 @@ async def generate_scenario(
       - Legacy: body.shot_configs is a plain list → defile-style prompter
         (generate_defile_multishot_prompt) with optional shot_arc picker.
 
-    If body.start_frame_url is set, it is used directly as the scene frame —
-    NB Pro composition is skipped entirely.
+    Scene frame resolution (no NB Pro compose — we skip scene generation):
+      - If body.start_frame_url is set → use that.
+      - Else → use body.outfit.front_url directly. If it's a video, extract
+        the first frame. Final image is always re-uploaded to fal.ai CDN.
     """
     from services.analysis_service import (
         generate_defile_multishot_prompt,
         generate_workflow_multishot_prompt,
     )
-    from services.nano_banana_service import generate_background, generate_scene_frame
     from services.shot_planner import plan_sequences, flat_shot_list, validate_rhythm
     from pipeline import _to_fal_url
 
-    # 1. Scene frame: either user-provided start frame, or NB Pro composition
-    if body.start_frame_url:
-        scene_frame_url = await _to_fal_url(body.start_frame_url)
-        logger.info("Workflow scenario: using user-supplied start frame %s",
-                    (scene_frame_url or "")[:80])
-    else:
-        if body.background_url:
-            bg_url = body.background_url
-        else:
-            bg_url = await generate_background(
-                prompt="high-end fashion runway, empty catwalk, dramatic stage lighting, luxury fashion show venue, no people, architectural interior",
-                aspect_ratio=body.aspect_ratio,
-            )
-
-        fal_front = await _to_fal_url(body.outfit.front_url)
-        garment_refs = [fal_front]
-        if body.outfit.side_url:
-            garment_refs.append(await _to_fal_url(body.outfit.side_url))
-        if body.outfit.back_url:
-            garment_refs.append(await _to_fal_url(body.outfit.back_url))
-        for eu in (body.outfit.extra_urls or []):
-            if eu and eu not in garment_refs:
-                garment_refs.append(await _to_fal_url(eu))
-
-        fal_bg = await _to_fal_url(bg_url)
-
-        from pipeline import _build_nb_pro_compose_prompt
-        nb_pro_prompt = _build_nb_pro_compose_prompt(analysis=None)
-
-        scene_frame_url = await generate_scene_frame(
-            image_urls=[fal_bg] + garment_refs,
-            prompt=nb_pro_prompt,
-            aspect_ratio=body.aspect_ratio,
-        )
-        logger.info("Workflow scenario: NB Pro scene frame: %s", scene_frame_url[:80] if scene_frame_url else "N/A")
+    scene_frame_url = await _resolve_scene_frame(
+        body.start_frame_url or body.outfit.front_url
+    )
+    logger.info("Workflow scenario: scene frame resolved %s",
+                (scene_frame_url or "")[:80])
 
     # 2. Shot generation — pick path based on payload
     if body.total_duration is not None:

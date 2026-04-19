@@ -160,6 +160,18 @@ def extract_last_frame(video_path: str, output_dir: str) -> str:
     return frame_path
 
 
+def extract_first_frame(video_path: str, output_dir: str) -> str:
+    """Extract the first frame of a video as a PNG file using FFmpeg."""
+    frame_path = os.path.join(output_dir, f"{uuid.uuid4().hex}_first.png")
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", video_path,
+         "-vframes", "1", "-q:v", "2", frame_path],
+        check=True, capture_output=True, timeout=30,
+    )
+    logger.info("Extracted first frame: %s", frame_path)
+    return frame_path
+
+
 async def upload_to_fal(file_path: str) -> str:
     """Upload a local file to fal.ai CDN and return the public URL."""
     url = await asyncio.to_thread(fal_client.upload_file, file_path)
