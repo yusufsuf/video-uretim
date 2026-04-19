@@ -247,7 +247,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("wf-btn-scenario").addEventListener("click", generateScenario);
     document.getElementById("wf-btn-approve-scenario").addEventListener("click", approveScenario);
-    document.getElementById("wf-btn-approve-scene").addEventListener("click", approveScene);
     document.getElementById("wf-bg-pick-btn").addEventListener("click", () => openWfLibPicker("background"));
 });
 
@@ -465,62 +464,14 @@ window.wfRegenerateScenario = () => {
     generateScenario();
 };
 
-// ─── Step 3: Approve Scenario → Generate Scene Frames ──────────────
+// ─── Step 3: Approve Scenario → Generate Video ─────────────────────
+// Scene frame is already produced during /scenario (either user-supplied
+// start frame or NB Pro composition) — no separate approval step.
 async function approveScenario() {
     const btn = document.getElementById("wf-btn-approve-scenario");
     btn.disabled = true;
-
-    try {
-        for (let i = 0; i < wfOutfitData.length; i++) {
-            btn.innerHTML = `<span class="wf-spinner"></span>Sahne karesi oluşturuluyor (${i + 1}/${wfOutfitData.length})...`;
-
-            const resp = await fetch(`${API}/api/workflow/scene-frame`, {
-                method: "POST",
-                headers: { ...authHeaders(), "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    outfit: wfOutfitData[i].outfit,
-                    background_url: wfBgUrl,
-                    background_extra_urls: wfBgExtraUrls,
-                    aspect_ratio: document.getElementById("wf-aspect").value,
-                }),
-            });
-
-            if (!resp.ok) throw new Error(`HTTP ${resp.status} (kıyafet ${i + 1})`);
-            const data = await resp.json();
-            wfOutfitData[i].scene_frame_url = data.scene_frame_url;
-        }
-
-        renderSceneFrames();
-        activateStep(3);
-    } catch (err) {
-        alert("Sahne karesi oluşturulamadı: " + err.message);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = "Onayla ve Devam Et";
-    }
-}
-
-function renderSceneFrames() {
-    const preview = document.getElementById("wf-scene-preview");
-    preview.innerHTML = wfOutfitData.map((od, i) => `
-        <div style="margin-bottom:12px">
-            <div style="font-weight:600;font-size:0.78rem;margin-bottom:6px;color:var(--text-primary)">${od.outfit.name || `Kıyafet ${i + 1}`}</div>
-            <img src="${od.scene_frame_url}" alt="Sahne karesi ${i + 1}" style="max-width:100%;border-radius:8px;border:1px solid var(--border-subtle)">
-        </div>
-    `).join("");
-}
-
-window.wfRegenerateScene = () => {
-    approveScenario();
-};
-
-// ─── Step 4: Approve Scene → Generate Video ────────────────────────
-async function approveScene() {
-    const btn = document.getElementById("wf-btn-approve-scene");
-    btn.disabled = true;
     btn.textContent = "Video başlatılıyor...";
 
-    // Build per-outfit payload
     const outfitPayloads = wfOutfitData.map(od => ({
         outfit: od.outfit,
         scene_frame_url: od.scene_frame_url,
@@ -543,7 +494,7 @@ async function approveScene() {
         const data = await resp.json();
 
         wfJobId = data.job_id;
-        activateStep(4);
+        activateStep(3);
         startPolling();
     } catch (err) {
         alert("Video üretimi başlatılamadı: " + err.message);
