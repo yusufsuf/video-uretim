@@ -1,18 +1,21 @@
 """Shot planner — total duration + rhythm → sequence/shot distribution.
 
-Used by workflow mode to turn a single "I want a 30s fast video" intent into:
-  - N sequences (each ≤ 15s, a single Kling multishot call)
-  - M shots per sequence (each ≥ 3s to satisfy Kling Omni minimum)
+Used by workflow mode to turn a single "I want a 40s fast video" intent into:
+  - N Kling Omni calls, each with AT MOST 2 shots (outfit consistency degrades
+    sharply as shot count per call increases — tested empirically)
+  - Each shot ≥ 3s (Kling Omni minimum)
   - Arc beat role per shot (so GPT can write role-aware prompts)
 
-Why sequences: Kling Omni caps each multishot call at 15s total. For longer
-videos we chain multiple Kling calls (last frame → next first frame) and concat
-the clips locally with ffmpeg — same pattern as multi-outfit workflow today.
+Why 2 shots per call: Kling Omni multishot can pack up to ~15s/call, but with
+3+ shots the model loses the garment. 2 shots per call is the sweet spot —
+multishot benefit (tight continuity) + stable outfit.
+
+For longer videos we chain calls (last frame → next first frame) and concat
+with ffmpeg — same pattern as multi-outfit workflow today.
 """
 
 from __future__ import annotations
 
-import math
 from typing import List, Optional
 
 # Kling Omni hard limits
@@ -20,15 +23,18 @@ KLING_MAX_SEQUENCE_DURATION = 15
 KLING_MIN_SHOT_DURATION = 3
 KLING_MAX_SHOT_DURATION = 10
 
+# Outfit-consistency cap: no more than 2 shots inside a single Kling call
+MAX_SHOTS_PER_SEQUENCE = 2
+
 # Workflow-level caps
 MAX_TOTAL_DURATION = 60
 MIN_TOTAL_DURATION = 6
 
 # rhythm → preferred shot length (seconds)
 _RHYTHM_SHOT_LEN = {
-    "slow":   6,   # 2-3 shots per 15s sequence
-    "normal": 4,   # 3-5 shots per 15s sequence
-    "fast":   3,   # 5 shots per 15s sequence (Kling minimum)
+    "slow":   6,   # paired → 12s/call
+    "normal": 4,   # paired → 8s/call
+    "fast":   3,   # paired → 6s/call (Kling minimum shot)
 }
 
 
@@ -40,64 +46,64 @@ def clamp_total_duration(total: int) -> int:
     return max(MIN_TOTAL_DURATION, min(MAX_TOTAL_DURATION, int(total)))
 
 
+def _distribute_total(total: int, n_shots: int) -> List[int]:
+    """Spread `total` seconds across `n_shots` respecting per-shot min/max."""
+    base = total // n_shots
+    extra = total - (base * n_shots)
+    durations = [base + (1 if i < extra else 0) for i in range(n_shots)]
+    return [max(KLING_MIN_SHOT_DURATION, min(KLING_MAX_SHOT_DURATION, d)) for d in durations]
+
+
 def plan_sequences(total_duration: int, rhythm: str = "normal") -> List[List[dict]]:
-    """Split total_duration into N sequences (≤15s each) and M shots per sequence.
+    """Split total_duration into shots, grouped into sequences of max 2 shots.
 
     Returns a list of sequences. Each sequence is a list of shot dicts:
         {"duration": int, "seq_index": int, "shot_index": int, "global_index": int}
 
-    Example — 30s normal rhythm:
-        [
-          [{duration: 5, ...}, {duration: 5, ...}, {duration: 5, ...}],  # seq 0 (15s)
-          [{duration: 5, ...}, {duration: 5, ...}, {duration: 5, ...}],  # seq 1 (15s)
-        ]
+    Example — 40s normal rhythm (target 4s/shot):
+        10 shots of 4s → 5 sequences of [4,4]  → 5 Kling calls
+    Example — 40s slow rhythm (target 6s/shot):
+        7 shots averaging ~5.7s → 4 sequences ([6,6],[6,6],[5,5],[6]) → 4 calls
+    Example — 40s fast rhythm (target 3s/shot):
+        13 shots averaging ~3s → 7 sequences → 7 calls
     """
     total_duration = clamp_total_duration(total_duration)
     target_shot = _rhythm_shot_len(rhythm)
 
-    # Split into sequences of at most 15s each, distributed as evenly as possible
-    n_sequences = max(1, math.ceil(total_duration / KLING_MAX_SEQUENCE_DURATION))
-    base_seq_dur = total_duration // n_sequences
-    extra = total_duration - (base_seq_dur * n_sequences)
-    seq_durations = [base_seq_dur + (1 if i < extra else 0) for i in range(n_sequences)]
+    # Shot count: keep shots close to target length
+    n_shots = max(1, round(total_duration / target_shot))
+    # Clamp so each shot stays ≥ KLING_MIN_SHOT_DURATION
+    n_shots = min(n_shots, total_duration // KLING_MIN_SHOT_DURATION)
+    n_shots = max(1, n_shots)
 
+    shot_durations = _distribute_total(total_duration, n_shots)
+
+    # Group shots into sequences of ≤ MAX_SHOTS_PER_SEQUENCE, each ≤ 15s
     sequences: List[List[dict]] = []
     global_idx = 0
+    seq_index = 0
+    i = 0
+    while i < len(shot_durations):
+        chunk = shot_durations[i:i + MAX_SHOTS_PER_SEQUENCE]
+        # Safety: if the 2-shot chunk exceeds Kling 15s cap, keep only 1 shot
+        if sum(chunk) > KLING_MAX_SEQUENCE_DURATION and len(chunk) > 1:
+            chunk = chunk[:1]
+            step = 1
+        else:
+            step = len(chunk)
 
-    for seq_i, seq_dur in enumerate(seq_durations):
-        # Fit as many target-length shots as possible, respecting Kling limits
-        n_shots = max(1, round(seq_dur / target_shot))
-        # Ensure each shot is at least KLING_MIN_SHOT_DURATION
-        max_shots_allowed = seq_dur // KLING_MIN_SHOT_DURATION
-        n_shots = max(1, min(n_shots, max_shots_allowed))
-
-        base_shot = seq_dur // n_shots
-        shot_extra = seq_dur - (base_shot * n_shots)
-
-        # Clamp each shot to [MIN, MAX]; redistribute any surplus toward middle shots
-        shot_durations = []
-        for si in range(n_shots):
-            d = base_shot + (1 if si < shot_extra else 0)
-            d = max(KLING_MIN_SHOT_DURATION, min(KLING_MAX_SHOT_DURATION, d))
-            shot_durations.append(d)
-
-        # If rounding pushed us over KLING_MAX_SEQUENCE_DURATION, trim the last shot
-        while sum(shot_durations) > KLING_MAX_SEQUENCE_DURATION:
-            shot_durations[-1] -= 1
-            if shot_durations[-1] < KLING_MIN_SHOT_DURATION:
-                shot_durations.pop()
-
-        shots = []
-        for si, d in enumerate(shot_durations):
-            shots.append({
+        seq_shots = []
+        for si, d in enumerate(chunk):
+            seq_shots.append({
                 "duration": int(d),
-                "seq_index": seq_i,
+                "seq_index": seq_index,
                 "shot_index": si,
                 "global_index": global_idx,
             })
             global_idx += 1
-
-        sequences.append(shots)
+        sequences.append(seq_shots)
+        seq_index += 1
+        i += step
 
     return sequences
 

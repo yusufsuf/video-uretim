@@ -92,21 +92,27 @@ window.selectWfShotArc = selectWfShotArc;
 // ─── Planner UI ───────────────────────────────────────────────────
 
 // Estimate shot count / sequences for the summary line (mirrors backend shot_planner).
+// Each Kling call packs at most 2 shots (outfit consistency cap).
 function wfPlanSummary(total, rhythm) {
     const shotLen = { slow: 6, normal: 4, fast: 3 }[rhythm] || 4;
-    const nSeq = Math.max(1, Math.ceil(total / 15));
-    const baseSeq = Math.floor(total / nSeq);
-    const extra = total - baseSeq * nSeq;
-    let totalShots = 0;
-    const seqLines = [];
-    for (let i = 0; i < nSeq; i++) {
-        const seqDur = baseSeq + (i < extra ? 1 : 0);
-        let nShots = Math.max(1, Math.round(seqDur / shotLen));
-        nShots = Math.min(nShots, Math.floor(seqDur / 3)) || 1;
-        totalShots += nShots;
-        seqLines.push(`${nShots} sahne (${seqDur}s)`);
+    let nShots = Math.max(1, Math.round(total / shotLen));
+    nShots = Math.min(nShots, Math.floor(total / 3)) || 1;
+
+    const base = Math.floor(total / nShots);
+    const extra = total - base * nShots;
+    const durations = [];
+    for (let i = 0; i < nShots; i++) {
+        let d = base + (i < extra ? 1 : 0);
+        d = Math.max(3, Math.min(10, d));
+        durations.push(d);
     }
-    return `${nSeq} sekans · ${totalShots} sahne toplam · ${seqLines.join(" + ")}`;
+
+    const seqs = [];
+    for (let i = 0; i < durations.length; i += 2) {
+        seqs.push(durations.slice(i, i + 2));
+    }
+    const seqStr = seqs.map(s => s.join("+")).join(" | ");
+    return `${seqs.length} Kling çağrısı · ${nShots} sahne · ${seqStr}`;
 }
 
 function wfRenderPlanSummary() {
