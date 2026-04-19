@@ -9,6 +9,7 @@ import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from dependencies import get_current_user
+from services.analysis_service import describe_element_image
 from services.library_service import add_item, delete_item, get_items
 from services.nano_banana_service import generate_venue_variants
 from services.video_service import upload_to_fal
@@ -95,6 +96,32 @@ async def upload_item(
 async def remove_item(item_id: str, user: dict = Depends(get_current_user)):
     await delete_item(user["id"], item_id)
     return {"message": "Öğe silindi."}
+
+
+@router.post("/describe-image")
+async def describe_image_endpoint(
+    file: UploadFile = File(...),
+    _user: dict = Depends(get_current_user),
+):
+    """GPT-4o Vision ile yüklenen görselden kısa TR açıklama üretir.
+    Element ekleme modalındaki "Auto" butonu bu endpoint'i kullanır.
+    """
+    ext = os.path.splitext(file.filename or "img.jpg")[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTS:
+        raise HTTPException(status_code=400, detail="Sadece JPG, PNG veya WebP analiz edilebilir.")
+
+    mime = file.content_type or {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".png": "image/png", ".webp": "image/webp",
+    }.get(ext, "image/jpeg")
+
+    try:
+        image_bytes = await file.read()
+        description = await describe_element_image(image_bytes, mime)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Açıklama üretilemedi: {exc}")
+
+    return {"description": description}
 
 
 @router.post("/generate-venue-variants")

@@ -545,42 +545,33 @@
             </div>
             <div class="studio-create-body">
                 <div class="studio-create-hint" id="create-mode-hint" style="font-size:12px;color:#9aa0a6;margin-bottom:10px;line-height:1.45">
-                    En iyi sonuç için <b>3 farklı açıdan</b> fotoğraf yükleyin: <b>ön</b>, <b>45° yan</b> ve <b>yan profil</b>.
-                    Tüm fotoğraflar aynı kostümü göstermeli, ışık benzer olmalı. Arka/detay dördüncü slot için idealdir.
+                    Bir ana görsel yükleyin. Daha iyi tutarlılık için farklı açılardan ek görseller ekleyebilirsiniz (opsiyonel).
                 </div>
                 <div style="display:flex;gap:6px;margin-bottom:10px">
-                    <button type="button" id="create-mode-image" class="wizard-btn-ghost create-mode-btn active" style="flex:1;padding:6px 10px;font-size:12px">Fotoğraf (3–4 görsel)</button>
+                    <button type="button" id="create-mode-image" class="wizard-btn-ghost create-mode-btn active" style="flex:1;padding:6px 10px;font-size:12px">Fotoğraf</button>
                     <button type="button" id="create-mode-video" class="wizard-btn-ghost create-mode-btn" style="flex:1;padding:6px 10px;font-size:12px">Video (.mp4/.mov, 3–8s)</button>
                 </div>
                 <div class="studio-create-uploads" id="create-uploads-image">
                     <div class="upload-zone" id="create-front-zone">
                         <input type="file" id="create-front-input" accept="image/*">
                         <div class="upload-zone-inner">
-                            <div class="upload-label">Ön Görünüm (0°)</div>
-                            <div class="upload-hint">Zorunlu — kameraya dönük</div>
+                            <div class="upload-label">Ana Görsel</div>
+                            <div class="upload-hint">Zorunlu</div>
                         </div>
                         <span class="badge">Zorunlu</span>
                     </div>
                     <div class="upload-zone" id="create-angle1-zone">
                         <input type="file" id="create-angle1-input" accept="image/*">
                         <div class="upload-zone-inner">
-                            <div class="upload-label">45° Yan</div>
-                            <div class="upload-hint">Önerilir — 3/4 açı</div>
+                            <div class="upload-label">Ek Açı</div>
+                            <div class="upload-hint">Opsiyonel</div>
                         </div>
-                        <span class="badge muted">Önerilir</span>
+                        <span class="badge muted">Opsiyonel</span>
                     </div>
                     <div class="upload-zone" id="create-angle2-zone">
                         <input type="file" id="create-angle2-input" accept="image/*">
                         <div class="upload-zone-inner">
-                            <div class="upload-label">Yan Profil (90°)</div>
-                            <div class="upload-hint">Önerilir — tam yan</div>
-                        </div>
-                        <span class="badge muted">Önerilir</span>
-                    </div>
-                    <div class="upload-zone" id="create-angle3-zone">
-                        <input type="file" id="create-angle3-input" accept="image/*">
-                        <div class="upload-zone-inner">
-                            <div class="upload-label">Arka / Detay</div>
+                            <div class="upload-label">Ek Açı</div>
                             <div class="upload-hint">Opsiyonel</div>
                         </div>
                         <span class="badge muted">Opsiyonel</span>
@@ -635,9 +626,18 @@
                     <option value="sequin">Payet (Sequin)</option>
                     <option value="polyester">Polyester</option>
                 </select>
-                <textarea id="create-elem-description" class="form-input" rows="3"
-                    placeholder="Kumaş ve genel özellikler — örn: ince askılı, V yaka, ipek karışımı, mat finish, arkası açık..."
-                    style="margin-top:8px;resize:vertical;font-family:inherit"></textarea>
+                <div style="position:relative;margin-top:8px">
+                    <textarea id="create-elem-description" class="form-input" rows="3"
+                        placeholder="Kumaş ve genel özellikler — örn: ince askılı, V yaka, ipek karışımı, mat finish, arkası açık... (AI ile otomatik doldurmak için Auto'ya bas)"
+                        style="resize:vertical;font-family:inherit;padding-right:88px;width:100%"></textarea>
+                    <button type="button" id="create-elem-auto-btn"
+                        style="position:absolute;bottom:8px;right:8px;padding:5px 12px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:6px;color:var(--text-primary);font-size:0.72rem;font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:4px;transition:background 0.15s"
+                        onmouseover="this.style.background='var(--bg-card)'" onmouseout="this.style.background='var(--bg-secondary)'"
+                        title="Yüklenen ana görseli analiz et ve kısa açıklama üret">
+                        <span id="create-elem-auto-icon">✦</span>
+                        <span id="create-elem-auto-label">Auto</span>
+                    </button>
+                </div>
             </div>
             <div class="studio-create-footer">
                 <button id="studio-create-save-btn" class="wizard-btn-primary" disabled>Kaydet ve Seç</button>

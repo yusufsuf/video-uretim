@@ -1248,7 +1248,6 @@ async function _fetchAndRenderStudioElements(grid) {
 let _createFrontFile  = null;
 let _createAngle1File = null;
 let _createAngle2File = null;
-let _createAngle3File = null;
 let _createVideoFile  = null;
 let _createMode = "image"; // "image" | "video"
 
@@ -1270,13 +1269,13 @@ function _setCreateMode(mode) {
         if (videoBox) videoBox.style.display = "none";
         vidBtn?.classList.remove("active");
         imgBtn?.classList.add("active");
-        if (hint) hint.innerHTML = "En iyi sonuç için <b>3 farklı açıdan</b> fotoğraf yükleyin: <b>ön</b>, <b>45° yan</b> ve <b>yan profil</b>. Tüm fotoğraflar aynı kostümü göstermeli, ışık benzer olmalı. Arka/detay dördüncü slot için idealdir.";
+        if (hint) hint.innerHTML = "Bir ana görsel yükleyin. Daha iyi tutarlılık için farklı açılardan ek görseller ekleyebilirsiniz (opsiyonel).";
     }
     _updateCreateSaveBtn();
 }
 
 function openStudioCreateModal() {
-    _createFrontFile = _createAngle1File = _createAngle2File = _createAngle3File = null;
+    _createFrontFile = _createAngle1File = _createAngle2File = null;
     _createVideoFile = null;
     _createMode = "image";
     const modal = document.getElementById("studio-create-modal");
@@ -1311,7 +1310,6 @@ function openStudioCreateModal() {
         ["create-front-zone",  "create-front-input",  f => { _createFrontFile  = f; _updateCreateSaveBtn(); }],
         ["create-angle1-zone", "create-angle1-input", f => { _createAngle1File = f; }],
         ["create-angle2-zone", "create-angle2-input", f => { _createAngle2File = f; }],
-        ["create-angle3-zone", "create-angle3-input", f => { _createAngle3File = f; }],
         ["create-video-zone",  "create-video-input",  f => { _createVideoFile  = f; _updateCreateSaveBtn(); }],
     ].forEach(([zoneId, inputId, onFile]) => {
         const zone = document.getElementById(zoneId);
@@ -1336,7 +1334,52 @@ function openStudioCreateModal() {
     document.getElementById("create-elem-name")?.addEventListener("input", _updateCreateSaveBtn);
     document.getElementById("studio-create-close")?.addEventListener("click", closeStudioCreateModal);
     document.getElementById("studio-create-save-btn")?.addEventListener("click", saveStudioElement);
+    document.getElementById("create-elem-auto-btn")?.addEventListener("click", autoDescribeElement);
     modal.addEventListener("click", e => { if (e.target === modal) closeStudioCreateModal(); });
+}
+
+async function autoDescribeElement() {
+    const btn   = document.getElementById("create-elem-auto-btn");
+    const label = document.getElementById("create-elem-auto-label");
+    const icon  = document.getElementById("create-elem-auto-icon");
+    const desc  = document.getElementById("create-elem-description");
+    if (!btn || !desc) return;
+
+    if (!_createFrontFile) {
+        alert("Önce ana görseli yükleyin.");
+        return;
+    }
+    if (_createMode === "video") {
+        alert("Auto yalnızca fotoğraf modunda çalışır. Ana görseli fotoğraf olarak yükleyin.");
+        return;
+    }
+
+    const origLabel = label ? label.textContent : "Auto";
+    btn.disabled = true;
+    if (label) label.textContent = "Analiz ediliyor...";
+    if (icon)  icon.textContent  = "⏳";
+
+    try {
+        const fd = new FormData();
+        fd.append("file", _createFrontFile);
+        const resp = await fetch("/library/describe-image", {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: fd,
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const text = (data.description || "").trim();
+        if (!text) throw new Error("boş açıklama");
+        desc.value = text;
+        desc.dispatchEvent(new Event("input", { bubbles: true }));
+    } catch (err) {
+        alert("Otomatik açıklama üretilemedi: " + err.message);
+    } finally {
+        btn.disabled = false;
+        if (label) label.textContent = origLabel;
+        if (icon)  icon.textContent  = "✦";
+    }
 }
 
 function _updateCreateSaveBtn() {
@@ -1379,7 +1422,6 @@ async function saveStudioElement() {
     if (!isVideo) {
         if (_createAngle1File) fd.append("file2", _createAngle1File);
         if (_createAngle2File) fd.append("file3", _createAngle2File);
-        if (_createAngle3File) fd.append("file4", _createAngle3File);
     }
 
     try {

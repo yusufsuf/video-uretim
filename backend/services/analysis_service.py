@@ -1911,3 +1911,41 @@ async def validate_element_alignment(image_urls: list[str]) -> dict:
         logger.warning("validate_element_alignment failed: %s — allowing by default", e)
         return {"aligned": True, "confidence": 0.0, "reason": f"kontrol başarısız: {e}"}
 
+
+async def describe_element_image(image_bytes: bytes, mime: str = "image/jpeg") -> str:
+    """GPT-4o Vision ile bir element görselinden kısa Türkçe açıklama üretir.
+
+    Kullanım: element ekleme modalında "Auto" butonu — kullanıcı görseli yüklediğinde
+    otomatik olarak 1-2 cümlelik özellik özeti üretir (tip, renk, silüet, kumaş, öne
+    çıkan detaylar). Açıklama sonradan elle düzenlenebilir.
+    """
+    data_uri = f"data:{mime};base64,{base64.b64encode(image_bytes).decode('utf-8')}"
+    system = (
+        "Sen bir moda analisti ve metin yazarısın. Tek bir görsel alır ve o görselin içindeki "
+        "ana nesneyi (kıyafet, karakter, aksesuar, mekân vb.) kısa ve somut bir şekilde anlatırsın.\n\n"
+        "KURALLAR:\n"
+        "- Yalnızca TÜRKÇE yaz, en fazla 2 cümle, toplam 220 karakter üst sınır\n"
+        "- Ne olduğu (tip) + belirgin renk + silüet/kesim + öne çıkan 1-2 detay + varsa kumaş izlenimi\n"
+        "- Abartılı sıfat kullanma (örn. 'muhteşem', 'şahane'); sade ve nesnel yaz\n"
+        "- Görselde olmayan bir şey uydurma; emin değilsen o detayı atla\n"
+        "- Sadece açıklamayı döndür, başlık/etiket/madde işareti/tırnak koyma"
+    )
+    try:
+        resp = await client.chat.completions.create(
+            model="gpt-5.4",
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": [
+                    {"type": "text", "text": "Bu element için kısa açıklama yaz."},
+                    {"type": "image_url", "image_url": {"url": data_uri, "detail": "high"}},
+                ]},
+            ],
+            max_completion_tokens=200,
+            temperature=0.3,
+        )
+        text = (resp.choices[0].message.content or "").strip().strip('"').strip("'")
+        return text[:240]
+    except Exception as e:
+        logger.warning("describe_element_image failed: %s", e)
+        raise
+
