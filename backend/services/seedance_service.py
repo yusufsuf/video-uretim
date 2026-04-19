@@ -58,6 +58,7 @@ async def create_task(
     first_frame_url: Optional[str] = None,
     last_frame_url: Optional[str] = None,
     reference_image_urls: Optional[list[str]] = None,
+    reference_video_urls: Optional[list[str]] = None,
     duration: int = 10,
     aspect_ratio: str = "9:16",
     resolution: str = "1080p",
@@ -82,11 +83,14 @@ async def create_task(
         payload["input"]["last_frame_url"] = last_frame_url
     if reference_image_urls:
         payload["input"]["reference_image_urls"] = reference_image_urls[:9]
+    if reference_video_urls:
+        payload["input"]["reference_video_urls"] = reference_video_urls[:3]
 
     url = settings.KIE_BASE_URL.rstrip("/") + CREATE_URL
-    logger.info("[seedance] createTask prompt=%r duration=%s aspect=%s res=%s refs=%d first_frame=%s",
+    logger.info("[seedance] createTask prompt=%r duration=%s aspect=%s res=%s imgs=%d vids=%d first_frame=%s",
                 prompt[:80], duration, aspect_ratio, resolution,
-                len(reference_image_urls or []), bool(first_frame_url))
+                len(reference_image_urls or []), len(reference_video_urls or []),
+                bool(first_frame_url))
 
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(url, headers=_headers(), json=payload)

@@ -1,11 +1,13 @@
 // Seedance 2.0 page — state + API calls
 
 const MAX_REFS = 9;
+const MAX_REF_VIDEOS = 3;
 const MAX_SHOTS = 6;
 
 const state = {
     startFileUrl: null,      // URL returned from /api/upload-temp
     refUrls: [],             // URLs returned from /api/upload-temp
+    refVideoUrls: [],        // Reference video URLs
     shots: [{ prompt: "", duration: 10 }],
     aspect: "9:16",
     resolution: "1080p",
@@ -94,6 +96,66 @@ function renderRefs() {
                 } catch (e) {
                     alert("Yükleme başarısız: " + e.message);
                     renderRefs();
+                }
+            });
+            input.click();
+        });
+        grid.appendChild(addSlot);
+    }
+}
+
+// ─── Reference videos grid ──────────────────────────────────────────
+
+function renderRefVideos() {
+    const grid = document.getElementById("sd-refvid-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    state.refVideoUrls.forEach((url, i) => {
+        const slot = document.createElement("div");
+        slot.className = "sd-ref-slot has-image";
+        slot.innerHTML = `
+            <video src="${url}" muted playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video>
+            <button class="sd-ref-remove" title="Kaldır">✕</button>
+            <div style="position:absolute;bottom:4px;left:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:0.55rem;padding:2px 5px;border-radius:3px;z-index:1">VIDEO</div>
+        `;
+        slot.querySelector(".sd-ref-remove").addEventListener("click", (e) => {
+            e.stopPropagation();
+            state.refVideoUrls.splice(i, 1);
+            renderRefVideos();
+            updateSubmit();
+        });
+        grid.appendChild(slot);
+    });
+
+    if (state.refVideoUrls.length < MAX_REF_VIDEOS) {
+        const addSlot = document.createElement("div");
+        addSlot.className = "sd-ref-slot";
+        addSlot.innerHTML = `
+            <div class="sd-ref-add">+</div>
+            <div>Video ekle</div>
+            <div style="font-size:0.62rem;margin-top:2px">${state.refVideoUrls.length}/${MAX_REF_VIDEOS}</div>
+        `;
+        addSlot.addEventListener("click", () => {
+            const input = document.createElement("input");
+            input.type = "file";
+            input.accept = "video/mp4,video/quicktime,.mp4,.mov";
+            input.addEventListener("change", async () => {
+                const f = input.files?.[0];
+                if (!f) return;
+                if (f.size > 50 * 1024 * 1024) {
+                    alert("Video 50 MB sınırını aşıyor.");
+                    return;
+                }
+                try {
+                    addSlot.innerHTML = '<div style="font-size:0.7rem">Yükleniyor…</div>';
+                    const url = await uploadFile(f);
+                    state.refVideoUrls.push(url);
+                    renderRefVideos();
+                    updateSubmit();
+                } catch (e) {
+                    alert("Yükleme başarısız: " + e.message);
+                    renderRefVideos();
                 }
             });
             input.click();
@@ -246,6 +308,7 @@ async function submit() {
             duration: s.duration || 10,
         })),
         reference_image_urls: state.refUrls,
+        reference_video_urls: state.refVideoUrls,
         start_frame_url: state.startFileUrl || null,
         aspect_ratio: state.aspect,
         resolution: state.resolution,
@@ -266,6 +329,7 @@ async function submit() {
 
 document.addEventListener("DOMContentLoaded", () => {
     renderRefs();
+    renderRefVideos();
     renderShots();
     bindStartFrame();
 

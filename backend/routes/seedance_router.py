@@ -46,6 +46,7 @@ class SeedanceShot(BaseModel):
 class SeedanceGenerateRequest(BaseModel):
     shots: List[SeedanceShot] = Field(min_length=1, max_length=6)
     reference_image_urls: List[str] = Field(default_factory=list, max_length=9)
+    reference_video_urls: List[str] = Field(default_factory=list, max_length=3)
     start_frame_url: Optional[str] = None
     aspect_ratio: str = "9:16"
     resolution: str = "1080p"
@@ -113,6 +114,7 @@ async def _run_seedance_pipeline(
                 prompt=shot.prompt,
                 first_frame_url=current_first_frame,
                 reference_image_urls=body.reference_image_urls or None,
+                reference_video_urls=body.reference_video_urls or None,
                 duration=shot.duration,
                 aspect_ratio=body.aspect_ratio,
                 resolution=body.resolution,
