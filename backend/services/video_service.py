@@ -180,18 +180,49 @@ async def upload_to_fal(file_path: str) -> str:
 
 
 def concatenate_clips(clip_paths: list, output_path: str) -> str:
-    """Concatenate video clips in order using FFmpeg concat demuxer."""
-    list_file = output_path.replace(".mp4", "_list.txt")
-    with open(list_file, "w") as f:
-        for p in clip_paths:
-            f.write(f"file '{os.path.abspath(p)}'\n")
-    subprocess.run(
-        ["ffmpeg", "-y", "-f", "concat", "-safe", "0",
-         "-i", list_file, "-c", "copy", output_path],
-        check=True, capture_output=True, timeout=300,
-    )
-    os.remove(list_file)
-    logger.info("Concatenated %d clips → %s", len(clip_paths), output_path)
+    """Concatenate video clips into a universally playable MP4.
+
+    Uses FFmpeg's concat filter with re-encode to libx264/yuv420p and
+    +faststart flag. Re-encoding is required because the demuxer+copy
+    path produces broken MP4s whenever two Kling clips have slightly
+    different stream metadata (timebase, SAR, pixel format nuances) —
+    the symptom is "video hazır ama açılmıyor" in browsers/Telegram.
+
+    Single-clip fast path: just remux with faststart (no re-encode).
+    """
+    if len(clip_paths) == 1:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", clip_paths[0],
+             "-c", "copy", "-movflags", "+faststart", output_path],
+            check=True, capture_output=True, timeout=120,
+        )
+        logger.info("Remuxed single clip with faststart → %s", output_path)
+        return output_path
+
+    cmd = ["ffmpeg", "-y"]
+    for p in clip_paths:
+        cmd.extend(["-i", p])
+    n = len(clip_paths)
+    filter_inputs = "".join(f"[{i}:v:0]" for i in range(n))
+    filter_complex = f"{filter_inputs}concat=n={n}:v=1:a=0[outv]"
+    cmd.extend([
+        "-filter_complex", filter_complex,
+        "-map", "[outv]",
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "18",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        "-an",  # fashion: silent
+        output_path,
+    ])
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=600)
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or b"").decode("utf-8", errors="ignore")[-600:]
+        logger.error("concat re-encode failed: %s", stderr)
+        raise
+    logger.info("Concatenated %d clips (re-encoded) → %s", len(clip_paths), output_path)
     return output_path
 
 
