@@ -84,19 +84,41 @@ function renderRefs() {
             const input = document.createElement("input");
             input.type = "file";
             input.accept = "image/*";
+            input.multiple = true;
             input.addEventListener("change", async () => {
-                const f = input.files?.[0];
-                if (!f) return;
-                try {
-                    addSlot.innerHTML = '<div style="font-size:0.7rem">Yükleniyor…</div>';
-                    const url = await uploadFile(f);
-                    state.refUrls.push(url);
-                    renderRefs();
-                    updateSubmit();
-                } catch (e) {
-                    alert("Yükleme başarısız: " + e.message);
-                    renderRefs();
-                }
+                const files = Array.from(input.files || []);
+                if (!files.length) return;
+
+                const slotsLeft = MAX_REFS - state.refUrls.length;
+                const toUpload = files.slice(0, slotsLeft);
+                const skipped = files.length - toUpload.length;
+
+                addSlot.innerHTML = `<div style="font-size:0.7rem">Yükleniyor (0/${toUpload.length})…</div>`;
+
+                let done = 0;
+                const results = await Promise.all(
+                    toUpload.map((f) =>
+                        uploadFile(f)
+                            .then((url) => {
+                                done++;
+                                addSlot.innerHTML = `<div style="font-size:0.7rem">Yükleniyor (${done}/${toUpload.length})…</div>`;
+                                return { ok: true, url };
+                            })
+                            .catch((e) => ({ ok: false, error: e.message, name: f.name }))
+                    )
+                );
+
+                const errors = [];
+                results.forEach((r) => {
+                    if (r.ok) state.refUrls.push(r.url);
+                    else errors.push(`${r.name}: ${r.error}`);
+                });
+
+                renderRefs();
+                updateSubmit();
+
+                if (errors.length) alert("Bazı dosyalar yüklenemedi:\n" + errors.join("\n"));
+                if (skipped > 0) alert(`Max ${MAX_REFS} referans — ${skipped} dosya atlandı.`);
             });
             input.click();
         });
