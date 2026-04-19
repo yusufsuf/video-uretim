@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css?v=15">
     <style>
+        html, body { overflow-y: auto !important; height: auto !important; min-height: 100vh; }
+
         /* ── Workflow-specific styles ───────────────────────── */
         .wf-container {
             max-width: 900px;
@@ -417,7 +419,7 @@
 
         .wf-mode-btn.active {
             background: var(--accent);
-            color: #fff;
+            color: var(--btn-text);
             border-color: var(--accent);
         }
 
@@ -447,7 +449,7 @@
 
         .wf-chip.active {
             background: var(--accent);
-            color: #fff;
+            color: var(--btn-text);
             border-color: var(--accent);
         }
 
@@ -470,7 +472,7 @@
 
         .wf-template-card.active {
             background: var(--accent);
-            color: #fff;
+            color: var(--btn-text);
             border-color: var(--accent);
         }
 
