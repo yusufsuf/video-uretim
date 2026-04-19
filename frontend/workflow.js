@@ -30,7 +30,7 @@ let wfStartFrameUrl = null;
 // Estimate shot count / sequences for the summary line (mirrors backend shot_planner).
 // Each Kling call packs at most 2 shots (outfit consistency cap).
 function wfPlanSummary(total, rhythm) {
-    const shotLen = { slow: 6, normal: 4, fast: 3 }[rhythm] || 4;
+    const shotLen = { slow: 6, normal: 3, fast: 3 }[rhythm] || 3;
     let nShots = Math.max(1, Math.round(total / shotLen));
     nShots = Math.min(nShots, Math.floor(total / 3)) || 1;
 

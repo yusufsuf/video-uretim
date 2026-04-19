@@ -33,7 +33,7 @@ MIN_TOTAL_DURATION = 6
 # rhythm → preferred shot length (seconds)
 _RHYTHM_SHOT_LEN = {
     "slow":   6,   # paired → 12s/call
-    "normal": 4,   # paired → 8s/call
+    "normal": 3,   # paired → 6s/call — kullanıcı tercihi: 4s fazla uzun kalıyor
     "fast":   3,   # paired → 6s/call (Kling minimum shot)
 }
 
