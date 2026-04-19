@@ -92,10 +92,13 @@ async def create_task(
                 len(reference_image_urls or []), len(reference_video_urls or []),
                 bool(first_frame_url))
 
+    logger.debug("[seedance] createTask payload input=%s", payload.get("input"))
+
     async with httpx.AsyncClient(timeout=60) as client:
         resp = await client.post(url, headers=_headers(), json=payload)
 
     if resp.status_code >= 400:
+        logger.error("[seedance] createTask HTTP %s body=%s", resp.status_code, resp.text[:800])
         raise SeedanceError(f"KIE createTask HTTP {resp.status_code}: {resp.text[:500]}")
 
     data = resp.json()
@@ -167,6 +170,7 @@ async def wait_for_task(task_id: str, *, on_progress=None) -> str:
                 raise SeedanceError(f"KIE task {task_id} succeeded but has no video URL.")
             return info["video_url"]
         if state == "fail":
+            logger.error("[seedance] task %s FAIL raw=%s", task_id, info.get("raw"))
             raise SeedanceError(
                 f"KIE task {task_id} failed: {info['fail_code']} {info['fail_msg']}"
             )
