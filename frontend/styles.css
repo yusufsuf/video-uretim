@@ -2464,6 +2464,16 @@ textarea.form-input {
 }
 .mode-card-studio .mode-card-icon { color: #6366f1; }
 
+.mode-card-seedance {
+    background: linear-gradient(135deg, rgba(255,107,107,0.08) 0%, rgba(196,113,237,0.06) 100%);
+    border-color: rgba(196,113,237,0.25);
+}
+.mode-card-seedance:hover {
+    border-color: rgba(196,113,237,0.55);
+    background: linear-gradient(135deg, rgba(255,107,107,0.14) 0%, rgba(196,113,237,0.12) 100%);
+}
+.mode-card-seedance .mode-card-icon { color: #c471ed; }
+
 /* Element seçim ekranı */
 .studio-element-empty {
     text-align: center;

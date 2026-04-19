@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antigravity — Seedance 2.0</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=26">
+    <style>
+        .sd-container {
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 32px 20px 80px;
+        }
+
+        .sd-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 28px;
+        }
+
+        .sd-title {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sd-title-badge {
+            font-size: 0.6rem;
+            padding: 3px 7px;
+            background: linear-gradient(135deg, #ff6b6b, #c471ed);
+            color: #fff;
+            border-radius: 999px;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+        }
+
+        .sd-back {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sd-back:hover { color: var(--text-primary); }
+
+        .sd-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 22px;
+            margin-bottom: 16px;
+        }
+
+        .sd-card-title {
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .sd-card-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+        }
+
+        .sd-ref-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        @media (max-width: 680px) {
+            .sd-ref-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .sd-ref-slot {
+            position: relative;
+            aspect-ratio: 3 / 4;
+            border: 1px dashed var(--border-subtle);
+            border-radius: 10px;
+            background: var(--bg-secondary);
+            cursor: pointer;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .sd-ref-slot:hover {
+            border-color: var(--accent);
+            color: var(--text-secondary);
+        }
+
+        .sd-ref-slot img {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .sd-ref-slot .sd-ref-remove {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.65);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-size: 0.75rem;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .sd-ref-slot.has-image .sd-ref-remove { display: flex; }
+        .sd-ref-slot.has-image { border-style: solid; }
+
+        .sd-ref-add {
+            font-size: 1.4rem;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .sd-shot-row {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 10px;
+        }
+
+        .sd-shot-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .sd-shot-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .sd-shot-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sd-shot-dur {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+        }
+
+        .sd-shot-dur input {
+            width: 56px;
+            padding: 4px 6px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.72rem;
+            text-align: center;
+            font-family: inherit;
+        }
+
+        .sd-shot-remove {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 2px 6px;
+        }
+
+        .sd-shot-remove:hover { color: #ff6b6b; }
+
+        .sd-shot-prompt {
+            width: 100%;
+            min-height: 72px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-primary);
+            padding: 10px 12px;
+            font-size: 0.8rem;
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .sd-add-shot {
+            width: 100%;
+            padding: 9px;
+            background: var(--bg-secondary);
+            border: 1px dashed var(--border-subtle);
+            border-radius: 10px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.75rem;
+            transition: all 0.15s;
+        }
+
+        .sd-add-shot:hover {
+            border-color: var(--accent);
+            color: var(--text-secondary);
+        }
+
+        .sd-start-zone {
+            border: 1px dashed var(--border-subtle);
+            border-radius: 10px;
+            background: var(--bg-secondary);
+            padding: 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            cursor: pointer;
+        }
+
+        .sd-start-zone:hover { border-color: var(--accent); }
+
+        .sd-start-preview {
+            width: 60px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .sd-start-preview.visible { display: block; }
+
+        .sd-row-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        @media (max-width: 680px) {
+            .sd-row-grid { grid-template-columns: 1fr; }
+        }
+
+        .sd-select {
+            width: 100%;
+            padding: 9px 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.8rem;
+        }
+
+        .sd-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #ff6b6b, #c471ed);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 0.95rem;
+            letter-spacing: 0.02em;
+            cursor: pointer;
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+
+        .sd-submit:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .sd-submit:not(:disabled):hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(196, 113, 237, 0.25);
+        }
+
+        .sd-progress {
+            display: none;
+            margin-top: 14px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+        }
+
+        .sd-progress.visible { display: block; }
+
+        .sd-progress-msg {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .sd-progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-primary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .sd-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #c471ed);
+            transition: width 0.4s;
+            width: 0;
+        }
+
+        .sd-result {
+            margin-top: 18px;
+        }
+
+        .sd-result video {
+            width: 100%;
+            max-height: 70vh;
+            border-radius: 12px;
+            background: #000;
+        }
+    </style>
+</head>
+
+<body>
+    <script>
+        (function () {
+            if (!localStorage.getItem('auth_token')) {
+                window.location.replace('/login');
+            }
+        })();
+    </script>
+
+    <div class="orb-container">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <div class="sd-container">
+        <div class="sd-header">
+            <div class="sd-title">Seedance 2.0 <span class="sd-title-badge">BETA</span></div>
+            <a href="/" class="sd-back">← Ana Sayfa</a>
+        </div>
+
+        <!-- Başlangıç Karesi -->
+        <div class="sd-card">
+            <div class="sd-card-title">Başlangıç Karesi <span style="color:var(--text-muted);font-weight:400">(opsiyonel)</span></div>
+            <div class="sd-card-hint">İlk shot bu kareden başlar. Atlanırsa Seedance sıfırdan üretir.</div>
+            <div class="sd-start-zone" id="sd-start-zone">
+                <input type="file" id="sd-start-input" accept="image/*" style="display:none">
+                <img id="sd-start-preview" class="sd-start-preview" alt="start frame">
+                <div>
+                    <div style="font-size:0.78rem;color:var(--text-primary);font-weight:600">Başlangıç karesi yükle</div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px">JPG/PNG, 300–6000px, max 30 MB</div>
+                </div>
+                <button id="sd-start-clear" type="button" style="margin-left:auto;display:none;background:none;border:1px solid var(--border-subtle);color:var(--text-muted);padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.72rem;font-family:inherit">Temizle</button>
+            </div>
+        </div>
+
+        <!-- Referans Görseller -->
+        <div class="sd-card">
+            <div class="sd-card-title">Referans Görseller — Manken & Kıyafet Tutarlılığı</div>
+            <div class="sd-card-hint">Max 9 görsel. Aynı kıyafet/manken tüm shotlarda korunur. (reference_image_urls)</div>
+            <div class="sd-ref-grid" id="sd-ref-grid"></div>
+        </div>
+
+        <!-- Shotlar -->
+        <div class="sd-card">
+            <div class="sd-card-title">Shotlar <span style="color:var(--text-muted);font-weight:400">(1–6 arası, her biri 4–15 sn)</span></div>
+            <div class="sd-card-hint">Multi-shot: her shot bir önceki shotın son karesinden devam eder (zincir) — böylece karakter/kıyafet tutarlılığı korunur.</div>
+            <div id="sd-shots-wrap"></div>
+            <button class="sd-add-shot" id="sd-add-shot">+ Shot ekle</button>
+        </div>
+
+        <!-- Genel Ayarlar -->
+        <div class="sd-card">
+            <div class="sd-card-title">Format</div>
+            <div class="sd-row-grid" style="margin-top:8px">
+                <div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px">Aspect Ratio</div>
+                    <select class="sd-select" id="sd-aspect">
+                        <option value="9:16">9:16 (dikey)</option>
+                        <option value="16:9">16:9 (yatay)</option>
+                        <option value="1:1">1:1 (kare)</option>
+                        <option value="3:4">3:4</option>
+                        <option value="4:3">4:3</option>
+                        <option value="21:9">21:9 (sinema)</option>
+                    </select>
+                </div>
+                <div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px">Çözünürlük</div>
+                    <select class="sd-select" id="sd-resolution">
+                        <option value="1080p">1080p (önerilen)</option>
+                        <option value="720p">720p</option>
+                        <option value="480p">480p (hızlı)</option>
+                    </select>
+                </div>
+                <div>
+                    <div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:4px">Ses</div>
+                    <select class="sd-select" id="sd-audio">
+                        <option value="false">Sessiz (moda)</option>
+                        <option value="true">Ses üret</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <button class="sd-submit" id="sd-submit">Video Üret</button>
+
+        <div class="sd-progress" id="sd-progress">
+            <div class="sd-progress-msg" id="sd-progress-msg">Hazırlanıyor…</div>
+            <div class="sd-progress-bar"><div class="sd-progress-fill" id="sd-progress-fill"></div></div>
+        </div>
+
+        <div class="sd-result" id="sd-result"></div>
+    </div>
+
+    <script src="seedance.js?v=1"></script>
+</body>
+</html>

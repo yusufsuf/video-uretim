@@ -40,6 +40,10 @@ class Settings:
     EVOLUTION_INSTANCE: str = os.getenv("EVOLUTION_INSTANCE", "")
     DAILY_VIDEO_LIMIT: int = int(os.getenv("DAILY_VIDEO_LIMIT", "5"))
 
+    # KIE.ai — Seedance 2.0 video generation
+    KIE_API_KEY: str = os.getenv("KIE_API_KEY", "")
+    KIE_BASE_URL: str = os.getenv("KIE_BASE_URL", "https://api.kie.ai")
+
     # Directories
     UPLOAD_DIR: str = os.path.join(os.path.dirname(__file__), "uploads")
     OUTPUT_DIR: str = os.path.join(os.path.dirname(__file__), "outputs")

@@ -34,6 +34,7 @@ from routes.admin_router import router as admin_router
 from routes.library_router import router as library_router
 from routes.workflow_router import router as workflow_router
 from routes.whatsapp_router import router as whatsapp_router
+from routes.seedance_router import router as seedance_router
 from services.order_service import save_order, lookup_order
 
 # ─── Logging ───────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ app.include_router(admin_router, prefix="/admin")
 app.include_router(library_router, prefix="/library")
 app.include_router(workflow_router, prefix="/api/workflow")
 app.include_router(whatsapp_router)
+app.include_router(seedance_router)
 
 # Serve generated outputs
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")
@@ -532,6 +534,11 @@ async def defile_page():
 @app.get("/workflow")
 async def workflow_page():
     return FileResponse(os.path.join(_get_frontend_dir(), "workflow.html"), media_type="text/html")
+
+
+@app.get("/seedance")
+async def seedance_page():
+    return FileResponse(os.path.join(_get_frontend_dir(), "seedance.html"), media_type="text/html")
 
 
 @app.get("/login")
