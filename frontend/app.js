@@ -1923,6 +1923,7 @@ function toggleStudioModelSelect() {
     const totalDurSel = document.getElementById("kp-total-duration");
     const arcSel = document.getElementById("kp-arc-tone");
     const noteInput = document.getElementById("kp-director-note");
+    const includeNegChk = document.getElementById("kp-include-negative");
 
     let currentMode = "multi_shot";
 
@@ -1971,7 +1972,20 @@ function toggleStudioModelSelect() {
         }
     }
 
+    function negativeCardHtml(neg) {
+        return `
+          <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div style="font-size:11px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:0.5px">Negative Prompt</div>
+              <button class="wizard-btn-ghost kp-copy-neg" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
+            </div>
+            <div class="kp-neg-prompt" style="font-size:12.5px;line-height:1.55;color:#fecaca">${escapeHtml(neg)}</div>
+          </div>
+        `;
+    }
+
     function renderCustom(data) {
+        const includeNeg = !!includeNegChk?.checked;
         const parts = [];
         data.shots.forEach((s) => {
             parts.push(`
@@ -1984,15 +1998,7 @@ function toggleStudioModelSelect() {
               </div>
             `);
         });
-        parts.push(`
-          <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:12px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <div style="font-size:11px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:0.5px">Negative Prompt</div>
-              <button class="wizard-btn-ghost kp-copy-neg" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
-            </div>
-            <div class="kp-neg-prompt" style="font-size:12.5px;line-height:1.55;color:#fecaca">${escapeHtml(data.negative_prompt)}</div>
-          </div>
-        `);
+        if (includeNeg) parts.push(negativeCardHtml(data.negative_prompt));
         output.innerHTML = parts.join("");
         output.style.display = "block";
 
@@ -2009,14 +2015,15 @@ function toggleStudioModelSelect() {
 
         copyAllBtn.style.display = "inline-flex";
         copyAllBtn.onclick = () => {
-            const all = data.shots.map((s) => `Shot ${s.shot_no} (${s.time_range}, ${s.camera_type}):\n${s.prompt}`).join("\n\n") +
-                        `\n\nNegative Prompt:\n${data.negative_prompt}`;
+            let all = data.shots.map((s) => `Shot ${s.shot_no} (${s.time_range}, ${s.camera_type}):\n${s.prompt}`).join("\n\n");
+            if (includeNeg) all += `\n\nNegative Prompt:\n${data.negative_prompt}`;
             copyText(all, copyAllBtn);
         };
     }
 
     function renderMulti(data) {
-        output.innerHTML = `
+        const includeNeg = !!includeNegChk?.checked;
+        let html = `
           <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px;margin-bottom:10px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
               <div style="font-size:12px;font-weight:700;color:#a5b4fc">Multi-Shot Prompt (tek paragraf)</div>
@@ -2024,14 +2031,9 @@ function toggleStudioModelSelect() {
             </div>
             <div class="kp-main-prompt" style="font-size:12.5px;line-height:1.6;color:#e5e7eb;white-space:pre-wrap">${escapeHtml(data.prompt)}</div>
           </div>
-          <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:12px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-              <div style="font-size:11px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:0.5px">Negative Prompt</div>
-              <button class="wizard-btn-ghost kp-copy-neg" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
-            </div>
-            <div class="kp-neg-prompt" style="font-size:12.5px;line-height:1.55;color:#fecaca">${escapeHtml(data.negative_prompt)}</div>
-          </div>
         `;
+        if (includeNeg) html += negativeCardHtml(data.negative_prompt);
+        output.innerHTML = html;
         output.style.display = "block";
 
         output.querySelector(".kp-copy-main")?.addEventListener("click", (e) => copyText(data.prompt, e.currentTarget));
@@ -2039,7 +2041,8 @@ function toggleStudioModelSelect() {
 
         copyAllBtn.style.display = "inline-flex";
         copyAllBtn.onclick = () => {
-            const all = `${data.prompt}\n\nNegative Prompt:\n${data.negative_prompt}`;
+            let all = data.prompt;
+            if (includeNeg) all += `\n\nNegative Prompt:\n${data.negative_prompt}`;
             copyText(all, copyAllBtn);
         };
     }
