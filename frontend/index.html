@@ -701,15 +701,8 @@
                     </div>
                     <div>
                         <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px">Toplam süre (sn)</label>
-                        <select id="kp-total-duration" class="form-input" style="margin-top:4px">
-                            <option value="5">5s</option>
-                            <option value="10" selected>10s</option>
-                            <option value="15">15s</option>
-                            <option value="20">20s</option>
-                            <option value="30">30s</option>
-                            <option value="45">45s</option>
-                            <option value="60">60s</option>
-                        </select>
+                        <input type="number" id="kp-total-duration" class="form-input" min="3" max="60" step="1" value="10" placeholder="örn. 10" style="margin-top:4px">
+                        <div style="font-size:11px;color:#6b7280;margin-top:4px">3–60 saniye arası seçilebilir</div>
                     </div>
                 </div>
 
@@ -741,7 +734,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=28"></script>
+    <script src="app.js?v=29"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');

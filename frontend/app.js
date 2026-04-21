@@ -1920,7 +1920,7 @@ function toggleStudioModelSelect() {
     const errorBox = document.getElementById("kp-error");
     const tagsInput = document.getElementById("kp-element-tags");
     const nShotsSel = document.getElementById("kp-n-shots");
-    const totalDurSel = document.getElementById("kp-total-duration");
+    const totalDurInput = document.getElementById("kp-total-duration");
     const arcSel = document.getElementById("kp-arc-tone");
     const noteInput = document.getElementById("kp-director-note");
     const includeNegChk = document.getElementById("kp-include-negative");
@@ -2111,12 +2111,18 @@ function toggleStudioModelSelect() {
             return;
         }
 
+        const totalDur = parseInt(totalDurInput.value, 10);
+        if (!Number.isFinite(totalDur) || totalDur < 3 || totalDur > 60) {
+            showError("Toplam süre 3-60 saniye arasında olmalı.");
+            return;
+        }
+
         const tags = tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean);
         const body = {
             start_frame_url: startFrameUrl,
             element_tags: tags,
             n_shots: parseInt(nShotsSel.value, 10),
-            total_duration: parseInt(totalDurSel.value, 10),
+            total_duration: totalDur,
             arc_tone: arcSel.value,
             mode: currentMode,
             director_note: noteInput.value.trim() || null,
