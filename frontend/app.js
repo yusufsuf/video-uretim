@@ -1924,8 +1924,15 @@ function toggleStudioModelSelect() {
     const arcSel = document.getElementById("kp-arc-tone");
     const noteInput = document.getElementById("kp-director-note");
     const includeNegChk = document.getElementById("kp-include-negative");
+    const sfZone = document.getElementById("kp-start-frame-zone");
+    const sfInput = document.getElementById("kp-start-frame-input");
+    const sfLabel = document.getElementById("kp-start-frame-label");
+    const sfHint = document.getElementById("kp-start-frame-hint");
+    const sfPreview = document.getElementById("kp-start-frame-preview");
 
     let currentMode = "multi_shot";
+    let startFrameUrl = null;
+    let startFrameUploading = false;
 
     function open() {
         modal.style.display = "flex";
@@ -1934,6 +1941,45 @@ function toggleStudioModelSelect() {
         copyAllBtn.style.display = "none";
     }
     function close() { modal.style.display = "none"; }
+
+    sfZone?.addEventListener("click", (e) => {
+        if (e.target === sfInput) return;
+        sfInput?.click();
+    });
+    sfInput?.addEventListener("change", async () => {
+        const file = sfInput.files?.[0];
+        if (!file) return;
+        errorBox.style.display = "none";
+        startFrameUploading = true;
+        startFrameUrl = null;
+        sfHint.textContent = "Yükleniyor…";
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            sfPreview.src = ev.target.result;
+            sfPreview.style.display = "block";
+        };
+        reader.readAsDataURL(file);
+        try {
+            const fd = new FormData();
+            fd.append("file", file);
+            const resp = await fetch("/api/upload-temp", {
+                method: "POST",
+                body: fd,
+                headers: getAuthHeaders(),
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            startFrameUrl = data.url;
+            sfLabel.textContent = "✓ " + file.name;
+            sfHint.textContent = "Hazır — GPT bu görseli analiz edip prompt'u ona göre yazacak";
+        } catch (e) {
+            showError("Start frame yüklenemedi: " + (e.message || e));
+            sfHint.textContent = "Yükleme başarısız — tekrar deneyin";
+            startFrameUrl = null;
+        } finally {
+            startFrameUploading = false;
+        }
+    });
 
     openBtn?.addEventListener("click", open);
     closeBtn?.addEventListener("click", close);
@@ -2056,8 +2102,18 @@ function toggleStudioModelSelect() {
         output.style.display = "none";
         copyAllBtn.style.display = "none";
 
+        if (startFrameUploading) {
+            showError("Start frame hâlâ yükleniyor, birkaç saniye bekleyin.");
+            return;
+        }
+        if (!startFrameUrl) {
+            showError("Başlangıç karesi zorunlu — lütfen bir görsel yükleyin.");
+            return;
+        }
+
         const tags = tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean);
         const body = {
+            start_frame_url: startFrameUrl,
             element_tags: tags,
             n_shots: parseInt(nShotsSel.value, 10),
             total_duration: parseInt(totalDurSel.value, 10),

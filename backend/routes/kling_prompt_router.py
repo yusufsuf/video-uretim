@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class ComposeRequest(BaseModel):
+    start_frame_url: str = Field(min_length=5)
     element_tags: List[str] = Field(default_factory=list, max_length=6)
     n_shots: int = Field(ge=MIN_SHOTS, le=MAX_SHOTS)
     total_duration: int = Field(ge=MIN_TOTAL_DURATION, le=MAX_TOTAL_DURATION)
@@ -50,6 +51,7 @@ async def compose(
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY tanımlı değil.")
     try:
         return await compose_kling_prompts(
+            start_frame_url=body.start_frame_url,
             element_tags=body.element_tags,
             n_shots=body.n_shots,
             total_duration=body.total_duration,
@@ -57,6 +59,8 @@ async def compose(
             director_note=body.director_note,
             mode=body.mode,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:  # noqa: BLE001
         logger.exception("kling-prompt compose failed")
         raise HTTPException(status_code=500, detail=f"Prompt üretilemedi: {e}") from e

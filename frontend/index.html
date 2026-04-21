@@ -660,6 +660,17 @@
                     olarak işaretlenir — Kling sitesinde <b>Bind Subject</b> ile kendi element'inize bağlarsınız.
                 </div>
 
+                <!-- START FRAME (ZORUNLU) -->
+                <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px">Başlangıç karesi <span style="color:#f87171">*</span></label>
+                <div class="upload-zone" id="kp-start-frame-zone" style="margin-bottom:14px">
+                    <input type="file" id="kp-start-frame-input" accept="image/*">
+                    <div class="upload-zone-inner">
+                        <div class="upload-label" id="kp-start-frame-label">📸 Start Frame Yükle</div>
+                        <div class="upload-hint" id="kp-start-frame-hint">Zorunlu — GPT bu görseli okuyup prompt'u ona göre yazar</div>
+                    </div>
+                    <img id="kp-start-frame-preview" style="display:none;max-width:100%;max-height:180px;border-radius:8px;margin-top:8px" />
+                </div>
+
                 <!-- MODE SELECTOR -->
                 <div style="display:flex;gap:8px;margin-bottom:14px">
                     <button type="button" class="wizard-btn-ghost kp-mode-btn active" data-mode="multi_shot" style="flex:1;padding:10px 8px;font-size:12px;font-weight:600">
@@ -730,7 +741,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=27"></script>
+    <script src="app.js?v=28"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');

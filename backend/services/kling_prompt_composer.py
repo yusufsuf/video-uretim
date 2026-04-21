@@ -28,11 +28,13 @@ cliprise) birleştirilerek aşağıdaki hard-rule set'i türetildi:
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import random
 from typing import List, Optional
 
+import httpx
 from openai import AsyncOpenAI
 
 from config import settings
@@ -201,6 +203,22 @@ CRITICAL RULES (apply to every mode)
 8. LANGUAGE
    English only. Do NOT write Turkish anywhere in the output. No commentary,
    no markdown, no headings, no trailing notes — only the JSON object.
+
+9. START FRAME DISCIPLINE (CRITICAL)
+   You are given a START FRAME image. This is the literal first frame Kling will
+   animate from. Your prompts MUST describe what is visibly in that frame and
+   what happens AFTER it — never a contradictory model, wardrobe, location,
+   time-of-day, or lighting.
+   - Read the frame first: subject pose, framing, environment, lighting direction,
+     time of day, color palette, atmosphere.
+   - The first shot must continue naturally from this exact pose and framing.
+   - Keep lighting palette, color temperature, location, and wardrobe CONSISTENT
+     with the frame across every shot (unless the director note explicitly calls
+     for a scene change).
+   - Do NOT invent details that contradict the frame (e.g., don't write "sunset"
+     if the frame is indoor studio; don't write "red dress" if it's black).
+   - Element @tags still apply for identity — do not re-describe the element
+     itself, just how it reacts to motion and light as seen in the frame.
 """
 
 _MODE_RULES_CUSTOM = """\
@@ -308,6 +326,17 @@ def _build_user_message_multi(
     return "\n\n".join(parts)
 
 
+async def _fetch_image_as_data_uri(url: str) -> str:
+    """Download an image URL and return a base64 data URI for OpenAI vision input."""
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as http:
+        r = await http.get(url)
+        r.raise_for_status()
+        mime = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
+        if not mime.startswith("image/"):
+            mime = "image/jpeg"
+        return f"data:{mime};base64,{base64.b64encode(r.content).decode('ascii')}"
+
+
 def _extract_json_object(text: str) -> dict:
     """Tolerant JSON extraction — handles code fences or leading prose."""
     s = text.strip()
@@ -324,6 +353,7 @@ def _extract_json_object(text: str) -> dict:
 
 
 async def compose_kling_prompts(
+    start_frame_url: str,
     element_tags: List[str],
     n_shots: int,
     total_duration: int,
@@ -331,13 +361,18 @@ async def compose_kling_prompts(
     director_note: Optional[str] = None,
     mode: str = "custom_multi_shot",
 ) -> dict:
-    """Compose Kling 3.0 Omni prompts.
+    """Compose Kling 3.0 Omni prompts from a start frame image.
+
+    The start frame is passed to GPT vision so prompts are anchored to the actual
+    model, wardrobe, location, lighting, and time-of-day shown in the frame.
 
     mode="custom_multi_shot" → per-shot paragraphs with explicit camera contracts.
         Returns {"mode", "shots":[...], "negative_prompt", "meta"}
     mode="multi_shot" → single unified paragraph (Kling auto-cuts).
         Returns {"mode", "prompt", "negative_prompt", "meta"}
     """
+    if not start_frame_url or not start_frame_url.strip():
+        raise ValueError("start_frame_url zorunludur.")
     arc = (arc_tone or "runway").lower().strip()
     if arc not in _ARC_TONE_GUIDANCE:
         arc = "runway"
@@ -364,11 +399,27 @@ async def compose_kling_prompts(
         user_msg = _build_user_message_multi(tags, n, total, arc, director_note)
         system_msg = _SYSTEM_PROMPT_BASE + "\n" + _MODE_RULES_MULTI
 
+    try:
+        image_data_uri = await _fetch_image_as_data_uri(start_frame_url)
+    except Exception as e:
+        logger.warning("start frame fetch failed (%s): %s", start_frame_url, e)
+        raise ValueError(f"Start frame indirilemedi: {e}") from e
+
     resp = await client.chat.completions.create(
         model=_GPT_MODEL,
         messages=[
             {"role": "system", "content": system_msg},
-            {"role": "user", "content": user_msg},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": (
+                        "START FRAME (this is the literal first frame Kling will animate — "
+                        "read it carefully and anchor every shot to what is visibly in it)."
+                    )},
+                    {"type": "image_url", "image_url": {"url": image_data_uri, "detail": "high"}},
+                    {"type": "text", "text": user_msg},
+                ],
+            },
         ],
         max_completion_tokens=2200,
         temperature=0.6,
@@ -391,6 +442,7 @@ async def compose_kling_prompts(
         "n_shots": n,
         "total_duration": total,
         "element_tags": tags,
+        "start_frame_url": start_frame_url,
         "model": _GPT_MODEL,
     }
 
