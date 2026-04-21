@@ -1906,3 +1906,187 @@ function toggleStudioModelSelect() {
     const wrapper = document.getElementById("studio-model-wrapper");
     if (wrapper) wrapper.style.display = provider === "kling" ? "flex" : "none";
 }
+
+// ─── Kling Prompt Composer Modal ───────────────────────────────────────────
+(function () {
+    const modal = document.getElementById("kling-prompt-modal");
+    if (!modal) return;
+
+    const openBtn = document.getElementById("open-kling-prompt-btn");
+    const closeBtn = document.getElementById("kling-prompt-close");
+    const generateBtn = document.getElementById("kp-generate-btn");
+    const copyAllBtn = document.getElementById("kp-copy-all-btn");
+    const output = document.getElementById("kp-output");
+    const errorBox = document.getElementById("kp-error");
+    const tagsInput = document.getElementById("kp-element-tags");
+    const nShotsSel = document.getElementById("kp-n-shots");
+    const totalDurSel = document.getElementById("kp-total-duration");
+    const arcSel = document.getElementById("kp-arc-tone");
+    const noteInput = document.getElementById("kp-director-note");
+
+    let currentMode = "multi_shot";
+
+    function open() {
+        modal.style.display = "flex";
+        errorBox.style.display = "none";
+        output.style.display = "none";
+        copyAllBtn.style.display = "none";
+    }
+    function close() { modal.style.display = "none"; }
+
+    openBtn?.addEventListener("click", open);
+    closeBtn?.addEventListener("click", close);
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+
+    // Mode toggle
+    document.querySelectorAll(".kp-mode-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            document.querySelectorAll(".kp-mode-btn").forEach((b) => {
+                b.classList.remove("active");
+                b.querySelector("div").style.color = "#9aa0a6";
+                b.firstChild.textContent = b.firstChild.textContent.replace(/^[✓]\s*/, "");
+            });
+            btn.classList.add("active");
+            currentMode = btn.dataset.mode;
+            const label = btn.firstChild;
+            if (!label.textContent.startsWith("✓")) {
+                label.textContent = "✓ " + label.textContent.trim();
+            }
+        });
+    });
+
+    function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.style.display = "block";
+    }
+
+    async function copyText(text, btn) {
+        try {
+            await navigator.clipboard.writeText(text);
+            const orig = btn.textContent;
+            btn.textContent = "✓ Kopyalandı";
+            setTimeout(() => { btn.textContent = orig; }, 1400);
+        } catch {
+            showError("Panoya kopyalanamadı.");
+        }
+    }
+
+    function renderCustom(data) {
+        const parts = [];
+        data.shots.forEach((s) => {
+            parts.push(`
+              <div class="kp-shot-card" style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px;margin-bottom:10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                  <div style="font-size:12px;font-weight:700;color:#a5b4fc">Shot ${s.shot_no} · ${s.time_range} · ${s.camera_type}</div>
+                  <button class="wizard-btn-ghost kp-copy-shot" data-shot="${s.shot_no}" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
+                </div>
+                <div class="kp-shot-prompt" style="font-size:12.5px;line-height:1.55;color:#e5e7eb;white-space:pre-wrap">${escapeHtml(s.prompt)}</div>
+              </div>
+            `);
+        });
+        parts.push(`
+          <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div style="font-size:11px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:0.5px">Negative Prompt</div>
+              <button class="wizard-btn-ghost kp-copy-neg" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
+            </div>
+            <div class="kp-neg-prompt" style="font-size:12.5px;line-height:1.55;color:#fecaca">${escapeHtml(data.negative_prompt)}</div>
+          </div>
+        `);
+        output.innerHTML = parts.join("");
+        output.style.display = "block";
+
+        output.querySelectorAll(".kp-copy-shot").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const n = parseInt(btn.dataset.shot, 10);
+                const shot = data.shots.find((s) => s.shot_no === n);
+                if (shot) copyText(shot.prompt, btn);
+            });
+        });
+        output.querySelector(".kp-copy-neg")?.addEventListener("click", (e) => {
+            copyText(data.negative_prompt, e.currentTarget);
+        });
+
+        copyAllBtn.style.display = "inline-flex";
+        copyAllBtn.onclick = () => {
+            const all = data.shots.map((s) => `Shot ${s.shot_no} (${s.time_range}, ${s.camera_type}):\n${s.prompt}`).join("\n\n") +
+                        `\n\nNegative Prompt:\n${data.negative_prompt}`;
+            copyText(all, copyAllBtn);
+        };
+    }
+
+    function renderMulti(data) {
+        output.innerHTML = `
+          <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px;margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div style="font-size:12px;font-weight:700;color:#a5b4fc">Multi-Shot Prompt (tek paragraf)</div>
+              <button class="wizard-btn-ghost kp-copy-main" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
+            </div>
+            <div class="kp-main-prompt" style="font-size:12.5px;line-height:1.6;color:#e5e7eb;white-space:pre-wrap">${escapeHtml(data.prompt)}</div>
+          </div>
+          <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <div style="font-size:11px;font-weight:700;color:#fca5a5;text-transform:uppercase;letter-spacing:0.5px">Negative Prompt</div>
+              <button class="wizard-btn-ghost kp-copy-neg" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
+            </div>
+            <div class="kp-neg-prompt" style="font-size:12.5px;line-height:1.55;color:#fecaca">${escapeHtml(data.negative_prompt)}</div>
+          </div>
+        `;
+        output.style.display = "block";
+
+        output.querySelector(".kp-copy-main")?.addEventListener("click", (e) => copyText(data.prompt, e.currentTarget));
+        output.querySelector(".kp-copy-neg")?.addEventListener("click", (e) => copyText(data.negative_prompt, e.currentTarget));
+
+        copyAllBtn.style.display = "inline-flex";
+        copyAllBtn.onclick = () => {
+            const all = `${data.prompt}\n\nNegative Prompt:\n${data.negative_prompt}`;
+            copyText(all, copyAllBtn);
+        };
+    }
+
+    function escapeHtml(s) {
+        return (s || "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+
+    generateBtn?.addEventListener("click", async () => {
+        errorBox.style.display = "none";
+        output.style.display = "none";
+        copyAllBtn.style.display = "none";
+
+        const tags = tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean);
+        const body = {
+            element_tags: tags,
+            n_shots: parseInt(nShotsSel.value, 10),
+            total_duration: parseInt(totalDurSel.value, 10),
+            arc_tone: arcSel.value,
+            mode: currentMode,
+            director_note: noteInput.value.trim() || null,
+        };
+
+        const orig = generateBtn.textContent;
+        generateBtn.disabled = true;
+        generateBtn.textContent = "Üretiliyor…";
+        try {
+            const resp = await fetch("/api/kling-prompt/compose", {
+                method: "POST",
+                headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || `HTTP ${resp.status}`);
+            }
+            const data = await resp.json();
+            if (data.mode === "multi_shot") {
+                renderMulti(data);
+            } else {
+                renderCustom(data);
+            }
+        } catch (e) {
+            showError(e.message || "Prompt üretilemedi.");
+        } finally {
+            generateBtn.disabled = false;
+            generateBtn.textContent = orig;
+        }
+    });
+})();
