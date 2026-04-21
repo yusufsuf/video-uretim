@@ -5,9 +5,11 @@ Takes element tag labels + shot count + total duration + arc tone + optional dir
 note and returns a JSON bundle of per-shot prompts + one negative prompt.
 Prompts reference elements as `@<tag>` placeholders — user swaps them for Kling's
 Bind Subject element picker on the site.
-"""
 
-from __future__ import annotations
+NOTE: Do not add `from __future__ import annotations` here — FastAPI + Pydantic v2
+resolve the request-body model (ComposeRequest) as a forward ref using module
+globals, and that fails under deferred annotations. Keep annotations concrete.
+"""
 
 import logging
 from typing import List, Optional
