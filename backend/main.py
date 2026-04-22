@@ -36,6 +36,7 @@ from routes.workflow_router import router as workflow_router
 from routes.whatsapp_router import router as whatsapp_router
 from routes.seedance_router import router as seedance_router
 from routes.kling_prompt_router import router as kling_prompt_router
+from routes.photo_montage_router import router as photo_montage_router
 from services.order_service import save_order, lookup_order
 
 # ─── Logging ───────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ app.include_router(workflow_router, prefix="/api/workflow")
 app.include_router(whatsapp_router)
 app.include_router(seedance_router)
 app.include_router(kling_prompt_router)
+app.include_router(photo_montage_router)
 
 # Serve generated outputs
 app.mount("/outputs", StaticFiles(directory=settings.OUTPUT_DIR), name="outputs")

@@ -2280,3 +2280,154 @@ function toggleStudioModelSelect() {
         }
     });
 })();
+
+// ─── Photo Montage Modal (4 photos → side-by-side) ─────────────────────────
+(function () {
+    const modal = document.getElementById("photo-montage-modal");
+    if (!modal) return;
+
+    const openBtn = document.getElementById("open-photo-montage-btn");
+    const closeBtn = document.getElementById("photo-montage-close");
+    const zone = document.getElementById("pm-zone");
+    const input = document.getElementById("pm-input");
+    const previews = document.getElementById("pm-previews");
+    const combineBtn = document.getElementById("pm-combine-btn");
+    const clearBtn = document.getElementById("pm-clear-btn");
+    const downloadBtn = document.getElementById("pm-download-btn");
+    const errorBox = document.getElementById("pm-error");
+    const resultWrap = document.getElementById("pm-result-wrap");
+    const resultImg = document.getElementById("pm-result-img");
+    const resultMeta = document.getElementById("pm-result-meta");
+
+    const MAX = 4;
+    let files = [];  // File[] — upload order
+
+    function open() {
+        modal.style.display = "flex";
+    }
+    function close() { modal.style.display = "none"; }
+
+    function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.style.display = "block";
+    }
+    function clearError() {
+        errorBox.style.display = "none";
+        errorBox.textContent = "";
+    }
+
+    function renderPreviews() {
+        if (files.length === 0) {
+            previews.style.display = "none";
+            previews.innerHTML = "";
+            combineBtn.disabled = true;
+            clearBtn.style.display = "none";
+            return;
+        }
+        previews.style.display = "grid";
+        previews.innerHTML = "";
+        files.forEach((f, idx) => {
+            const card = document.createElement("div");
+            card.style.cssText = "position:relative;background:#0b0e14;border:1px solid rgba(14,165,233,0.25);border-radius:8px;overflow:hidden;aspect-ratio:3/4;display:flex;align-items:center;justify-content:center";
+            const img = document.createElement("img");
+            img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block";
+            const reader = new FileReader();
+            reader.onload = (ev) => { img.src = ev.target.result; };
+            reader.readAsDataURL(f);
+            card.appendChild(img);
+
+            const badge = document.createElement("div");
+            badge.textContent = String(idx + 1);
+            badge.style.cssText = "position:absolute;top:4px;left:4px;background:rgba(14,165,233,0.9);color:#fff;font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px";
+            card.appendChild(badge);
+
+            const rm = document.createElement("button");
+            rm.type = "button";
+            rm.textContent = "✕";
+            rm.style.cssText = "position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;width:22px;height:22px;border-radius:4px;cursor:pointer;font-size:12px;line-height:1";
+            rm.addEventListener("click", () => {
+                files.splice(idx, 1);
+                renderPreviews();
+            });
+            card.appendChild(rm);
+
+            previews.appendChild(card);
+        });
+        combineBtn.disabled = false;
+        clearBtn.style.display = "inline-flex";
+    }
+
+    function addFiles(newFiles) {
+        clearError();
+        const remaining = MAX - files.length;
+        if (remaining <= 0) {
+            showError(`En fazla ${MAX} fotoğraf ekleyebilirsiniz.`);
+            return;
+        }
+        const toAdd = Array.from(newFiles).slice(0, remaining);
+        files = files.concat(toAdd);
+        if (newFiles.length > remaining) {
+            showError(`Sadece ilk ${remaining} fotoğraf eklendi (maks ${MAX}).`);
+        }
+        renderPreviews();
+    }
+
+    zone?.addEventListener("click", (e) => {
+        if (e.target === input) return;
+        input?.click();
+    });
+    input?.addEventListener("change", () => {
+        if (input.files && input.files.length) {
+            addFiles(input.files);
+            input.value = "";
+        }
+    });
+
+    openBtn?.addEventListener("click", open);
+    closeBtn?.addEventListener("click", close);
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+
+    clearBtn?.addEventListener("click", () => {
+        files = [];
+        resultWrap.style.display = "none";
+        downloadBtn.style.display = "none";
+        clearError();
+        renderPreviews();
+    });
+
+    combineBtn?.addEventListener("click", async () => {
+        if (files.length === 0) return;
+        clearError();
+        resultWrap.style.display = "none";
+        downloadBtn.style.display = "none";
+
+        const fd = new FormData();
+        files.forEach((f) => fd.append("files", f));
+
+        const origText = combineBtn.textContent;
+        combineBtn.disabled = true;
+        combineBtn.textContent = "Birleştiriliyor…";
+        try {
+            const resp = await fetch("/api/photo-montage", {
+                method: "POST",
+                body: fd,
+                headers: getAuthHeaders(),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || `HTTP ${resp.status}`);
+            }
+            const data = await resp.json();
+            resultImg.src = data.url;
+            resultMeta.textContent = `${data.count} fotoğraf · ${data.width}×${data.height} px`;
+            resultWrap.style.display = "block";
+            downloadBtn.href = data.url;
+            downloadBtn.style.display = "inline-flex";
+        } catch (e) {
+            showError(e.message || "Birleştirme başarısız.");
+        } finally {
+            combineBtn.disabled = false;
+            combineBtn.textContent = origText;
+        }
+    });
+})();

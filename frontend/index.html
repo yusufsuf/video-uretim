@@ -100,6 +100,7 @@
                 <div class="topbar-actions">
                     <a href="/gallery" class="topbar-link">Video Galeri</a>
                     <button id="open-kling-prompt-btn" class="btn-primary-sm" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);">Prompt</button>
+                    <button id="open-photo-montage-btn" class="btn-primary-sm" style="background:linear-gradient(135deg,#0ea5e9,#06b6d4);">🎞️ Yan Yana</button>
                     <button id="open-wizard-btn" class="btn-primary-sm">+ Yeni Video</button>
                     <button id="theme-toggle" class="theme-toggle-btn" title="Tema değiştir">
                         <span class="theme-icon">◐</span>
@@ -764,6 +765,48 @@
         </div>
     </div>
 
+    <!-- Photo Montage Modal (4 photos → side-by-side) -->
+    <div class="studio-create-overlay" id="photo-montage-modal" style="display:none">
+        <div class="studio-create-panel" style="max-width:640px">
+            <div class="studio-create-header">
+                <span class="studio-create-title">🎞️ Yan Yana — Fotoğraf Birleştirici</span>
+                <button class="wizard-close" id="photo-montage-close">✕</button>
+            </div>
+            <div class="studio-create-body">
+                <div style="font-size:12px;color:#9aa0a6;margin-bottom:12px;line-height:1.5">
+                    En fazla <b>4 fotoğraf</b> yükleyin — yüklediğiniz sıraya göre yan yana dizilir.
+                    Boyut düşürülmez; en uzun fotoğrafın yüksekliği hedef alınır, kısa olanlar oranlı
+                    şekilde yukarı ölçeklenir.
+                </div>
+
+                <div class="upload-zone" id="pm-zone" style="margin-bottom:14px">
+                    <input type="file" id="pm-input" accept="image/*" multiple>
+                    <div class="upload-zone-inner">
+                        <div class="upload-label">📸 Fotoğrafları seç (1–4)</div>
+                        <div class="upload-hint">Aynı anda 4'e kadar seçebilir, ayrıca tek tek ekleyebilirsiniz</div>
+                    </div>
+                </div>
+
+                <div id="pm-previews" style="display:none;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px"></div>
+
+                <div id="pm-result-wrap" style="display:none;margin-top:6px">
+                    <div style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Birleştirilmiş görsel</div>
+                    <div style="background:#0b0e14;border:1px solid rgba(14,165,233,0.3);border-radius:10px;padding:10px">
+                        <img id="pm-result-img" style="max-width:100%;display:block;border-radius:6px" />
+                        <div id="pm-result-meta" style="font-size:11px;color:#9aa0a6;margin-top:8px"></div>
+                    </div>
+                </div>
+
+                <div id="pm-error" style="margin-top:14px;display:none;padding:10px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#fca5a5;font-size:12px"></div>
+            </div>
+            <div class="studio-create-footer" style="display:flex;gap:10px;align-items:center">
+                <button id="pm-clear-btn" class="wizard-btn-ghost" style="display:none">Temizle</button>
+                <button id="pm-combine-btn" class="wizard-btn-primary" style="flex:1" disabled>Birleştir</button>
+                <a id="pm-download-btn" class="wizard-btn-ghost" style="display:none;text-decoration:none" download>⬇️ İndir</a>
+            </div>
+        </div>
+    </div>
+
     <!-- Kling Technique Picker Overlay -->
     <div id="kp-tech-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;align-items:center;justify-content:center;padding:20px">
         <div style="background:#111827;border:1px solid rgba(99,102,241,0.3);border-radius:12px;max-width:720px;width:100%;max-height:85vh;display:flex;flex-direction:column">
@@ -781,7 +824,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=30"></script>
+    <script src="app.js?v=31"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');
