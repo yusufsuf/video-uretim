@@ -713,7 +713,37 @@
                     <option value="street">Street — sokak / doğal ışık</option>
                     <option value="cinematic">Cinematic — sinematik, atmosferik</option>
                     <option value="lookbook">Lookbook — temiz / ürün odaklı</option>
+                    <option value="couture">Couture — haute couture, zarif</option>
+                    <option value="bridal">Bridal — gelinlik, romantik</option>
+                    <option value="athleisure">Athleisure — spor / enerjik</option>
+                    <option value="resort">Resort — tatil / sahil / yaz</option>
+                    <option value="avant_garde">Avant-Garde — cesur, konsept</option>
+                    <option value="noir">Noir — siyah-beyaz, dramatik</option>
+                    <option value="retro_70s">Retro 70s — vintage, sıcak tonlar</option>
+                    <option value="urban_night">Urban Night — şehir gecesi, neon</option>
+                    <option value="fantasy_dream">Fantasy Dream — rüya gibi, sihirli</option>
+                    <option value="vintage_hollywood">Vintage Hollywood — eski sinema</option>
                 </select>
+
+                <!-- SHOT TECHNIQUES (Custom Multi-Shot only) -->
+                <div id="kp-shot-techniques-wrap" style="display:none;margin-top:14px">
+                    <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px">Shot kamera teknikleri <span style="color:#6b7280;text-transform:none;letter-spacing:0">(opsiyonel — boş bırakılan shot'lar için AI seçer)</span></label>
+                    <div id="kp-shot-techniques" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+                </div>
+
+                <!-- SAHNENIN DEVAMI (continuation) -->
+                <div style="margin-top:14px;padding:12px;border:1px solid rgba(139,92,246,0.25);border-radius:8px;background:rgba(139,92,246,0.06)">
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#d1d5db;cursor:pointer">
+                        <input type="checkbox" id="kp-continuation-toggle" style="width:14px;height:14px;cursor:pointer">
+                        <span>🔗 <b>Sahnenin Devamı</b> <span style="color:#6b7280;font-size:11px">— önceki prompt'a bağla</span></span>
+                    </label>
+                    <div id="kp-continuation-box" style="display:none;margin-top:10px">
+                        <div style="font-size:11px;color:#9aa0a6;margin-bottom:6px;line-height:1.5">
+                            Önceki üretilen prompt metnini buraya yapıştırın. Start frame olarak önceki videonun <b>son karesini</b> yükleyin. AI ikisini birlikte okuyup hikâyeyi devam ettirecek şekilde yazar.
+                        </div>
+                        <textarea id="kp-previous-prompt" class="form-input" rows="4" placeholder="Önceki promptu buraya yapıştırın..." style="resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px"></textarea>
+                    </div>
+                </div>
 
                 <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;margin-top:14px;display:block">Yönetmen notu (opsiyonel)</label>
                 <textarea id="kp-director-note" class="form-input" rows="2" placeholder="ör: gün batımında denize yakın, sıcak ışık" style="margin-top:4px;resize:vertical"></textarea>
@@ -734,7 +764,24 @@
         </div>
     </div>
 
-    <script src="app.js?v=29"></script>
+    <!-- Kling Technique Picker Overlay -->
+    <div id="kp-tech-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;align-items:center;justify-content:center;padding:20px">
+        <div style="background:#111827;border:1px solid rgba(99,102,241,0.3);border-radius:12px;max-width:720px;width:100%;max-height:85vh;display:flex;flex-direction:column">
+            <div style="padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;align-items:center">
+                <div>
+                    <div style="font-size:14px;font-weight:600;color:#f3f4f6">🎬 Shot <span id="kp-tech-shot-idx">1</span> — Kamera Tekniği Seç</div>
+                    <div style="font-size:11px;color:#9aa0a6;margin-top:2px">Boş bırakırsan AI otomatik seçer</div>
+                </div>
+                <button id="kp-tech-close" class="wizard-close">✕</button>
+            </div>
+            <div id="kp-tech-grid" style="padding:14px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px"></div>
+            <div style="padding:10px 18px;border-top:1px solid rgba(255,255,255,0.08);display:flex;justify-content:flex-end">
+                <button id="kp-tech-clear" class="wizard-btn-ghost" style="font-size:12px">Seçimi temizle (AI seçsin)</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=30"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');

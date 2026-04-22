@@ -27,6 +27,7 @@ from services.kling_prompt_composer import (
     MIN_TOTAL_DURATION,
     compose_kling_prompts,
 )
+from services.kling_techniques import TECHNIQUES
 
 router = APIRouter(prefix="/api/kling-prompt", tags=["kling-prompt"])
 logger = logging.getLogger(__name__)
@@ -40,6 +41,14 @@ class ComposeRequest(BaseModel):
     arc_tone: str = Field(default="runway")
     mode: str = Field(default="custom_multi_shot")  # "multi_shot" | "custom_multi_shot"
     director_note: Optional[str] = Field(default=None, max_length=500)
+    shot_techniques: Optional[List[Optional[str]]] = Field(default=None, max_length=MAX_SHOTS)
+    previous_prompt: Optional[str] = Field(default=None, max_length=8000)
+
+
+@router.get("/techniques")
+async def list_techniques(_user: dict = Depends(get_current_user)):
+    """Return the technique library for the frontend picker."""
+    return {"techniques": TECHNIQUES}
 
 
 @router.post("/compose")
@@ -60,6 +69,8 @@ async def compose(
             arc_tone=body.arc_tone,
             director_note=body.director_note,
             mode=body.mode,
+            shot_techniques=body.shot_techniques,
+            previous_prompt=body.previous_prompt,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

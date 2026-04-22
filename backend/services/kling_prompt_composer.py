@@ -38,6 +38,7 @@ import httpx
 from openai import AsyncOpenAI
 
 from config import settings
+from services.kling_techniques import get_technique
 
 logger = logging.getLogger(__name__)
 
@@ -78,11 +79,21 @@ _CAMERA_POOL = [
 
 # Closing camera type per arc (last shot anchor)
 _ARC_CLOSERS = {
-    "runway":    "final_back_walk",
-    "editorial": "dolly_in_face",
-    "street":    "over_shoulder_back",
-    "cinematic": "back_detail_close",
-    "lookbook":  "three_quarter_turn_orbit",
+    "runway":            "final_back_walk",
+    "editorial":         "dolly_in_face",
+    "street":            "over_shoulder_back",
+    "cinematic":         "back_detail_close",
+    "lookbook":          "three_quarter_turn_orbit",
+    "couture":           "close_up_fabric",
+    "bridal":            "final_back_walk",
+    "athleisure":        "descending_follow",
+    "resort":            "side_tracking_profile",
+    "avant_garde":       "hem_to_head_tilt_up",
+    "noir":              "dolly_in_face",
+    "retro_70s":         "three_quarter_turn_orbit",
+    "urban_night":       "over_shoulder_back",
+    "fantasy_dream":     "dolly_in_face",
+    "vintage_hollywood": "dolly_in_face",
 }
 
 _ARC_TONE_GUIDANCE = {
@@ -109,6 +120,56 @@ _ARC_TONE_GUIDANCE = {
     "lookbook": (
         "Clean product-first aesthetic. Neutral backdrop, even studio lighting, minimal shadows. "
         "Controlled micro-motion showcasing garment silhouette and fabric. Pace: calm and balanced."
+    ),
+    "couture": (
+        "Haute couture atelier feel. Sculptural silhouettes, museum-like negative space. "
+        "Gallery lighting — single soft key at 35°, no fill, deep shadows. 3200K warm tungsten. "
+        "Motion is sparse and reverent; every gesture deliberate. Pace: very slow, artful."
+    ),
+    "bridal": (
+        "Bridal elegance. Soft diffused key with heavy bounce fill, airy highlights, 5200K. "
+        "Pastel or ivory palette, delicate veil/train motion catching light. Walking is glide-like, "
+        "hem sweeps the floor with visible secondary motion. Pace: graceful, ceremonial."
+    ),
+    "athleisure": (
+        "Athletic energy. Dynamic camera, faster tracking, confident forward propulsion. "
+        "Daylight 5600K with slight cool cast, natural sweat sheen. Fabric compresses and stretches "
+        "with each stride; breathable weave visible on close-ups. Pace: brisk, alive."
+    ),
+    "resort": (
+        "Resort / beachwear. Natural sunlight, warm 5000K with sky-blue fill bounce. "
+        "Linen/silk reacts to real breeze, hem and hair lift with each step. Sand, pool tile, or "
+        "wood deck underfoot. Pace: breezy, unhurried, sun-kissed."
+    ),
+    "avant_garde": (
+        "Avant-garde editorial. Unconventional framing, asymmetric poses, architectural shadows. "
+        "High-contrast single-source lighting from unusual angle. Color palette reduced to 2–3 "
+        "saturated tones. Motion is statuesque with sudden controlled shifts. Pace: staccato."
+    ),
+    "noir": (
+        "Film-noir mood. Hard raking side-light creating deep Rembrandt shadows, 3000K. "
+        "Smoky haze, venetian-blind patterns, wet floor reflections. Model moves with silent intent, "
+        "cigarette-smoke grace. Desaturated palette leaning monochrome. Pace: slow, tense."
+    ),
+    "retro_70s": (
+        "1970s retro fashion. Warm amber tungsten (2800K), subtle film grain, soft halation on "
+        "highlights. Flared fabric swings wide on turns, hair catches golden backlight. Wood, "
+        "velvet, or sun-bleached exterior settings. Pace: relaxed, groovy."
+    ),
+    "urban_night": (
+        "Urban nightlife. Neon practicals (magenta + cyan), wet asphalt reflections, street haze. "
+        "Model moves through layered light pools, silhouette dominates between sources. Color "
+        "separation between warm signs and cool ambient. Pace: cool, confident."
+    ),
+    "fantasy_dream": (
+        "Dreamlike fantasy. Atmospheric haze, volumetric god-rays, soft bloom on highlights. "
+        "Ethereal key light with heavy diffusion, pastel color grade. Motion feels suspended — "
+        "fabric and hair float longer than physics would allow. Pace: languid, floating."
+    ),
+    "vintage_hollywood": (
+        "Vintage Hollywood glamour (1940s–50s). Classic three-point lighting with hard edged key, "
+        "soft fill, strong rim on hair. Silvery highlights, creamy blacks, slight sepia cast. "
+        "Model poses with studied elegance, minimal movement. Pace: poised, iconic."
     ),
 }
 
@@ -138,6 +199,48 @@ def _assign_cameras(n: int, arc_tone: str) -> List[str]:
         return [closer]
     chosen = pool[: n - 1] + [closer]
     return chosen
+
+
+def _resolve_shot_cameras(
+    n: int,
+    arc_tone: str,
+    shot_techniques: Optional[List[Optional[str]]],
+) -> List[str]:
+    """Merge user-picked technique IDs with auto-assignment.
+
+    For shots where the user picked a technique ID (from the kling_techniques
+    library), use that ID directly. For None/missing slots, auto-pick from the
+    remaining pool while avoiding duplicates against user picks.
+    """
+    if not shot_techniques:
+        return _assign_cameras(n, arc_tone)
+
+    # Normalize
+    picks = list(shot_techniques) + [None] * max(0, n - len(shot_techniques))
+    picks = picks[:n]
+
+    user_set = {p for p in picks if p}
+    closer = _ARC_CLOSERS.get(arc_tone, _ARC_CLOSERS["runway"])
+
+    # Auto pool: exclude user-chosen ones so we don't duplicate.
+    remaining = [c for c in _CAMERA_POOL if c not in user_set]
+    if closer not in user_set and closer in remaining:
+        remaining.remove(closer)  # we'll tack the closer on if last slot is empty
+    random.shuffle(remaining)
+
+    out: list[str] = []
+    for i, p in enumerate(picks):
+        if p:
+            out.append(p)
+            continue
+        if i == n - 1 and closer not in user_set:
+            out.append(closer)
+        elif remaining:
+            out.append(remaining.pop())
+        else:
+            # Fallback — user over-specified duplicates, just pick anything
+            out.append(random.choice(_CAMERA_POOL))
+    return out
 
 
 def _build_time_ranges(durations: List[int]) -> List[str]:
@@ -277,23 +380,46 @@ def _build_user_message_custom(
     cameras: List[str],
     arc_tone: str,
     director_note: Optional[str],
+    previous_prompt: Optional[str] = None,
 ) -> str:
     tag_line = ", ".join(f"@{t}" for t in element_tags) if element_tags else "(no elements — write generic fashion scene)"
     arc_guidance = _ARC_TONE_GUIDANCE.get(arc_tone, _ARC_TONE_GUIDANCE["runway"])
 
     shot_lines = []
     for i, (tr, dur, cam) in enumerate(zip(time_ranges, durations, cameras), 1):
-        shot_lines.append(f'  - shot_no={i}, time_range="{tr}", duration={dur}, camera_type="{cam}"')
+        tech = get_technique(cam)
+        if tech:
+            # User-picked technique from library — pass the full English instruction.
+            shot_lines.append(
+                f'  - shot_no={i}, time_range="{tr}", duration={dur}, camera_type="{cam}", '
+                f'camera_instruction="{tech["en_camera"]}"'
+            )
+        else:
+            shot_lines.append(
+                f'  - shot_no={i}, time_range="{tr}", duration={dur}, camera_type="{cam}"'
+            )
     shot_block = "\n".join(shot_lines)
 
-    parts = [
+    parts = []
+    if previous_prompt and previous_prompt.strip():
+        parts.append(
+            "CONTINUATION CONTEXT\n"
+            "This new sequence directly continues from a previous Kling generation. The START FRAME "
+            "you are given is the LAST FRAME of that previous video. Your new shots must pick up "
+            "EXACTLY where the previous sequence ended — same pose momentum, same mood, same setting, "
+            "same wardrobe — and extend the narrative organically. Do not re-introduce the subject "
+            "or re-establish the scene; treat this as a direct continuation.\n\n"
+            f"PREVIOUS PROMPT(S) (for reference only, do NOT copy phrasing):\n{previous_prompt.strip()}"
+        )
+
+    parts.extend([
         f"ELEMENT TAGS (use verbatim, with @ prefix): {tag_line}",
         f"ARC TONE: {arc_tone}",
         f"ARC GUIDANCE: {arc_guidance}",
         f"TOTAL SHOTS: {len(durations)}",
-        f"SHOT CONTRACTS (write one prompt per shot, honor camera_type exactly):",
+        "SHOT CONTRACTS (write one prompt per shot, honor camera_type / camera_instruction exactly):",
         shot_block,
-    ]
+    ])
     if director_note and director_note.strip():
         parts.append(f"DIRECTOR NOTE (shape the overall narrative around this): {director_note.strip()}")
 
@@ -307,18 +433,31 @@ def _build_user_message_multi(
     total_duration: int,
     arc_tone: str,
     director_note: Optional[str],
+    previous_prompt: Optional[str] = None,
 ) -> str:
     tag_line = ", ".join(f"@{t}" for t in element_tags) if element_tags else "(no elements — write generic fashion scene)"
     arc_guidance = _ARC_TONE_GUIDANCE.get(arc_tone, _ARC_TONE_GUIDANCE["runway"])
 
-    parts = [
+    parts = []
+    if previous_prompt and previous_prompt.strip():
+        parts.append(
+            "CONTINUATION CONTEXT\n"
+            "This new sequence directly continues from a previous Kling generation. The START FRAME "
+            "you are given is the LAST FRAME of that previous video. Your new paragraph must pick "
+            "up EXACTLY where the previous sequence ended — same pose momentum, same mood, same "
+            "setting, same wardrobe — and extend the narrative organically. Do not re-introduce the "
+            "subject or re-establish the scene; treat this as a direct continuation.\n\n"
+            f"PREVIOUS PROMPT (for reference only, do NOT copy phrasing):\n{previous_prompt.strip()}"
+        )
+
+    parts.extend([
         f"ELEMENT TAGS (use verbatim, with @ prefix): {tag_line}",
         f"ARC TONE: {arc_tone}",
         f"ARC GUIDANCE: {arc_guidance}",
         f"TARGET BEATS (implied cuts inside the single paragraph): {n_shots}",
         f"TOTAL DURATION: {total_duration}s",
         "Pace the beats so they fit the total duration naturally. Do NOT output time stamps or shot numbers.",
-    ]
+    ])
     if director_note and director_note.strip():
         parts.append(f"DIRECTOR NOTE (shape the overall narrative around this): {director_note.strip()}")
 
@@ -360,6 +499,8 @@ async def compose_kling_prompts(
     arc_tone: str = "runway",
     director_note: Optional[str] = None,
     mode: str = "custom_multi_shot",
+    shot_techniques: Optional[List[Optional[str]]] = None,
+    previous_prompt: Optional[str] = None,
 ) -> dict:
     """Compose Kling 3.0 Omni prompts from a start frame image.
 
@@ -391,12 +532,16 @@ async def compose_kling_prompts(
     if m == "custom_multi_shot":
         durations = _distribute_durations(total, n)
         time_ranges = _build_time_ranges(durations)
-        cameras = _assign_cameras(n, arc)
-        user_msg = _build_user_message_custom(tags, durations, time_ranges, cameras, arc, director_note)
+        cameras = _resolve_shot_cameras(n, arc, shot_techniques)
+        user_msg = _build_user_message_custom(
+            tags, durations, time_ranges, cameras, arc, director_note, previous_prompt,
+        )
         system_msg = _SYSTEM_PROMPT_BASE + "\n" + _MODE_RULES_CUSTOM
     else:
         durations, time_ranges, cameras = [], [], []
-        user_msg = _build_user_message_multi(tags, n, total, arc, director_note)
+        user_msg = _build_user_message_multi(
+            tags, n, total, arc, director_note, previous_prompt,
+        )
         system_msg = _SYSTEM_PROMPT_BASE + "\n" + _MODE_RULES_MULTI
 
     try:
@@ -443,6 +588,7 @@ async def compose_kling_prompts(
         "total_duration": total,
         "element_tags": tags,
         "start_frame_url": start_frame_url,
+        "continuation": bool(previous_prompt and previous_prompt.strip()),
         "model": _GPT_MODEL,
     }
 

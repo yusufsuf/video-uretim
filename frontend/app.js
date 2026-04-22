@@ -1930,15 +1930,33 @@ function toggleStudioModelSelect() {
     const sfHint = document.getElementById("kp-start-frame-hint");
     const sfPreview = document.getElementById("kp-start-frame-preview");
 
+    // Technique picker + continuation
+    const techWrap = document.getElementById("kp-shot-techniques-wrap");
+    const techRow = document.getElementById("kp-shot-techniques");
+    const techOverlay = document.getElementById("kp-tech-overlay");
+    const techGrid = document.getElementById("kp-tech-grid");
+    const techCloseBtn = document.getElementById("kp-tech-close");
+    const techClearBtn = document.getElementById("kp-tech-clear");
+    const techShotIdx = document.getElementById("kp-tech-shot-idx");
+    const contToggle = document.getElementById("kp-continuation-toggle");
+    const contBox = document.getElementById("kp-continuation-box");
+    const prevPromptInput = document.getElementById("kp-previous-prompt");
+
     let currentMode = "multi_shot";
     let startFrameUrl = null;
     let startFrameUploading = false;
+    let techniques = [];  // loaded once from backend
+    let shotTechniques = [];  // aligned to n_shots; null = AI picks
+    let activePickerShot = -1;
 
     function open() {
         modal.style.display = "flex";
         errorBox.style.display = "none";
         output.style.display = "none";
         copyAllBtn.style.display = "none";
+        loadTechniques();
+        rebuildShotChips();
+        updateTechniqueVisibility();
     }
     function close() { modal.style.display = "none"; }
 
@@ -1999,8 +2017,103 @@ function toggleStudioModelSelect() {
             if (!label.textContent.startsWith("✓")) {
                 label.textContent = "✓ " + label.textContent.trim();
             }
+            updateTechniqueVisibility();
         });
     });
+
+    // n_shots change → rebuild technique chips
+    nShotsSel?.addEventListener("change", rebuildShotChips);
+
+    // Continuation toggle
+    contToggle?.addEventListener("change", () => {
+        contBox.style.display = contToggle.checked ? "block" : "none";
+    });
+
+    // Technique picker wiring
+    techCloseBtn?.addEventListener("click", closeTechniquePicker);
+    techOverlay?.addEventListener("click", (e) => {
+        if (e.target === techOverlay) closeTechniquePicker();
+    });
+    techClearBtn?.addEventListener("click", () => {
+        if (activePickerShot >= 0) {
+            shotTechniques[activePickerShot] = null;
+            rebuildShotChips();
+        }
+        closeTechniquePicker();
+    });
+
+    function updateTechniqueVisibility() {
+        if (!techWrap) return;
+        techWrap.style.display = currentMode === "custom_multi_shot" ? "block" : "none";
+    }
+
+    async function loadTechniques() {
+        if (techniques.length > 0) return;
+        try {
+            const resp = await fetch("/api/kling-prompt/techniques", { headers: getAuthHeaders() });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            techniques = data.techniques || [];
+        } catch { /* silent — picker just won't show items */ }
+    }
+
+    function rebuildShotChips() {
+        if (!techRow) return;
+        const n = parseInt(nShotsSel.value, 10) || 1;
+        // resize shotTechniques preserving existing picks
+        while (shotTechniques.length < n) shotTechniques.push(null);
+        if (shotTechniques.length > n) shotTechniques = shotTechniques.slice(0, n);
+
+        techRow.innerHTML = "";
+        for (let i = 0; i < n; i++) {
+            const tech = shotTechniques[i] ? techniques.find((t) => t.id === shotTechniques[i]) : null;
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "wizard-btn-ghost";
+            chip.style.cssText = "font-size:11px;padding:6px 10px;display:flex;align-items:center;gap:6px;" +
+                (tech ? "background:rgba(99,102,241,0.18);border-color:rgba(99,102,241,0.5);color:#c7d2fe" : "");
+            chip.innerHTML = `<span style="font-weight:700">Shot ${i + 1}</span>` +
+                `<span style="color:${tech ? '#c7d2fe' : '#6b7280'}">${tech ? escapeHtml(tech.tr_label) : 'AI seçsin'}</span>`;
+            chip.addEventListener("click", () => openTechniquePicker(i));
+            techRow.appendChild(chip);
+        }
+    }
+
+    function openTechniquePicker(shotIdx) {
+        activePickerShot = shotIdx;
+        techShotIdx.textContent = String(shotIdx + 1);
+        techGrid.innerHTML = "";
+        const current = shotTechniques[shotIdx];
+        techniques.forEach((t) => {
+            const card = document.createElement("button");
+            card.type = "button";
+            const active = t.id === current;
+            card.style.cssText = "text-align:left;padding:10px 12px;background:" +
+                (active ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.03)") +
+                ";border:1px solid " + (active ? "rgba(99,102,241,0.6)" : "rgba(255,255,255,0.08)") +
+                ";border-radius:8px;cursor:pointer;transition:all 0.15s;color:#e5e7eb";
+            card.innerHTML = `<div style="font-size:12.5px;font-weight:700;margin-bottom:3px;color:${active ? '#c7d2fe' : '#f3f4f6'}">${escapeHtml(t.tr_label)}</div>` +
+                `<div style="font-size:11px;color:#9aa0a6;line-height:1.45">${escapeHtml(t.tr_desc)}</div>`;
+            card.addEventListener("mouseenter", () => {
+                if (!active) card.style.background = "rgba(99,102,241,0.08)";
+            });
+            card.addEventListener("mouseleave", () => {
+                if (!active) card.style.background = "rgba(255,255,255,0.03)";
+            });
+            card.addEventListener("click", () => {
+                shotTechniques[shotIdx] = t.id;
+                rebuildShotChips();
+                closeTechniquePicker();
+            });
+            techGrid.appendChild(card);
+        });
+        techOverlay.style.display = "flex";
+    }
+
+    function closeTechniquePicker() {
+        techOverlay.style.display = "none";
+        activePickerShot = -1;
+    }
 
     function showError(msg) {
         errorBox.textContent = msg;
@@ -2118,15 +2231,27 @@ function toggleStudioModelSelect() {
         }
 
         const tags = tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean);
+        const nShots = parseInt(nShotsSel.value, 10);
         const body = {
             start_frame_url: startFrameUrl,
             element_tags: tags,
-            n_shots: parseInt(nShotsSel.value, 10),
+            n_shots: nShots,
             total_duration: totalDur,
             arc_tone: arcSel.value,
             mode: currentMode,
             director_note: noteInput.value.trim() || null,
         };
+
+        if (currentMode === "custom_multi_shot") {
+            const picks = shotTechniques.slice(0, nShots);
+            while (picks.length < nShots) picks.push(null);
+            if (picks.some((p) => p)) body.shot_techniques = picks;
+        }
+
+        if (contToggle?.checked) {
+            const prev = (prevPromptInput?.value || "").trim();
+            if (prev) body.previous_prompt = prev;
+        }
 
         const orig = generateBtn.textContent;
         generateBtn.disabled = true;
