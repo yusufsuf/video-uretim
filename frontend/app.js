@@ -2824,6 +2824,17 @@ function toggleStudioModelSelect() {
     function renderOutput(data) {
         const parts = [];
 
+        // Duration-adjusted warning (when backend clamped up due to Seedance min-per-shot)
+        const meta = data.meta || {};
+        if (meta.duration_adjusted && meta.requested_duration && meta.total_duration) {
+            parts.push(`
+              <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#fbbf24;line-height:1.5">
+                ⚠️ <b>Süre ayarlandı:</b> ${meta.requested_duration}s istediniz ama ${meta.n_shots} shot için Seedance'ın minimum shot-başı süresi (4s) nedeniyle toplam <b>${meta.total_duration}s</b>'ye çıkarıldı.
+                Tam ${meta.requested_duration}s istiyorsanız render modunu <b>Timed Segments</b>'a alın (tek kamera, beat süresi sınırsız) veya shot sayısını düşürün.
+              </div>
+            `);
+        }
+
         // Combined prompt card (most useful — one-click copy)
         parts.push(`
           <div style="background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:12px;margin-bottom:12px">

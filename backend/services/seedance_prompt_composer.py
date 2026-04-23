@@ -315,19 +315,36 @@ JSON-STRICT OUTPUT (no extra keys):
 
 # ─── Helpers ──────────────────────────────────────────────────────
 
-def _validate_and_clamp(n_shots: int, total_duration: int) -> tuple[int, int]:
+def _validate_and_clamp(
+    n_shots: int,
+    total_duration: int,
+    *,
+    enforce_min_per_shot: bool = True,
+) -> tuple[int, int, bool]:
+    """Returns (n, total, was_adjusted). enforce_min_per_shot=False is used for
+    timed_segments mode where beats inside one continuous take can be shorter
+    than Seedance's 4-second per-job minimum.
+    """
     n = max(MIN_SHOTS, min(MAX_SHOTS, int(n_shots)))
-    total = max(MIN_TOTAL_DURATION, min(MAX_TOTAL_DURATION, int(total_duration)))
-    total = max(total, n * MIN_SHOT_DURATION)
+    orig_total = max(MIN_TOTAL_DURATION, min(MAX_TOTAL_DURATION, int(total_duration)))
+    total = orig_total
+    if enforce_min_per_shot:
+        total = max(total, n * MIN_SHOT_DURATION)
     total = min(total, n * MAX_SHOT_DURATION)
-    return n, total
+    return n, total, (total != orig_total)
 
 
-def _distribute_durations(total: int, n: int) -> List[int]:
+def _distribute_durations(
+    total: int,
+    n: int,
+    *,
+    min_per_segment: int = MIN_SHOT_DURATION,
+) -> List[int]:
     base = total // n
     extra = total - (base * n)
     out = [base + (1 if i < extra else 0) for i in range(n)]
-    return [max(MIN_SHOT_DURATION, min(MAX_SHOT_DURATION, d)) for d in out]
+    lo = max(1, min_per_segment)
+    return [max(lo, min(MAX_SHOT_DURATION, d)) for d in out]
 
 
 def _build_time_ranges(durations: List[int]) -> List[str]:
@@ -546,13 +563,20 @@ async def compose_seedance_prompts(
     if arc not in _ARC_TONE_GUIDANCE:
         arc = "runway"
 
-    n, total = _validate_and_clamp(n_shots, total_duration)
+    # timed_segments is a single continuous take — beats inside it can be shorter
+    # than Seedance's 4s per-job minimum. numbered_shots emits N separate jobs so
+    # the 4s minimum applies there.
+    enforce_min = rm == "numbered_shots"
+    n, total, duration_adjusted = _validate_and_clamp(
+        n_shots, total_duration, enforce_min_per_shot=enforce_min,
+    )
 
     # In timed_segments mode, Seedance treats it as 1 continuous shot even if user
     # asked for N beats — keep n for beat count, but shot_count in footer is 1.
     footer_shots = 1 if rm == "timed_segments" else n
 
-    durations = _distribute_durations(total, n)
+    min_per_segment = MIN_SHOT_DURATION if enforce_min else 1
+    durations = _distribute_durations(total, n, min_per_segment=min_per_segment)
     time_ranges = _build_time_ranges(durations)
 
     if rm == "numbered_shots":
@@ -658,6 +682,8 @@ async def compose_seedance_prompts(
         "n_shots": n,
         "footer_shots": footer_shots,
         "total_duration": total,
+        "requested_duration": int(total_duration),
+        "duration_adjusted": duration_adjusted,
         "silent": bool(silent),
         "continuation": bool(previous_prompt and previous_prompt.strip()),
         "reference_numbering": numbering,
