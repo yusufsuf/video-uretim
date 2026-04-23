@@ -2431,3 +2431,514 @@ function toggleStudioModelSelect() {
         }
     });
 })();
+
+// ─── Seedance 2.0 Prompt Composer Modal ────────────────────────────────────
+(function () {
+    const modal = document.getElementById("seedance-prompt-modal");
+    if (!modal) return;
+
+    const openBtn = document.getElementById("open-seedance-prompt-btn");
+    const closeBtn = document.getElementById("seedance-prompt-close");
+    const generateBtn = document.getElementById("sd-generate-btn");
+    const copyCombinedBtn = document.getElementById("sd-copy-combined-btn");
+    const output = document.getElementById("sd-output");
+    const errorBox = document.getElementById("sd-error");
+
+    // Quota bar
+    const quotaUsedEl = document.getElementById("sd-quota-used");
+    const quotaRemainingEl = document.getElementById("sd-quota-remaining");
+
+    // Start frame bucket
+    const sfZone = document.getElementById("sd-sf-zone");
+    const sfInput = document.getElementById("sd-sf-input");
+    const sfLabel = document.getElementById("sd-sf-label");
+    const sfHint = document.getElementById("sd-sf-hint");
+    const sfPreview = document.getElementById("sd-sf-preview");
+
+    // Character bucket
+    const charZone = document.getElementById("sd-char-zone");
+    const charInput = document.getElementById("sd-char-input");
+    const charPreviews = document.getElementById("sd-char-previews");
+
+    // Location bucket
+    const locZone = document.getElementById("sd-loc-zone");
+    const locInput = document.getElementById("sd-loc-input");
+    const locPreviews = document.getElementById("sd-loc-previews");
+
+    // Render mode
+    const renderBtns = document.querySelectorAll(".sd-render-btn");
+    const shotTechWrap = document.getElementById("sd-shot-techniques-wrap");
+    const shotTechRow = document.getElementById("sd-shot-techniques");
+
+    // Form inputs
+    const nShotsSel = document.getElementById("sd-n-shots");
+    const totalDurInput = document.getElementById("sd-total-duration");
+    const aspectSel = document.getElementById("sd-aspect");
+    const filmLookSel = document.getElementById("sd-film-look");
+    const arcSel = document.getElementById("sd-arc-tone");
+    const dirNoteInput = document.getElementById("sd-director-note");
+    const silentChk = document.getElementById("sd-silent");
+    const contToggle = document.getElementById("sd-continuation-toggle");
+    const contBox = document.getElementById("sd-continuation-box");
+    const prevPromptInput = document.getElementById("sd-previous-prompt");
+
+    const MAX_TOTAL = 9;
+    let startFrameUrl = null;
+    let startFrameUploading = false;
+    let charItems = [];  // [{url, name, uploading}]
+    let locItems = [];
+    let currentRenderMode = "numbered_shots";
+    let techniques = [];
+    let shotTechniques = [];
+    let activePickerShot = -1;
+
+    // Reuse Kling technique picker overlay (same overlay element)
+    const techOverlay = document.getElementById("kp-tech-overlay");
+    const techGrid = document.getElementById("kp-tech-grid");
+    const techShotIdx = document.getElementById("kp-tech-shot-idx");
+
+    function open() {
+        modal.style.display = "flex";
+        errorBox.style.display = "none";
+        output.style.display = "none";
+        copyCombinedBtn.style.display = "none";
+        loadTechniques();
+        rebuildShotChips();
+        updateQuotaBar();
+        updateRenderVisibility();
+    }
+    function close() { modal.style.display = "none"; }
+
+    function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.style.display = "block";
+    }
+    function clearError() { errorBox.style.display = "none"; }
+
+    function escapeHtml(s) {
+        return (s || "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+
+    function quotaUsed() {
+        return (startFrameUrl ? 1 : 0) + charItems.length + locItems.length;
+    }
+    function quotaRemaining() {
+        return MAX_TOTAL - quotaUsed();
+    }
+    function updateQuotaBar() {
+        const used = quotaUsed();
+        const remaining = MAX_TOTAL - used;
+        quotaUsedEl.textContent = String(used);
+        quotaRemainingEl.textContent = String(remaining);
+        quotaRemainingEl.style.color = remaining === 0 ? "#f87171" : (remaining <= 2 ? "#fbbf24" : "#4ade80");
+    }
+
+    async function uploadFile(file) {
+        const fd = new FormData();
+        fd.append("file", file);
+        const resp = await fetch("/api/upload-temp", {
+            method: "POST",
+            body: fd,
+            headers: getAuthHeaders(),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        return data.url;
+    }
+
+    // Start frame handler
+    sfZone?.addEventListener("click", (e) => {
+        if (e.target === sfInput) return;
+        sfInput?.click();
+    });
+    sfInput?.addEventListener("change", async () => {
+        const file = sfInput.files?.[0];
+        if (!file) return;
+        clearError();
+        startFrameUploading = true;
+        startFrameUrl = null;
+        updateQuotaBar();
+        sfHint.textContent = "Yükleniyor…";
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            sfPreview.src = ev.target.result;
+            sfPreview.style.display = "block";
+        };
+        reader.readAsDataURL(file);
+        try {
+            const url = await uploadFile(file);
+            startFrameUrl = url;
+            sfLabel.textContent = "✓ " + file.name;
+            sfHint.textContent = "Hazır — @image1 olarak numaralandırıldı";
+            updateQuotaBar();
+        } catch (e) {
+            showError("Start frame yüklenemedi: " + (e.message || e));
+            sfHint.textContent = "Yükleme başarısız — tekrar deneyin";
+            startFrameUrl = null;
+            updateQuotaBar();
+        } finally {
+            startFrameUploading = false;
+        }
+    });
+
+    // Bucket renderer (shared for character & location)
+    function renderBucket(previewsEl, items, bucketStartOffset) {
+        if (items.length === 0) {
+            previewsEl.style.display = "none";
+            previewsEl.innerHTML = "";
+            return;
+        }
+        previewsEl.style.display = "grid";
+        previewsEl.innerHTML = "";
+        items.forEach((item, idx) => {
+            const card = document.createElement("div");
+            card.style.cssText = "position:relative;background:#0b0e14;border:1px solid rgba(249,115,22,0.25);border-radius:6px;overflow:hidden;aspect-ratio:3/4";
+            const img = document.createElement("img");
+            img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block";
+            img.src = item.thumbUrl || item.url;
+            card.appendChild(img);
+
+            const badge = document.createElement("div");
+            badge.textContent = `@image${bucketStartOffset + idx}`;
+            badge.style.cssText = "position:absolute;bottom:3px;left:3px;background:rgba(249,115,22,0.9);color:#fff;font-size:10px;font-weight:700;padding:2px 5px;border-radius:3px";
+            card.appendChild(badge);
+
+            const rm = document.createElement("button");
+            rm.type = "button";
+            rm.textContent = "✕";
+            rm.style.cssText = "position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.7);color:#fff;border:none;width:20px;height:20px;border-radius:3px;cursor:pointer;font-size:11px;line-height:1";
+            rm.addEventListener("click", () => {
+                const target = items === charItems ? charItems : locItems;
+                target.splice(idx, 1);
+                rerenderBuckets();
+                updateQuotaBar();
+            });
+            card.appendChild(rm);
+
+            if (item.uploading) {
+                const overlay = document.createElement("div");
+                overlay.textContent = "Yükleniyor…";
+                overlay.style.cssText = "position:absolute;inset:0;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center";
+                card.appendChild(overlay);
+            }
+            previewsEl.appendChild(card);
+        });
+    }
+
+    function rerenderBuckets() {
+        // @image numbering: start=1, character=2..(1+C), location=(2+C)..(1+C+L)
+        const charStart = 2;
+        const locStart = 2 + charItems.length;
+        renderBucket(charPreviews, charItems, charStart);
+        renderBucket(locPreviews, locItems, locStart);
+    }
+
+    async function addToBucket(files, target) {
+        clearError();
+        const remaining = quotaRemaining();
+        if (remaining <= 0) {
+            showError(`9 görsel limitine ulaşıldı — önce bir görsel silin.`);
+            return;
+        }
+        const filesToAdd = Array.from(files).slice(0, remaining);
+        if (files.length > remaining) {
+            showError(`Sadece ilk ${remaining} görsel eklendi (toplam 9 limit).`);
+        }
+
+        // Preview with local blob first
+        const startIndex = target.length;
+        filesToAdd.forEach((f) => {
+            target.push({
+                url: null,
+                thumbUrl: URL.createObjectURL(f),
+                name: f.name,
+                uploading: true,
+            });
+        });
+        rerenderBuckets();
+        updateQuotaBar();
+
+        // Upload in parallel
+        await Promise.all(filesToAdd.map(async (f, i) => {
+            const slot = startIndex + i;
+            try {
+                const url = await uploadFile(f);
+                if (target[slot]) {
+                    target[slot].url = url;
+                    target[slot].uploading = false;
+                }
+            } catch (e) {
+                showError(`${f.name} yüklenemedi: ${e.message || e}`);
+                // Remove failed upload from target
+                if (target[slot]) {
+                    target.splice(slot, 1);
+                }
+            }
+        }));
+        rerenderBuckets();
+    }
+
+    // Character bucket wiring
+    charZone?.addEventListener("click", (e) => {
+        if (e.target === charInput) return;
+        charInput?.click();
+    });
+    charInput?.addEventListener("change", async () => {
+        if (charInput.files && charInput.files.length) {
+            await addToBucket(charInput.files, charItems);
+            charInput.value = "";
+        }
+    });
+
+    // Location bucket wiring
+    locZone?.addEventListener("click", (e) => {
+        if (e.target === locInput) return;
+        locInput?.click();
+    });
+    locInput?.addEventListener("change", async () => {
+        if (locInput.files && locInput.files.length) {
+            await addToBucket(locInput.files, locItems);
+            locInput.value = "";
+        }
+    });
+
+    openBtn?.addEventListener("click", open);
+    closeBtn?.addEventListener("click", close);
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+
+    // Render mode toggle
+    renderBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+            renderBtns.forEach((b) => {
+                b.classList.remove("active");
+                b.firstChild.textContent = b.firstChild.textContent.replace(/^[✓]\s*/, "");
+            });
+            btn.classList.add("active");
+            currentRenderMode = btn.dataset.mode;
+            const label = btn.firstChild;
+            if (!label.textContent.startsWith("✓")) {
+                label.textContent = "✓ " + label.textContent.trim();
+            }
+            updateRenderVisibility();
+        });
+    });
+
+    function updateRenderVisibility() {
+        if (!shotTechWrap) return;
+        // Shot techniques only for numbered_shots mode
+        shotTechWrap.style.display = currentRenderMode === "numbered_shots" ? "block" : "none";
+    }
+
+    // n_shots change → rebuild technique chips
+    nShotsSel?.addEventListener("change", rebuildShotChips);
+
+    // Continuation toggle
+    contToggle?.addEventListener("change", () => {
+        contBox.style.display = contToggle.checked ? "block" : "none";
+    });
+
+    // Technique library (shared with Kling)
+    async function loadTechniques() {
+        if (techniques.length > 0) return;
+        try {
+            const resp = await fetch("/api/kling-prompt/techniques", { headers: getAuthHeaders() });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            techniques = data.techniques || [];
+        } catch { /* silent */ }
+    }
+
+    function rebuildShotChips() {
+        if (!shotTechRow) return;
+        const n = parseInt(nShotsSel.value, 10) || 1;
+        while (shotTechniques.length < n) shotTechniques.push(null);
+        if (shotTechniques.length > n) shotTechniques = shotTechniques.slice(0, n);
+
+        shotTechRow.innerHTML = "";
+        for (let i = 0; i < n; i++) {
+            const tech = shotTechniques[i] ? techniques.find((t) => t.id === shotTechniques[i]) : null;
+            const chip = document.createElement("button");
+            chip.type = "button";
+            chip.className = "wizard-btn-ghost";
+            chip.style.cssText = "font-size:11px;padding:6px 10px;display:flex;align-items:center;gap:6px;" +
+                (tech ? "background:rgba(249,115,22,0.18);border-color:rgba(249,115,22,0.5);color:#fed7aa" : "");
+            chip.innerHTML = `<span style="font-weight:700">Shot ${i + 1}</span>` +
+                `<span style="color:${tech ? '#fed7aa' : '#6b7280'}">${tech ? escapeHtml(tech.tr_label) : 'AI seçsin'}</span>`;
+            chip.addEventListener("click", () => openTechniquePicker(i));
+            shotTechRow.appendChild(chip);
+        }
+    }
+
+    function openTechniquePicker(shotIdx) {
+        activePickerShot = shotIdx;
+        techShotIdx.textContent = String(shotIdx + 1);
+        techGrid.innerHTML = "";
+        const current = shotTechniques[shotIdx];
+        techniques.forEach((t) => {
+            const card = document.createElement("button");
+            card.type = "button";
+            const active = t.id === current;
+            card.style.cssText = "text-align:left;padding:10px 12px;background:" +
+                (active ? "rgba(249,115,22,0.18)" : "rgba(255,255,255,0.03)") +
+                ";border:1px solid " + (active ? "rgba(249,115,22,0.6)" : "rgba(255,255,255,0.08)") +
+                ";border-radius:8px;cursor:pointer;transition:all 0.15s;color:#e5e7eb";
+            card.innerHTML = `<div style="font-size:12.5px;font-weight:700;margin-bottom:3px;color:${active ? '#fed7aa' : '#f3f4f6'}">${escapeHtml(t.tr_label)}</div>` +
+                `<div style="font-size:11px;color:#9aa0a6;line-height:1.45">${escapeHtml(t.tr_desc)}</div>`;
+            card.addEventListener("click", () => {
+                shotTechniques[shotIdx] = t.id;
+                rebuildShotChips();
+                closeTechniquePicker();
+            });
+            techGrid.appendChild(card);
+        });
+        techOverlay.style.display = "flex";
+        // Override tech-clear to set shot-technique null for this modal's state
+        const clearBtn = document.getElementById("kp-tech-clear");
+        if (clearBtn) {
+            clearBtn.onclick = () => {
+                if (activePickerShot >= 0) {
+                    shotTechniques[activePickerShot] = null;
+                    rebuildShotChips();
+                }
+                closeTechniquePicker();
+            };
+        }
+    }
+
+    function closeTechniquePicker() {
+        techOverlay.style.display = "none";
+        activePickerShot = -1;
+    }
+
+    async function copyText(text, btn) {
+        try {
+            await navigator.clipboard.writeText(text);
+            const orig = btn.textContent;
+            btn.textContent = "✓ Kopyalandı";
+            setTimeout(() => { btn.textContent = orig; }, 1400);
+        } catch {
+            showError("Panoya kopyalanamadı.");
+        }
+    }
+
+    function renderOutput(data) {
+        const parts = [];
+
+        // Combined prompt card (most useful — one-click copy)
+        parts.push(`
+          <div style="background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:12px;margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <div style="font-size:11px;font-weight:700;color:#fdba74;text-transform:uppercase;letter-spacing:0.5px">📦 Tam Prompt (Seedance'a yapıştır)</div>
+              <button class="wizard-btn-ghost sd-copy-combined-inner" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
+            </div>
+            <pre style="font-size:12px;line-height:1.5;color:#e5e7eb;white-space:pre-wrap;word-break:break-word;margin:0;font-family:ui-monospace,Menlo,Consolas,monospace">${escapeHtml(data.combined_prompt)}</pre>
+          </div>
+        `);
+
+        // Per-shot breakdown
+        if (data.shots && data.shots.length) {
+            parts.push(`<div style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Per-shot döküm</div>`);
+            data.shots.forEach((s) => {
+                parts.push(`
+                  <div class="sd-shot-card" style="background:rgba(249,115,22,0.04);border:1px solid rgba(249,115,22,0.18);border-radius:10px;padding:12px;margin-bottom:8px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                      <div style="font-size:12px;font-weight:700;color:#fdba74">Shot ${s.shot_no} · ${s.time_range} · ${escapeHtml(s.camera_type)}</div>
+                      <button class="wizard-btn-ghost sd-copy-shot" data-shot="${s.shot_no}" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
+                    </div>
+                    <div class="sd-shot-prompt" style="font-size:12px;line-height:1.5;color:#e5e7eb;white-space:pre-wrap">${escapeHtml(s.prompt)}</div>
+                  </div>
+                `);
+            });
+        }
+
+        output.innerHTML = parts.join("");
+        output.style.display = "block";
+
+        output.querySelector(".sd-copy-combined-inner")?.addEventListener("click", (e) => {
+            copyText(data.combined_prompt, e.currentTarget);
+        });
+        output.querySelectorAll(".sd-copy-shot").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const n = parseInt(btn.dataset.shot, 10);
+                const shot = data.shots.find((s) => s.shot_no === n);
+                if (shot) copyText(shot.prompt, btn);
+            });
+        });
+
+        copyCombinedBtn.style.display = "inline-flex";
+        copyCombinedBtn.onclick = () => copyText(data.combined_prompt, copyCombinedBtn);
+    }
+
+    generateBtn?.addEventListener("click", async () => {
+        clearError();
+        output.style.display = "none";
+        copyCombinedBtn.style.display = "none";
+
+        if (startFrameUploading) {
+            showError("Start frame hâlâ yükleniyor, birkaç saniye bekleyin.");
+            return;
+        }
+        if (!startFrameUrl) {
+            showError("Başlangıç karesi zorunlu — lütfen bir görsel yükleyin.");
+            return;
+        }
+        if (charItems.some((it) => it.uploading) || locItems.some((it) => it.uploading)) {
+            showError("Bazı görseller hâlâ yükleniyor, bitmesini bekleyin.");
+            return;
+        }
+
+        const totalDur = parseInt(totalDurInput.value, 10);
+        if (!Number.isFinite(totalDur) || totalDur < 4 || totalDur > 90) {
+            showError("Toplam süre 4-90 saniye arasında olmalı.");
+            return;
+        }
+
+        const nShots = parseInt(nShotsSel.value, 10);
+        const body = {
+            start_frame_url: startFrameUrl,
+            character_urls: charItems.filter((it) => it.url).map((it) => it.url),
+            location_urls: locItems.filter((it) => it.url).map((it) => it.url),
+            n_shots: nShots,
+            total_duration: totalDur,
+            aspect_ratio: aspectSel.value,
+            arc_tone: arcSel.value,
+            render_mode: currentRenderMode,
+            film_look: filmLookSel.value,
+            silent: !!silentChk.checked,
+            director_note: dirNoteInput.value.trim() || null,
+        };
+
+        if (currentRenderMode === "numbered_shots") {
+            const picks = shotTechniques.slice(0, nShots);
+            while (picks.length < nShots) picks.push(null);
+            if (picks.some((p) => p)) body.shot_techniques = picks;
+        }
+
+        if (contToggle?.checked) {
+            const prev = (prevPromptInput?.value || "").trim();
+            if (prev) body.previous_prompt = prev;
+        }
+
+        const origText = generateBtn.textContent;
+        generateBtn.disabled = true;
+        generateBtn.textContent = "Üretiliyor…";
+        try {
+            const resp = await fetch("/api/seedance-prompt/compose", {
+                method: "POST",
+                headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || `HTTP ${resp.status}`);
+            }
+            const data = await resp.json();
+            renderOutput(data);
+        } catch (e) {
+            showError(e.message || "Prompt üretilemedi.");
+        } finally {
+            generateBtn.disabled = false;
+            generateBtn.textContent = origText;
+        }
+    });
+})();

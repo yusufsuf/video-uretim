@@ -100,6 +100,7 @@
                 <div class="topbar-actions">
                     <a href="/gallery" class="topbar-link">Video Galeri</a>
                     <button id="open-kling-prompt-btn" class="btn-primary-sm" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);">Prompt</button>
+                    <button id="open-seedance-prompt-btn" class="btn-primary-sm" style="background:linear-gradient(135deg,#f97316,#ef4444);">📽️ Seedance</button>
                     <button id="open-photo-montage-btn" class="btn-primary-sm" style="background:linear-gradient(135deg,#0ea5e9,#06b6d4);">🎞️ Yan Yana</button>
                     <button id="open-wizard-btn" class="btn-primary-sm">+ Yeni Video</button>
                     <button id="theme-toggle" class="theme-toggle-btn" title="Tema değiştir">
@@ -765,6 +766,175 @@
         </div>
     </div>
 
+    <!-- Seedance 2.0 Prompt Composer Modal -->
+    <div class="studio-create-overlay" id="seedance-prompt-modal" style="display:none">
+        <div class="studio-create-panel" style="max-width:720px">
+            <div class="studio-create-header">
+                <span class="studio-create-title">📽️ Seedance 2.0 — Prompt Yazar</span>
+                <button class="wizard-close" id="seedance-prompt-close">✕</button>
+            </div>
+            <div class="studio-create-body">
+                <div style="font-size:12px;color:#9aa0a6;margin-bottom:10px;line-height:1.5">
+                    Seedance 2.0 için kopyala-yapıştır prompt'ları üretir. 3 ayrık yükleme alanı —
+                    sistem otomatik <code style="background:rgba(249,115,22,0.15);padding:1px 6px;border-radius:4px">@image1</code>
+                    <code style="background:rgba(249,115,22,0.15);padding:1px 6px;border-radius:4px">@image2…</code> numarası verir ve her görsele doğru job'u atar.
+                </div>
+
+                <!-- QUOTA BAR -->
+                <div id="sd-quota-bar" style="display:flex;align-items:center;gap:10px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.25);border-radius:8px;padding:8px 12px;margin-bottom:14px;font-size:12px">
+                    <span style="color:#fdba74;font-weight:700">📊 Görsel kotası:</span>
+                    <span style="color:#e5e7eb">Toplam <b>9</b> · Kullanılan <b id="sd-quota-used">0</b> · Kalan <b id="sd-quota-remaining" style="color:#4ade80">9</b></span>
+                </div>
+
+                <!-- BUCKET 1: START FRAME -->
+                <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px">🎬 Başlangıç karesi <span style="color:#f87171">*</span> <span style="color:#6b7280;text-transform:none;letter-spacing:0">— videonun ilk karesi (@image1)</span></label>
+                <div class="upload-zone" id="sd-sf-zone" style="margin-bottom:14px">
+                    <input type="file" id="sd-sf-input" accept="image/*">
+                    <div class="upload-zone-inner">
+                        <div class="upload-label" id="sd-sf-label">📸 Start Frame Yükle</div>
+                        <div class="upload-hint" id="sd-sf-hint">Zorunlu — GPT bu görseli okuyup prompt'u ona göre yazar</div>
+                    </div>
+                    <img id="sd-sf-preview" style="display:none;max-width:100%;max-height:160px;border-radius:8px;margin-top:8px" />
+                </div>
+
+                <!-- BUCKET 2: CHARACTER + OUTFIT -->
+                <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px">👤 Karakter + Kıyafet tutarlılığı <span style="color:#6b7280;text-transform:none;letter-spacing:0">— manken ve elbise referansları (0–8 görsel)</span></label>
+                <div class="upload-zone" id="sd-char-zone" style="margin-bottom:10px">
+                    <input type="file" id="sd-char-input" accept="image/*" multiple>
+                    <div class="upload-zone-inner">
+                        <div class="upload-label">👗 Karakter referansı ekle</div>
+                        <div class="upload-hint">Farklı açılar, yakın planlar — yüz, beden, kumaş dokusu</div>
+                    </div>
+                </div>
+                <div id="sd-char-previews" style="display:none;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px"></div>
+
+                <!-- BUCKET 3: LOCATION -->
+                <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px">🏛️ Mekan / Ortam referansı <span style="color:#6b7280;text-transform:none;letter-spacing:0">— lokasyon, ışık, palet (0–8 görsel)</span></label>
+                <div class="upload-zone" id="sd-loc-zone" style="margin-bottom:10px">
+                    <input type="file" id="sd-loc-input" accept="image/*" multiple>
+                    <div class="upload-zone-inner">
+                        <div class="upload-label">🌆 Mekan referansı ekle</div>
+                        <div class="upload-hint">Renk paleti ve ortam havası için — framing zorlanmaz</div>
+                    </div>
+                </div>
+                <div id="sd-loc-previews" style="display:none;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px"></div>
+
+                <!-- RENDER MODE -->
+                <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px">Çıktı formatı</label>
+                <div style="display:flex;gap:8px;margin-bottom:14px">
+                    <button type="button" class="wizard-btn-ghost sd-render-btn active" data-mode="numbered_shots" style="flex:1;padding:10px 8px;font-size:12px;font-weight:600">
+                        ✓ Numbered Shots
+                        <div style="font-size:10px;font-weight:400;color:#9aa0a6;margin-top:2px">Shot 1: … / Shot 2: …</div>
+                    </button>
+                    <button type="button" class="wizard-btn-ghost sd-render-btn" data-mode="timed_segments" style="flex:1;padding:10px 8px;font-size:12px;font-weight:600">
+                        Timed Segments
+                        <div style="font-size:10px;font-weight:400;color:#9aa0a6;margin-top:2px">0-3s: … / 3-6s: … (tek kamera)</div>
+                    </button>
+                </div>
+
+                <!-- SHOT COUNT / DURATION / ASPECT -->
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+                    <div>
+                        <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px">Shot / Beat sayısı</label>
+                        <select id="sd-n-shots" class="form-input" style="margin-top:4px">
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3" selected>3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px">Toplam süre (sn)</label>
+                        <input type="number" id="sd-total-duration" class="form-input" min="4" max="90" step="1" value="15" placeholder="15" style="margin-top:4px">
+                        <div style="font-size:11px;color:#6b7280;margin-top:4px">Shot başı 4–15s · toplam 4–90s</div>
+                    </div>
+                    <div>
+                        <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px">Aspect</label>
+                        <select id="sd-aspect" class="form-input" style="margin-top:4px">
+                            <option value="9:16" selected>9:16 (dikey)</option>
+                            <option value="16:9">16:9 (yatay)</option>
+                            <option value="1:1">1:1 (kare)</option>
+                            <option value="3:4">3:4</option>
+                            <option value="4:3">4:3</option>
+                            <option value="21:9">21:9 (sinema)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- FILM LOOK -->
+                <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;display:block">Film look</label>
+                <select id="sd-film-look" class="form-input" style="margin-top:4px">
+                    <option value="arri_alexa" selected>ARRI ALEXA — sinematik</option>
+                    <option value="kodak_portra">Kodak Portra — sıcak / pastel</option>
+                    <option value="moody_noir">Moody Noir — koyu kontrast</option>
+                    <option value="clean_commercial">Clean Commercial — reklam</option>
+                    <option value="natural_documentary">Natural Documentary — doğal</option>
+                    <option value="fashion_editorial">Fashion Editorial — dergi kapağı</option>
+                    <option value="orange_teal">Orange-Teal — Hollywood</option>
+                    <option value="vintage_super8">Vintage Super-8 — nostaljik</option>
+                </select>
+
+                <!-- ARC TONE -->
+                <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;margin-top:14px;display:block">Arc tone</label>
+                <select id="sd-arc-tone" class="form-input" style="margin-top:4px">
+                    <option value="runway" selected>Runway — klasik podyum</option>
+                    <option value="editorial">Editorial — dergi kapağı</option>
+                    <option value="street">Street — sokak / doğal ışık</option>
+                    <option value="cinematic">Cinematic — sinematik, atmosferik</option>
+                    <option value="lookbook">Lookbook — temiz / ürün odaklı</option>
+                    <option value="couture">Couture — haute couture, zarif</option>
+                    <option value="bridal">Bridal — gelinlik, romantik</option>
+                    <option value="athleisure">Athleisure — spor / enerjik</option>
+                    <option value="resort">Resort — tatil / sahil / yaz</option>
+                    <option value="avant_garde">Avant-Garde — cesur, konsept</option>
+                    <option value="noir">Noir — siyah-beyaz, dramatik</option>
+                    <option value="retro_70s">Retro 70s — vintage, sıcak tonlar</option>
+                    <option value="urban_night">Urban Night — şehir gecesi, neon</option>
+                    <option value="fantasy_dream">Fantasy Dream — rüya gibi, sihirli</option>
+                    <option value="vintage_hollywood">Vintage Hollywood — eski sinema</option>
+                </select>
+
+                <!-- SHOT TECHNIQUES (numbered mode only) -->
+                <div id="sd-shot-techniques-wrap" style="margin-top:14px">
+                    <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;display:block;margin-bottom:6px">Shot kamera teknikleri <span style="color:#6b7280;text-transform:none;letter-spacing:0">(opsiyonel — boş bırakılan shot'lar için AI seçer)</span></label>
+                    <div id="sd-shot-techniques" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+                </div>
+
+                <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;margin-top:14px;display:block">Yönetmen notu (opsiyonel)</label>
+                <textarea id="sd-director-note" class="form-input" rows="2" placeholder="ör: gün batımında denize yakın, sıcak ışık" style="margin-top:4px;resize:vertical"></textarea>
+
+                <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:#d1d5db;cursor:pointer">
+                    <input type="checkbox" id="sd-silent" checked style="width:14px;height:14px;cursor:pointer">
+                    <span>Sessiz video <span style="color:#6b7280;font-size:11px">(fashion standardı — "no music, no audio" eklenir)</span></span>
+                </label>
+
+                <!-- CONTINUATION -->
+                <div style="margin-top:14px;padding:12px;border:1px solid rgba(249,115,22,0.25);border-radius:8px;background:rgba(249,115,22,0.06)">
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#d1d5db;cursor:pointer">
+                        <input type="checkbox" id="sd-continuation-toggle" style="width:14px;height:14px;cursor:pointer">
+                        <span>🔗 <b>Sahnenin Devamı</b> <span style="color:#6b7280;font-size:11px">— önceki Seedance prompt'una bağla</span></span>
+                    </label>
+                    <div id="sd-continuation-box" style="display:none;margin-top:10px">
+                        <div style="font-size:11px;color:#9aa0a6;margin-bottom:6px;line-height:1.5">
+                            Önceki prompt metnini yapıştırın. Start frame olarak önceki videonun <b>son karesini</b> yükleyin.
+                        </div>
+                        <textarea id="sd-previous-prompt" class="form-input" rows="4" placeholder="Önceki promptu buraya yapıştırın..." style="resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px"></textarea>
+                    </div>
+                </div>
+
+                <!-- OUTPUT -->
+                <div id="sd-output" style="margin-top:18px;display:none"></div>
+                <div id="sd-error" style="margin-top:14px;display:none;padding:10px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#fca5a5;font-size:12px"></div>
+            </div>
+            <div class="studio-create-footer" style="display:flex;gap:10px;align-items:center">
+                <button id="sd-generate-btn" class="wizard-btn-primary" style="flex:1">Prompt Üret</button>
+                <button id="sd-copy-combined-btn" class="wizard-btn-ghost" style="display:none">📋 Tümünü Kopyala</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Photo Montage Modal (4 photos → side-by-side) -->
     <div class="studio-create-overlay" id="photo-montage-modal" style="display:none">
         <div class="studio-create-panel" style="max-width:640px">
@@ -824,7 +994,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=31"></script>
+    <script src="app.js?v=32"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');
