@@ -863,6 +863,23 @@
                     </div>
                 </div>
 
+                <!-- PROMPT DENSITY -->
+                <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;display:block">Prompt yoğunluğu</label>
+                <div style="display:flex;gap:8px;margin-top:4px;margin-bottom:14px">
+                    <button type="button" class="wizard-btn-ghost sd-density-btn" data-density="concise" style="flex:1;padding:8px 6px;font-size:11px;font-weight:600">
+                        Kısa (öz)
+                        <div style="font-size:10px;font-weight:400;color:#9aa0a6;margin-top:2px">~1500–2000 char · OpenArt uyumlu</div>
+                    </button>
+                    <button type="button" class="wizard-btn-ghost sd-density-btn active" data-density="balanced" style="flex:1;padding:8px 6px;font-size:11px;font-weight:600">
+                        ✓ Orta (dengeli)
+                        <div style="font-size:10px;font-weight:400;color:#9aa0a6;margin-top:2px">~2500–3500 char · çoğu UI</div>
+                    </button>
+                    <button type="button" class="wizard-btn-ghost sd-density-btn" data-density="detailed" style="flex:1;padding:8px 6px;font-size:11px;font-weight:600">
+                        Uzun (detaylı)
+                        <div style="font-size:10px;font-weight:400;color:#9aa0a6;margin-top:2px">~4000–5500 char · API direkt</div>
+                    </button>
+                </div>
+
                 <!-- FILM LOOK -->
                 <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px;display:block">Film look</label>
                 <select id="sd-film-look" class="form-input" style="margin-top:4px">
@@ -994,7 +1011,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=33"></script>
+    <script src="app.js?v=34"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');

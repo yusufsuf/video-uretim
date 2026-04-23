@@ -23,19 +23,14 @@ hard-rule set'i:
 
 from __future__ import annotations
 
-import base64
-import json
 import logging
-import random
 from typing import List, Optional
 
-import httpx
 from openai import AsyncOpenAI
 
 from config import settings
 from services.kling_techniques import get_technique
 from services.kling_prompt_composer import (
-    _ARC_CLOSERS,
     _ARC_TONE_GUIDANCE,
     _camera_lens_mm,
     _extract_json_object,
@@ -61,6 +56,32 @@ MAX_LOCATION_REFS = 8
 
 RENDER_MODES = ("numbered_shots", "timed_segments")
 ASPECT_RATIOS = ("9:16", "16:9", "1:1", "3:4", "21:9", "4:3", "adaptive")
+
+DENSITIES = ("concise", "balanced", "detailed")
+
+_DENSITY_GUIDANCE = {
+    "concise": (
+        "PROMPT DENSITY: CONCISE (short — target ≤ 40 words per shot / beat).\n"
+        "Keep every shot/beat tight and essential. ONE camera verb, ONE subject action "
+        "with physics, ONE lighting detail, ONE texture/detail beat. Cut adjectives "
+        "aggressively. No redundancy across shots. Target total combined_prompt: "
+        "≈1500–2000 characters for 3rd-party UIs with strict length limits "
+        "(e.g., OpenArt)."
+    ),
+    "balanced": (
+        "PROMPT DENSITY: BALANCED (medium — target ≤ 70 words per shot / beat).\n"
+        "Keep essentials plus one cinematographer-level detail per beat (light role "
+        "change, fabric micro-motion, or environmental texture). Avoid lengthy lists. "
+        "Target total combined_prompt: ≈2500–3500 characters."
+    ),
+    "detailed": (
+        "PROMPT DENSITY: DETAILED (rich — target ≤ 120 words per shot / beat).\n"
+        "Write cinematographer-grade paragraphs: camera verb + subject physics + "
+        "multi-source lighting with Kelvin + fabric secondary motion + texture beat. "
+        "Use only when the target UI has no length limit (Seedance API direct, "
+        "wavespeed.ai). Target total combined_prompt: ≈4000–5500 characters."
+    ),
+}
 
 _GPT_MODEL = "gpt-5.4"
 
@@ -410,6 +431,7 @@ def _build_user_message(
     cameras: List[str],
     director_note: Optional[str],
     previous_prompt: Optional[str],
+    density: str = "balanced",
 ) -> str:
     arc_guidance = _ARC_TONE_GUIDANCE.get(arc_tone, _ARC_TONE_GUIDANCE["runway"])
 
@@ -431,6 +453,7 @@ def _build_user_message(
     parts.append("FILM-LOOK PREAMBLE (emit verbatim as the second paragraph):")
     parts.append(film_look_preamble)
 
+    parts.append(_DENSITY_GUIDANCE.get(density, _DENSITY_GUIDANCE["balanced"]))
     parts.append(f"ARC TONE: {arc_tone}")
     parts.append(f"ARC GUIDANCE: {arc_guidance}")
     parts.append(f"ASPECT RATIO: {aspect_ratio}")
@@ -520,6 +543,7 @@ async def compose_seedance_prompts(
     render_mode: str = "numbered_shots",
     film_look: str = "arri_alexa",
     silent: bool = True,
+    density: str = "balanced",
     director_note: Optional[str] = None,
     shot_techniques: Optional[List[Optional[str]]] = None,
     previous_prompt: Optional[str] = None,
@@ -563,6 +587,10 @@ async def compose_seedance_prompts(
     if arc not in _ARC_TONE_GUIDANCE:
         arc = "runway"
 
+    dens = (density or "balanced").lower().strip()
+    if dens not in DENSITIES:
+        dens = "balanced"
+
     # timed_segments is a single continuous take — beats inside it can be shorter
     # than Seedance's 4s per-job minimum. numbered_shots emits N separate jobs so
     # the 4s minimum applies there.
@@ -599,6 +627,7 @@ async def compose_seedance_prompts(
         n_shots=footer_shots,
         arc_tone=arc,
         silent=bool(silent),
+        density=dens,
         durations=durations,
         time_ranges=time_ranges,
         cameras=cameras,
@@ -679,6 +708,7 @@ async def compose_seedance_prompts(
         "aspect_ratio": ar,
         "arc_tone": arc,
         "film_look": look_id,
+        "density": dens,
         "n_shots": n,
         "footer_shots": footer_shots,
         "total_duration": total,
@@ -688,6 +718,7 @@ async def compose_seedance_prompts(
         "continuation": bool(previous_prompt and previous_prompt.strip()),
         "reference_numbering": numbering,
         "total_references": total_refs,
+        "combined_length": len(combined),
         "model": _GPT_MODEL,
     }
 

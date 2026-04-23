@@ -45,6 +45,7 @@ class ComposeRequest(BaseModel):
     render_mode: str = Field(default="numbered_shots")  # "numbered_shots" | "timed_segments"
     film_look: str = Field(default="arri_alexa")
     silent: bool = Field(default=True)
+    density: str = Field(default="balanced")  # "concise" | "balanced" | "detailed"
     director_note: Optional[str] = Field(default=None, max_length=500)
     shot_techniques: Optional[List[Optional[str]]] = Field(default=None, max_length=MAX_SHOTS)
     previous_prompt: Optional[str] = Field(default=None, max_length=8000)
@@ -85,6 +86,7 @@ async def compose(
             render_mode=body.render_mode,
             film_look=body.film_look,
             silent=body.silent,
+            density=body.density,
             director_note=body.director_note,
             shot_techniques=body.shot_techniques,
             previous_prompt=body.previous_prompt,

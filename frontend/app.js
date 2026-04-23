@@ -2467,6 +2467,7 @@ function toggleStudioModelSelect() {
 
     // Render mode
     const renderBtns = document.querySelectorAll(".sd-render-btn");
+    const densityBtns = document.querySelectorAll(".sd-density-btn");
     const shotTechWrap = document.getElementById("sd-shot-techniques-wrap");
     const shotTechRow = document.getElementById("sd-shot-techniques");
 
@@ -2488,6 +2489,7 @@ function toggleStudioModelSelect() {
     let charItems = [];  // [{url, name, uploading}]
     let locItems = [];
     let currentRenderMode = "numbered_shots";
+    let currentDensity = "balanced";
     let techniques = [];
     let shotTechniques = [];
     let activePickerShot = -1;
@@ -2723,6 +2725,22 @@ function toggleStudioModelSelect() {
         });
     });
 
+    // Density toggle
+    densityBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+            densityBtns.forEach((b) => {
+                b.classList.remove("active");
+                b.firstChild.textContent = b.firstChild.textContent.replace(/^[✓]\s*/, "");
+            });
+            btn.classList.add("active");
+            currentDensity = btn.dataset.density;
+            const label = btn.firstChild;
+            if (!label.textContent.startsWith("✓")) {
+                label.textContent = "✓ " + label.textContent.trim();
+            }
+        });
+    });
+
     function updateRenderVisibility() {
         if (!shotTechWrap) return;
         // Shot techniques only for numbered_shots mode
@@ -2836,13 +2854,24 @@ function toggleStudioModelSelect() {
         }
 
         // Combined prompt card (most useful — one-click copy)
+        const chars = (meta.combined_length != null) ? meta.combined_length : (data.combined_prompt || "").length;
+        const tooLongForOpenArt = chars > 2500;
+        const lenColor = tooLongForOpenArt ? "#fbbf24" : (chars > 1800 ? "#fde68a" : "#86efac");
+        const lenLabel = `${chars} karakter`;
+        const openArtHint = tooLongForOpenArt
+            ? `<div style="font-size:11px;color:#fbbf24;margin-top:6px;line-height:1.5">⚠️ OpenArt ~2500 karakter üstünü reddediyor. <b>Kısa (öz)</b> yoğunluğunu deneyin.</div>`
+            : "";
         parts.push(`
           <div style="background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:12px;margin-bottom:12px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
               <div style="font-size:11px;font-weight:700;color:#fdba74;text-transform:uppercase;letter-spacing:0.5px">📦 Tam Prompt (Seedance'a yapıştır)</div>
-              <button class="wizard-btn-ghost sd-copy-combined-inner" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:11px;color:${lenColor};font-family:ui-monospace,Menlo,Consolas,monospace">${lenLabel}</span>
+                <button class="wizard-btn-ghost sd-copy-combined-inner" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
+              </div>
             </div>
             <pre style="font-size:12px;line-height:1.5;color:#e5e7eb;white-space:pre-wrap;word-break:break-word;margin:0;font-family:ui-monospace,Menlo,Consolas,monospace">${escapeHtml(data.combined_prompt)}</pre>
+            ${openArtHint}
           </div>
         `);
 
@@ -2916,6 +2945,7 @@ function toggleStudioModelSelect() {
             render_mode: currentRenderMode,
             film_look: filmLookSel.value,
             silent: !!silentChk.checked,
+            density: currentDensity,
             director_note: dirNoteInput.value.trim() || null,
         };
 
