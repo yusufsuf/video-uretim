@@ -32,6 +32,7 @@ import base64
 import json
 import logging
 import random
+import re
 from typing import List, Optional
 
 import httpx
@@ -201,6 +202,22 @@ def _assign_cameras(n: int, arc_tone: str) -> List[str]:
     return chosen
 
 
+_LENS_RE = re.compile(r"(\d{2,3})\s*mm", re.IGNORECASE)
+
+
+def _camera_lens_mm(camera_id: str) -> Optional[int]:
+    """Extract the mm focal length from a technique's en_camera string.
+
+    Returns None if the camera_id is not in the library or no mm number is
+    present. Used for rule-13 lens-jump detection between adjacent shots.
+    """
+    tech = get_technique(camera_id)
+    if not tech:
+        return None
+    match = _LENS_RE.search(tech.get("en_camera", "") or "")
+    return int(match.group(1)) if match else None
+
+
 def _resolve_shot_cameras(
     n: int,
     arc_tone: str,
@@ -322,6 +339,49 @@ CRITICAL RULES (apply to every mode)
      if the frame is indoor studio; don't write "red dress" if it's black).
    - Element @tags still apply for identity — do not re-describe the element
      itself, just how it reacts to motion and light as seen in the frame.
+
+10. SCENE-ABSOLUTE LIGHTING (CRITICAL for rotating / moving cameras)
+    Lighting angles must describe where the light is relative to the SUBJECT /
+    SCENE, NOT relative to the camera. The sun, practicals, and windows do not
+    move when the camera moves.
+    - Prefer scene-anchored phrasing: "warm key from the wall-side of the scene",
+      "key on the subject's left shoulder at 45°", "backlight from the open doorway",
+      "sky fill from above-left of the subject".
+    - AVOID: "warm key from camera left" during orbits, 3/4 turns, whip pans,
+      side-tracking, or any shot where the camera traverses more than ~30°.
+    - For a full orbit / three_quarter_turn, EXPLICITLY note how the light role
+      evolves during the arc: "key begins as side-light on the left cheek, rolls
+      through as a rim along the shoulder at the 90° point, then settles as a
+      soft hair-light when the subject faces screen-right." This is physics; Kling
+      rewards it.
+
+11. PER-SHOT LIGHTING VARIATION
+    Environmental consistency (same time of day, same palette, same light sources)
+    is preserved across all shots, but the lighting DESCRIPTION per shot must
+    reflect that shot's motion and framing. Do NOT copy the same lighting
+    sentence verbatim across shots.
+    - Push-in to face → eye-light catches, subtle catchlight in iris.
+    - Orbit → key becomes rim, then hair-light, then fill.
+    - Descending follow → key angle steepens, ground shadow stretches.
+    - Dolly-in to macro → contrast compresses, texture micro-shadows emerge.
+    - Back walk / pull-out → key compresses into silhouette, rim separates the
+      figure from background.
+
+12. CLOSER / BACK-WALK TECHNIQUE PLACEMENT
+    The techniques final_back_walk, ascending_pull_back, dolly_out are natural
+    SEQUENCE CLOSERS. If one of these is assigned to a NON-LAST shot, do NOT
+    treat it as a finale. Instead, stage a brief back-walk or pull-out that
+    ENDS with a pivot / turn so the subject is re-oriented for the next shot's
+    direction of motion. Example sentence: "…she slows mid-stride, pivots with a
+    grounded weight shift, and faces forward just as the shot ends, setting up
+    the next beat." This keeps the cut narratively continuous.
+
+13. LENS CONTINUITY ACROSS ADJACENT SHOTS
+    A lens jump larger than ~35mm between adjacent shots (e.g., 85mm macro →
+    24mm wide) is jarring. When the assigned shot list forces such a jump,
+    soften the cut: either end the tighter shot on a small pull-out reveal, or
+    begin the wider shot with a brief locked hold before movement starts. This
+    lets Kling interpolate a clean transition.
 """
 
 _MODE_RULES_CUSTOM = """\
@@ -385,20 +445,38 @@ def _build_user_message_custom(
     tag_line = ", ".join(f"@{t}" for t in element_tags) if element_tags else "(no elements — write generic fashion scene)"
     arc_guidance = _ARC_TONE_GUIDANCE.get(arc_tone, _ARC_TONE_GUIDANCE["runway"])
 
+    closer_ids = {"final_back_walk", "ascending_pull_back", "dolly_out"}
+    total_shots = len(durations)
     shot_lines = []
     for i, (tr, dur, cam) in enumerate(zip(time_ranges, durations, cameras), 1):
         tech = get_technique(cam)
+        is_closer_nonfinal = cam in closer_ids and i != total_shots
+        flag = " [CLOSER AT NON-FINAL SLOT → apply rule 12: end with pivot/turn to re-orient for next shot]" if is_closer_nonfinal else ""
         if tech:
-            # User-picked technique from library — pass the full English instruction.
             shot_lines.append(
                 f'  - shot_no={i}, time_range="{tr}", duration={dur}, camera_type="{cam}", '
-                f'camera_instruction="{tech["en_camera"]}"'
+                f'camera_instruction="{tech["en_camera"]}"{flag}'
             )
         else:
             shot_lines.append(
-                f'  - shot_no={i}, time_range="{tr}", duration={dur}, camera_type="{cam}"'
+                f'  - shot_no={i}, time_range="{tr}", duration={dur}, camera_type="{cam}"{flag}'
             )
+
+    # Lens-jump warnings (rule 13): detect adjacent lens jumps > 35mm
+    lens_jumps = []
+    lenses = [_camera_lens_mm(cam) for cam in cameras]
+    for i in range(1, len(lenses)):
+        prev_mm, cur_mm = lenses[i - 1], lenses[i]
+        if prev_mm and cur_mm and abs(cur_mm - prev_mm) > 35:
+            lens_jumps.append((i, i + 1, prev_mm, cur_mm))
+
     shot_block = "\n".join(shot_lines)
+    if lens_jumps:
+        jump_lines = "\n".join(
+            f"  - shots {a}→{b}: {pm}mm → {cm}mm (apply rule 13: soften the cut)"
+            for a, b, pm, cm in lens_jumps
+        )
+        shot_block += "\n\nLENS JUMPS DETECTED:\n" + jump_lines
 
     parts = []
     if previous_prompt and previous_prompt.strip():
