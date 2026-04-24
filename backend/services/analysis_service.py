@@ -107,7 +107,7 @@ async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> Dre
         label += "."
 
     response = await client.chat.completions.create(
-        model="gpt-5.4",
+        model="gpt-5.5",
         messages=[
             {"role": "system", "content": ANALYSIS_SYSTEM},
             {
@@ -353,7 +353,7 @@ async def generate_multi_scene_prompt(
         })
 
     response = await client.chat.completions.create(
-        model="gpt-5.4",
+        model="gpt-5.5",
         messages=[
             {"role": "system", "content": MULTI_SCENE_SYSTEM},
             {"role": "user", "content": content_parts},
@@ -972,7 +972,7 @@ async def generate_defile_multishot_prompt(
         )
 
     response = await client.chat.completions.create(
-        model="gpt-5.4",
+        model="gpt-5.5",
         messages=[
             {"role": "system", "content": _DEFILE_MULTISHOT_SYSTEM},
             {
@@ -1153,7 +1153,7 @@ async def generate_workflow_multishot_prompt(
     user_text = "\n".join(user_text_parts)
 
     response = await client.chat.completions.create(
-        model="gpt-5.4",
+        model="gpt-5.5",
         messages=[
             {"role": "system", "content": _WORKFLOW_MULTISHOT_SYSTEM},
             {
@@ -1317,7 +1317,7 @@ async def generate_custom_multishot_prompt(
     content.append({"type": "text", "text": user_text})
 
     response = await client.chat.completions.create(
-        model="gpt-5.4",
+        model="gpt-5.5",
         messages=[
             {"role": "system", "content": _CUSTOM_MULTISHOT_SYSTEM},
             {
@@ -1452,7 +1452,7 @@ async def generate_ozel_multishot_prompt(
     content.append({"type": "text", "text": user_text})
 
     response = await client.chat.completions.create(
-        model="gpt-5.4",
+        model="gpt-5.5",
         messages=[
             {"role": "system", "content": _OZEL_MULTISHOT_SYSTEM},
             {"role": "user", "content": content},
@@ -1506,7 +1506,7 @@ async def extract_scene_anchor(start_frame_url: str) -> str:
     """Start frame görselinden kısa bir sahne tanımı çıkar (Stüdyo modu için)."""
     try:
         resp = await client.chat.completions.create(
-            model="gpt-5.4",
+            model="gpt-5.5",
             messages=[{
                 "role": "user",
                 "content": [
@@ -1593,7 +1593,7 @@ async def generate_studio_ai_shots(
 
     try:
         resp = await client.chat.completions.create(
-            model="gpt-5.4",
+            model="gpt-5.5",
             messages=[
                 {
                     "role": "system",
@@ -1647,7 +1647,7 @@ async def translate_garment_description(user_description: str) -> str:
     )
     try:
         resp = await client.chat.completions.create(
-            model="gpt-5.4",
+            model="gpt-5.5",
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_description.strip()},
@@ -1701,7 +1701,7 @@ async def translate_studio_shot_description(
     )
     try:
         resp = await client.chat.completions.create(
-            model="gpt-5.4",
+            model="gpt-5.5",
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_msg},
@@ -1768,7 +1768,7 @@ Return a JSON object:
 
     try:
         resp = await client.chat.completions.create(
-            model="gpt-5.4",
+            model="gpt-5.5",
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_msg},
@@ -1844,7 +1844,7 @@ async def analyse_garment_slits(
 
     try:
         resp = await client.chat.completions.create(
-            model="gpt-5.4",
+            model="gpt-5.5",
             messages=[{"role": "user", "content": image_blocks}],
             response_format={"type": "json_object"},
             max_completion_tokens=200,
@@ -1893,7 +1893,7 @@ async def validate_element_alignment(image_urls: list[str]) -> dict:
 
     try:
         resp = await client.chat.completions.create(
-            model="gpt-5.4",
+            model="gpt-5.5",
             messages=[{"role": "user", "content": image_blocks}],
             response_format={"type": "json_object"},
             max_completion_tokens=200,
@@ -1932,7 +1932,7 @@ async def describe_element_image(image_bytes: bytes, mime: str = "image/jpeg") -
     )
     try:
         resp = await client.chat.completions.create(
-            model="gpt-5.4",
+            model="gpt-5.5",
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": [

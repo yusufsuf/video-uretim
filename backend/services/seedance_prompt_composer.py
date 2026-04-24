@@ -83,7 +83,7 @@ _DENSITY_GUIDANCE = {
     ),
 }
 
-_GPT_MODEL = "gpt-5.4"
+_GPT_MODEL = "gpt-5.5"
 
 
 FILM_LOOKS: dict[str, dict] = {

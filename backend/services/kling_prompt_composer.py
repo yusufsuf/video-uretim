@@ -57,7 +57,7 @@ MIN_SHOT_DURATION = 3
 MAX_SHOT_DURATION = 15
 
 # OpenAI model — latest ChatGPT for maximum prompt quality (project-wide standard).
-_GPT_MODEL = "gpt-5.4"
+_GPT_MODEL = "gpt-5.5"
 
 # Supported Kling UI modes
 MODES = ("multi_shot", "custom_multi_shot")
