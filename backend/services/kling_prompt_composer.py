@@ -47,12 +47,14 @@ client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
 
 # Kling / fashion hard limits
+# Kling 3.0 Omni API hard-caps total duration at 15s (see kling_service.generate_omni_video);
+# single-shot mode can use the full 15s, multi-shot splits it.
 MIN_SHOTS = 1
 MAX_SHOTS = 6          # Kling native multishot cap
 MIN_TOTAL_DURATION = 3
-MAX_TOTAL_DURATION = 60
-MIN_SHOT_DURATION = 3  # Kling minimum
-MAX_SHOT_DURATION = 10 # Kling maximum per shot
+MAX_TOTAL_DURATION = 15
+MIN_SHOT_DURATION = 3
+MAX_SHOT_DURATION = 15
 
 # OpenAI model — latest ChatGPT for maximum prompt quality (project-wide standard).
 _GPT_MODEL = "gpt-5.4"
@@ -382,6 +384,44 @@ CRITICAL RULES (apply to every mode)
     soften the cut: either end the tighter shot on a small pull-out reveal, or
     begin the wider shot with a brief locked hold before movement starts. This
     lets Kling interpolate a clean transition.
+
+14. FACE + IDENTITY REALISM (ALWAYS)
+    Describe faces only by what is VISIBLE in the start frame or carried via the
+    @element. DO NOT invent cosmetic changes, age shifts, makeup swaps, or
+    facial restructuring across shots. Across every shot: eye shape, nose line,
+    jaw structure, hairline, and body proportions remain IDENTICAL. Skin is
+    natural, not polished. Avoid "glowing", "flawless", "airbrushed" — write
+    "natural skin with fine pores and subtle sheen, eye catchlight, tiny
+    asymmetries preserved" when skin needs description at all.
+"""
+
+
+_STRUCTURED_GARMENT_OVERRIDE = """\
+STRUCTURED GARMENT MODE (override Rule 3 for this sequence)
+The subject's garment is haute couture — rigid, architectural, sculpted, heavy.
+Fabric DOES NOT flutter, sway, ripple, or flow. The silhouette HOLDS its shape.
+
+MANDATORY phrasing swaps:
+  - Replace any "hem flutters / sways / catches breeze" with
+      "hemline holds its architectural line, no sway"
+  - Replace any "fabric ripples / flows / glides" with
+      "fabric retains its sculpted surface, no wave, no ripple"
+  - Replace any "skirt swings / fans out" with
+      "skirt silhouette stays static, garment moves as one body with the subject"
+  - Replace any "silk catches the light on the turn" with
+      "the matte surface turns slowly with the subject, reflecting light cleanly"
+
+Walk discipline:
+  - Keep gait physics (heel-first landing, weight transfer, arms loose) BUT
+    the garment MOVES AS ONE BODY with the torso — hip/shoulder micro-shift
+    only, no cloth flapping, no wind effect.
+
+EVEN INSIDE resort / bridal / fantasy_dream / retro_70s arcs, the fabric
+stays RIGID. Those arcs still govern lighting/mood, but NOT fabric motion.
+
+BANNED WORDS (do not appear anywhere in any shot): flutters, flapping, sways,
+swings, ripples, billows, flows, drapes loosely, catches wind, wind-blown,
+chiffon-like, silk flutter, cloth flapping.
 """
 
 _MODE_RULES_CUSTOM = """\
@@ -579,6 +619,7 @@ async def compose_kling_prompts(
     mode: str = "custom_multi_shot",
     shot_techniques: Optional[List[Optional[str]]] = None,
     previous_prompt: Optional[str] = None,
+    structured_garment: bool = False,
 ) -> dict:
     """Compose Kling 3.0 Omni prompts from a start frame image.
 
@@ -622,6 +663,9 @@ async def compose_kling_prompts(
         )
         system_msg = _SYSTEM_PROMPT_BASE + "\n" + _MODE_RULES_MULTI
 
+    if structured_garment:
+        system_msg += "\n" + _STRUCTURED_GARMENT_OVERRIDE
+
     try:
         image_data_uri = await _fetch_image_as_data_uri(start_frame_url)
     except Exception as e:
@@ -657,7 +701,20 @@ async def compose_kling_prompts(
 
     neg = (data.get("negative_prompt") or "").strip()
     if not neg:
-        neg = "sliding feet, morphing fabric, extra fingers, changing outfit, plastic skin"
+        # Base fallback — face-identity + hand-fix + fabric anti-morph
+        neg = (
+            "plastic skin, morphing face, shifting facial features, doll-like features, "
+            "changing outfit, extra fingers, sliding feet, AI-smooth skin"
+        )
+
+    if structured_garment:
+        # Strengthen negative with fabric-rigidity enforcers; append only if not already there.
+        rigid_terms = (
+            "flapping hem, flowing fabric, swaying skirt, wind-blown garment, "
+            "rippling drape, chiffon flutter, cloth flapping"
+        )
+        if "flapping" not in neg.lower() and "swaying" not in neg.lower():
+            neg = (neg + ", " + rigid_terms).strip(", ")
 
     meta = {
         "mode": m,
@@ -667,6 +724,7 @@ async def compose_kling_prompts(
         "element_tags": tags,
         "start_frame_url": start_frame_url,
         "continuation": bool(previous_prompt and previous_prompt.strip()),
+        "structured_garment": bool(structured_garment),
         "model": _GPT_MODEL,
     }
 

@@ -703,8 +703,8 @@
                     </div>
                     <div>
                         <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px">Toplam süre (sn)</label>
-                        <input type="number" id="kp-total-duration" class="form-input" min="3" max="60" step="1" value="10" placeholder="örn. 10" style="margin-top:4px">
-                        <div style="font-size:11px;color:#6b7280;margin-top:4px">3–60 saniye arası seçilebilir</div>
+                        <input type="number" id="kp-total-duration" class="form-input" min="3" max="15" step="1" value="10" placeholder="örn. 10" style="margin-top:4px">
+                        <div style="font-size:11px;color:#6b7280;margin-top:4px">3–15 sn (Kling 3.0 Omni sınırı)</div>
                     </div>
                 </div>
 
@@ -751,8 +751,13 @@
                 <textarea id="kp-director-note" class="form-input" rows="2" placeholder="ör: gün batımında denize yakın, sıcak ışık" style="margin-top:4px;resize:vertical"></textarea>
 
                 <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:#d1d5db;cursor:pointer">
+                    <input type="checkbox" id="kp-structured-garment" style="width:14px;height:14px;cursor:pointer">
+                    <span>🧵 Yapılandırılmış kumaş <span style="color:#6b7280;font-size:11px">— haute couture / sert / küt (hem flapping, fabric sway kapatılır)</span></span>
+                </label>
+
+                <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:#d1d5db;cursor:pointer">
                     <input type="checkbox" id="kp-include-negative" style="width:14px;height:14px;cursor:pointer">
-                    <span>Negative prompt da üret <span style="color:#6b7280;font-size:11px">(Kling 3.0 Omni'de alanı yok — eski sürümler için)</span></span>
+                    <span>Negative prompt da üret <span style="color:#6b7280;font-size:11px">(opsiyonel — varsayılan kapalı)</span></span>
                 </label>
 
                 <!-- OUTPUT AREA -->
@@ -994,6 +999,48 @@
         </div>
     </div>
 
+    <!-- Kling Generate — Element Eşleme Modal -->
+    <div class="studio-create-overlay" id="kling-generate-modal" style="display:none">
+        <div class="studio-create-panel" style="max-width:560px">
+            <div class="studio-create-header">
+                <span class="studio-create-title">🎬 Kling'de Üret — Element Eşleme</span>
+                <button class="wizard-close" id="kling-generate-close">✕</button>
+            </div>
+            <div class="studio-create-body">
+                <div style="font-size:12px;color:#9aa0a6;margin-bottom:12px;line-height:1.5">
+                    Prompt'taki her <code style="background:rgba(99,102,241,0.15);padding:1px 6px;border-radius:4px">@tag</code> için library'nizdeki element'i seçin. Video 3-15 saniye içinde Kling 3.0 Omni ile üretilir.
+                </div>
+
+                <div id="kg-bindings" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px"></div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+                    <div>
+                        <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px">Aspect ratio</label>
+                        <select id="kg-aspect" class="form-input" style="margin-top:4px">
+                            <option value="9:16" selected>9:16 (dikey)</option>
+                            <option value="16:9">16:9 (yatay)</option>
+                            <option value="1:1">1:1 (kare)</option>
+                            <option value="3:4">3:4</option>
+                            <option value="4:3">4:3</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;align-items:flex-end">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#d1d5db;cursor:pointer">
+                            <input type="checkbox" id="kg-include-negative" style="width:14px;height:14px;cursor:pointer">
+                            <span>Negative prompt'u aktif et</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="kg-status" style="margin-top:12px;display:none;padding:10px 12px;border-radius:8px;font-size:12px;line-height:1.5"></div>
+                <div id="kg-error" style="margin-top:12px;display:none;padding:10px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#fca5a5;font-size:12px"></div>
+            </div>
+            <div class="studio-create-footer" style="display:flex;gap:10px;align-items:center">
+                <button id="kg-submit-btn" class="wizard-btn-primary" style="flex:1;background:linear-gradient(135deg,#6366f1,#8b5cf6)">🎬 Şimdi Üret</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Kling Technique Picker Overlay -->
     <div id="kp-tech-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;align-items:center;justify-content:center;padding:20px">
         <div style="background:#111827;border:1px solid rgba(99,102,241,0.3);border-radius:12px;max-width:720px;width:100%;max-height:85vh;display:flex;flex-direction:column">
@@ -1011,7 +1058,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=34"></script>
+    <script src="app.js?v=36"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');

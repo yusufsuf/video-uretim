@@ -1924,6 +1924,7 @@ function toggleStudioModelSelect() {
     const arcSel = document.getElementById("kp-arc-tone");
     const noteInput = document.getElementById("kp-director-note");
     const includeNegChk = document.getElementById("kp-include-negative");
+    const structuredGarmentChk = document.getElementById("kp-structured-garment");
     const sfZone = document.getElementById("kp-start-frame-zone");
     const sfInput = document.getElementById("kp-start-frame-input");
     const sfLabel = document.getElementById("kp-start-frame-label");
@@ -2158,6 +2159,7 @@ function toggleStudioModelSelect() {
             `);
         });
         if (includeNeg) parts.push(negativeCardHtml(data.negative_prompt));
+        parts.push(generateButtonHtml());
         output.innerHTML = parts.join("");
         output.style.display = "block";
 
@@ -2171,6 +2173,10 @@ function toggleStudioModelSelect() {
         output.querySelector(".kp-copy-neg")?.addEventListener("click", (e) => {
             copyText(data.negative_prompt, e.currentTarget);
         });
+        wireGenerateButton(output, () => ({
+            shots: data.shots.map((s) => ({ prompt: s.prompt, duration: s.duration })),
+            negative_prompt: includeNeg ? data.negative_prompt : null,
+        }));
 
         copyAllBtn.style.display = "inline-flex";
         copyAllBtn.onclick = () => {
@@ -2192,11 +2198,21 @@ function toggleStudioModelSelect() {
           </div>
         `;
         if (includeNeg) html += negativeCardHtml(data.negative_prompt);
+        html += generateButtonHtml();
         output.innerHTML = html;
         output.style.display = "block";
 
         output.querySelector(".kp-copy-main")?.addEventListener("click", (e) => copyText(data.prompt, e.currentTarget));
         output.querySelector(".kp-copy-neg")?.addEventListener("click", (e) => copyText(data.negative_prompt, e.currentTarget));
+
+        // In multi_shot mode Kling auto-cuts but our bridge still needs a
+        // shots[] array; wrap the single paragraph as one shot whose duration
+        // equals total_duration (from the form input).
+        const totalDur = parseInt(totalDurInput.value, 10) || 10;
+        wireGenerateButton(output, () => ({
+            shots: [{ prompt: data.prompt, duration: totalDur }],
+            negative_prompt: includeNeg ? data.negative_prompt : null,
+        }));
 
         copyAllBtn.style.display = "inline-flex";
         copyAllBtn.onclick = () => {
@@ -2204,6 +2220,33 @@ function toggleStudioModelSelect() {
             if (includeNeg) all += `\n\nNegative Prompt:\n${data.negative_prompt}`;
             copyText(all, copyAllBtn);
         };
+    }
+
+    function generateButtonHtml() {
+        return `
+          <button class="wizard-btn-primary kp-generate-video-btn" style="margin-top:8px;width:100%;background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:12px;font-size:13px;font-weight:600">
+            🎬 Kling'de Üret (3-15 sn video)
+          </button>
+        `;
+    }
+
+    function wireGenerateButton(container, payloadProvider) {
+        const btn = container.querySelector(".kp-generate-video-btn");
+        if (!btn) return;
+        btn.addEventListener("click", () => {
+            if (!startFrameUrl) {
+                showError("Başlangıç karesi yüklü olmalı — önce prompt üretin.");
+                return;
+            }
+            const tags = tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean);
+            const payload = payloadProvider();
+            window.__klingGenerateOpen?.({
+                start_frame_url: startFrameUrl,
+                shots: payload.shots,
+                negative_prompt: payload.negative_prompt,
+                tags,
+            });
+        });
     }
 
     function escapeHtml(s) {
@@ -2225,8 +2268,8 @@ function toggleStudioModelSelect() {
         }
 
         const totalDur = parseInt(totalDurInput.value, 10);
-        if (!Number.isFinite(totalDur) || totalDur < 3 || totalDur > 60) {
-            showError("Toplam süre 3-60 saniye arasında olmalı.");
+        if (!Number.isFinite(totalDur) || totalDur < 3 || totalDur > 15) {
+            showError("Toplam süre 3-15 saniye arasında olmalı (Kling 3.0 Omni sınırı).");
             return;
         }
 
@@ -2240,6 +2283,7 @@ function toggleStudioModelSelect() {
             arc_tone: arcSel.value,
             mode: currentMode,
             director_note: noteInput.value.trim() || null,
+            structured_garment: !!structuredGarmentChk?.checked,
         };
 
         if (currentMode === "custom_multi_shot") {
@@ -2982,4 +3026,187 @@ function toggleStudioModelSelect() {
             generateBtn.textContent = origText;
         }
     });
+})();
+
+// ─── Kling "Şimdi Üret" — Element Eşleme Modal ─────────────────────────────
+(function () {
+    const modal = document.getElementById("kling-generate-modal");
+    if (!modal) return;
+
+    const closeBtn = document.getElementById("kling-generate-close");
+    const submitBtn = document.getElementById("kg-submit-btn");
+    const bindingsEl = document.getElementById("kg-bindings");
+    const aspectSel = document.getElementById("kg-aspect");
+    const includeNegChk = document.getElementById("kg-include-negative");
+    const statusEl = document.getElementById("kg-status");
+    const errorEl = document.getElementById("kg-error");
+
+    let currentContext = null;   // {start_frame_url, shots, negative_prompt, tags}
+    let bindableItems = [];      // library items with kling_element_id
+
+    function escapeHtml(s) {
+        return (s || "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+    function showError(msg) {
+        errorEl.textContent = msg;
+        errorEl.style.display = "block";
+    }
+    function clearError() {
+        errorEl.style.display = "none";
+    }
+    function showStatus(msg, tone) {
+        statusEl.textContent = msg;
+        const bg = tone === "ok" ? "rgba(34,197,94,0.1)" : (tone === "warn" ? "rgba(251,191,36,0.1)" : "rgba(99,102,241,0.1)");
+        const bd = tone === "ok" ? "rgba(34,197,94,0.3)" : (tone === "warn" ? "rgba(251,191,36,0.3)" : "rgba(99,102,241,0.3)");
+        const fg = tone === "ok" ? "#86efac" : (tone === "warn" ? "#fcd34d" : "#c7d2fe");
+        statusEl.style.background = bg;
+        statusEl.style.border = `1px solid ${bd}`;
+        statusEl.style.color = fg;
+        statusEl.style.display = "block";
+    }
+
+    async function loadBindableItems() {
+        const resp = await fetch("/api/kling-prompt/bindable-items", { headers: getAuthHeaders() });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        bindableItems = data.items || [];
+    }
+
+    function renderBindings() {
+        bindingsEl.innerHTML = "";
+        const tags = currentContext.tags || [];
+        if (tags.length === 0) {
+            bindingsEl.innerHTML = `<div style="font-size:12px;color:#9aa0a6;padding:10px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:8px">Prompt'ta element tag'i yok — video element binding olmadan üretilecek.</div>`;
+            return;
+        }
+        tags.forEach((tag) => {
+            const row = document.createElement("div");
+            row.style.cssText = "display:flex;align-items:center;gap:10px;padding:10px;background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.2);border-radius:8px";
+            const label = document.createElement("code");
+            label.textContent = "@" + tag;
+            label.style.cssText = "background:rgba(99,102,241,0.15);padding:3px 8px;border-radius:4px;font-size:12px;font-weight:700;min-width:80px;text-align:center";
+            row.appendChild(label);
+
+            const select = document.createElement("select");
+            select.className = "form-input kg-binding-select";
+            select.dataset.tag = tag;
+            select.style.cssText = "flex:1;font-size:12px";
+            const empty = document.createElement("option");
+            empty.value = "";
+            empty.textContent = bindableItems.length === 0
+                ? "Library'nizde bağlanabilir element yok — önce library'e element ekleyin"
+                : "— Library'den seç —";
+            select.appendChild(empty);
+            bindableItems.forEach((it) => {
+                const opt = document.createElement("option");
+                opt.value = String(it.kling_element_id);
+                opt.textContent = `${it.name} (${it.category})`;
+                select.appendChild(opt);
+            });
+            row.appendChild(select);
+            bindingsEl.appendChild(row);
+        });
+    }
+
+    window.__klingGenerateOpen = async function (ctx) {
+        currentContext = ctx;
+        modal.style.display = "flex";
+        clearError();
+        statusEl.style.display = "none";
+        bindingsEl.innerHTML = `<div style="font-size:12px;color:#9aa0a6;padding:10px">Library yükleniyor…</div>`;
+        try {
+            await loadBindableItems();
+            renderBindings();
+        } catch (e) {
+            showError("Library yüklenemedi: " + (e.message || e));
+        }
+    };
+
+    function close() {
+        modal.style.display = "none";
+        currentContext = null;
+    }
+    closeBtn?.addEventListener("click", close);
+    modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+
+    submitBtn?.addEventListener("click", async () => {
+        clearError();
+        if (!currentContext) return;
+
+        const tagElementMap = {};
+        const selects = bindingsEl.querySelectorAll(".kg-binding-select");
+        for (const sel of selects) {
+            const tag = sel.dataset.tag;
+            const val = sel.value;
+            if (!val) {
+                showError(`@${tag} için library'den bir element seçmeniz gerekiyor.`);
+                return;
+            }
+            tagElementMap[tag] = parseInt(val, 10);
+        }
+
+        const body = {
+            start_frame_url: currentContext.start_frame_url,
+            shots: currentContext.shots,
+            tag_element_map: tagElementMap,
+            aspect_ratio: aspectSel.value,
+            generate_audio: false,
+        };
+        if (includeNegChk.checked && currentContext.negative_prompt) {
+            body.negative_prompt = currentContext.negative_prompt;
+        }
+
+        const origText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Gönderiliyor…";
+
+        try {
+            const resp = await fetch("/api/kling-prompt/generate", {
+                method: "POST",
+                headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || `HTTP ${resp.status}`);
+            }
+            const job = await resp.json();
+            showStatus(`Video üretiliyor (job: ${job.job_id}) — yaklaşık 3-5 dakika sürer.`, "info");
+            pollJob(job.job_id);
+        } catch (e) {
+            showError("Üretim başlatılamadı: " + (e.message || e));
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = origText;
+        }
+    });
+
+    async function pollJob(jobId) {
+        const maxTries = 200;  // ~10 min at 3s interval
+        let tries = 0;
+        const timer = setInterval(async () => {
+            tries++;
+            try {
+                const resp = await fetch(`/api/status/${jobId}`, { headers: getAuthHeaders() });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const j = await resp.json();
+                if (j.status === "completed") {
+                    clearInterval(timer);
+                    showStatus(`✓ Video hazır! ${j.result_url ? `<a href="${j.result_url}" target="_blank" style="color:#86efac;text-decoration:underline">Aç</a>` : ""}`, "ok");
+                    statusEl.innerHTML = `✓ Video hazır! ${j.result_url ? `<a href="${j.result_url}" target="_blank" style="color:#86efac;text-decoration:underline">Aç</a>` : ""}`;
+                } else if (j.status === "failed") {
+                    clearInterval(timer);
+                    showError("Üretim başarısız: " + (j.message || ""));
+                } else {
+                    showStatus(`⏳ ${j.message || "üretim sürüyor"} — %${j.progress || 0}`, "info");
+                }
+            } catch (e) {
+                // tolerate transient errors
+            }
+            if (tries >= maxTries) {
+                clearInterval(timer);
+                showError("Zaman aşımı — job UI'de görünecek, Galeriden kontrol edin.");
+            }
+        }, 3000);
+    }
 })();
