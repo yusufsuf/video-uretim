@@ -1925,6 +1925,7 @@ function toggleStudioModelSelect() {
     const noteInput = document.getElementById("kp-director-note");
     const includeNegChk = document.getElementById("kp-include-negative");
     const structuredGarmentChk = document.getElementById("kp-structured-garment");
+    const floorLengthChk = document.getElementById("kp-floor-length");
     const sfZone = document.getElementById("kp-start-frame-zone");
     const sfInput = document.getElementById("kp-start-frame-input");
     const sfLabel = document.getElementById("kp-start-frame-label");
@@ -2309,6 +2310,7 @@ function toggleStudioModelSelect() {
             mode: currentMode,
             director_note: noteInput.value.trim() || null,
             structured_garment: !!structuredGarmentChk?.checked,
+            floor_length: !!floorLengthChk?.checked,
         };
 
         if (currentMode === "custom_multi_shot") {

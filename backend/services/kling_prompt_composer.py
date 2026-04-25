@@ -452,6 +452,34 @@ swings, ripples, billows, flows, drapes loosely, catches wind, wind-blown,
 chiffon-like, silk flutter, cloth flapping.
 """
 
+
+_FLOOR_LENGTH_OVERRIDE = """\
+FLOOR-LENGTH GOWN MODE (override garment length descriptions)
+The subject's gown is FLOOR-LENGTH — the hemline reaches the ground in every
+shot. The dress is NEVER ankle-length, midi, knee-length, or above-the-floor.
+
+MANDATORY phrasing:
+  - The hemline rests at floor level, in continuous contact with the surface
+    (paving / floor / ground) throughout the sequence.
+  - Walking shots: "the floor-length hem grazes the paving with each measured
+    step" — the hem skims the surface but does not lift, fan, or expose feet.
+  - Static shots: "the gown extends fully to the floor, the hemline pooling
+    softly against the ground" or "...resting flush against the surface."
+  - Wide / full-body shots: ALWAYS confirm the lower edge of the gown reaches
+    the ground — no visible feet, no exposed shoes, no gap between hem and floor.
+  - Close-up / detail shots focusing on the hem: describe the precise contact
+    line where the fabric meets the floor, the slight train pool if present.
+
+BANNED LENGTH DESCRIPTORS (do NOT appear anywhere): ankle-length, midi,
+mid-calf, calf-length, tea-length, knee-length, above-the-knee, short skirt,
+short dress, exposed feet, exposed shoes, hem above floor, hem above ankle,
+trimmed hem, shorter version, cropped hem, mini.
+
+If this mode is ON together with STRUCTURED GARMENT MODE, both apply: the hem
+is at floor level AND it is sculpted/rigid (no fan, no swirl, no dramatic
+sweep — the hem rests architecturally against the ground).
+"""
+
 _MODE_RULES_CUSTOM = """\
 MODE: CUSTOM MULTI-SHOT
 You will receive a list of shot contracts — one per shot — with shot_no,
@@ -648,6 +676,7 @@ async def compose_kling_prompts(
     shot_techniques: Optional[List[Optional[str]]] = None,
     previous_prompt: Optional[str] = None,
     structured_garment: bool = False,
+    floor_length: bool = False,
 ) -> dict:
     """Compose Kling 3.0 Omni prompts from a start frame image.
 
@@ -694,6 +723,8 @@ async def compose_kling_prompts(
 
     if structured_garment:
         system_msg += "\n" + _STRUCTURED_GARMENT_OVERRIDE
+    if floor_length:
+        system_msg += "\n" + _FLOOR_LENGTH_OVERRIDE
 
     try:
         image_data_uri = await _fetch_image_as_data_uri(start_frame_url)
@@ -744,6 +775,15 @@ async def compose_kling_prompts(
         if "flapping" not in neg.lower() and "swaying" not in neg.lower():
             neg = (neg + ", " + rigid_terms).strip(", ")
 
+    if floor_length:
+        # Anti-short hem terms; only add ones not already present.
+        floor_terms = (
+            "ankle-length, midi, knee-length, calf-length, exposed feet, "
+            "exposed shoes, hem above floor, short skirt, mini"
+        )
+        if "ankle-length" not in neg.lower() and "midi" not in neg.lower():
+            neg = (neg + ", " + floor_terms).strip(", ")
+
     meta = {
         "mode": m,
         "arc_tone": arc,
@@ -753,6 +793,7 @@ async def compose_kling_prompts(
         "start_frame_url": start_frame_url,
         "continuation": bool(previous_prompt and previous_prompt.strip()),
         "structured_garment": bool(structured_garment),
+        "floor_length": bool(floor_length),
         "shot_swaps": shot_swaps,
         "model": _GPT_MODEL,
     }

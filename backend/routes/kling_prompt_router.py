@@ -49,6 +49,7 @@ class ComposeRequest(BaseModel):
     shot_techniques: Optional[List[Optional[str]]] = Field(default=None, max_length=MAX_SHOTS)
     previous_prompt: Optional[str] = Field(default=None, max_length=8000)
     structured_garment: bool = Field(default=False)
+    floor_length: bool = Field(default=False)
 
 
 @router.get("/techniques")
@@ -78,6 +79,7 @@ async def compose(
             shot_techniques=body.shot_techniques,
             previous_prompt=body.previous_prompt,
             structured_garment=body.structured_garment,
+            floor_length=body.floor_length,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
