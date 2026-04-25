@@ -688,7 +688,9 @@ async def compose_kling_prompts(
                 ],
             },
         ],
-        max_completion_tokens=2200,        response_format={"type": "json_object"},
+        max_completion_tokens=6000,
+        reasoning_effort="minimal",
+        response_format={"type": "json_object"},
     )
     raw = resp.choices[0].message.content or ""
     try:
