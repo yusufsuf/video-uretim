@@ -118,9 +118,7 @@ async def analyse_dress(front_path: str, back_path: Optional[str] = None) -> Dre
                 ],
             },
         ],
-        response_format={"type": "json_object"},
-        temperature=0.2,
-        max_completion_tokens=1800,
+        response_format={"type": "json_object"},        max_completion_tokens=1800,
     )
 
     raw = response.choices[0].message.content.strip()
@@ -358,9 +356,7 @@ async def generate_multi_scene_prompt(
             {"role": "system", "content": MULTI_SCENE_SYSTEM},
             {"role": "user", "content": content_parts},
         ],
-        response_format={"type": "json_object"},
-        temperature=0.7,
-        max_completion_tokens=3000,
+        response_format={"type": "json_object"},        max_completion_tokens=3000,
     )
 
     raw = response.choices[0].message.content
@@ -983,9 +979,7 @@ async def generate_defile_multishot_prompt(
                 ],
             },
         ],
-        response_format={"type": "json_object"},
-        temperature=0.75,
-        max_completion_tokens=1200,
+        response_format={"type": "json_object"},        max_completion_tokens=1200,
     )
 
     raw = (response.choices[0].message.content or "").strip()
@@ -1164,9 +1158,7 @@ async def generate_workflow_multishot_prompt(
                 ],
             },
         ],
-        response_format={"type": "json_object"},
-        temperature=0.75,
-        max_completion_tokens=1800,
+        response_format={"type": "json_object"},        max_completion_tokens=1800,
     )
 
     raw = (response.choices[0].message.content or "").strip()
@@ -1325,9 +1317,7 @@ async def generate_custom_multishot_prompt(
                 "content": content,
             },
         ],
-        response_format={"type": "json_object"},
-        temperature=0.7,
-        max_completion_tokens=1500,
+        response_format={"type": "json_object"},        max_completion_tokens=1500,
     )
 
     raw = (response.choices[0].message.content or "").strip()
@@ -1457,9 +1447,7 @@ async def generate_ozel_multishot_prompt(
             {"role": "system", "content": _OZEL_MULTISHOT_SYSTEM},
             {"role": "user", "content": content},
         ],
-        response_format={"type": "json_object"},
-        temperature=0.7,
-        max_completion_tokens=1200,
+        response_format={"type": "json_object"},        max_completion_tokens=1200,
     )
 
     import re as _re
@@ -1609,9 +1597,7 @@ async def generate_studio_ai_shots(
                 {"role": "user", "content": user_content},
             ],
             response_format={"type": "json_object"},
-            max_completion_tokens=700,
-            temperature=0.8,
-        )
+            max_completion_tokens=700,        )
         data = json.loads(resp.choices[0].message.content or "{}")
         shots = data.get("shots", [])
         return [
@@ -1652,9 +1638,7 @@ async def translate_garment_description(user_description: str) -> str:
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_description.strip()},
             ],
-            max_completion_tokens=80,
-            temperature=0.2,
-        )
+            max_completion_tokens=80,        )
         translated = (resp.choices[0].message.content or "").strip()
         # Strip surrounding quotes if any
         if translated and translated[0] in ('"', "'") and translated[-1] in ('"', "'"):
@@ -1706,9 +1690,7 @@ async def translate_studio_shot_description(
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_msg},
             ],
-            max_completion_tokens=160,
-            temperature=0.3,
-        )
+            max_completion_tokens=160,        )
         translated = (resp.choices[0].message.content or "").strip()
         logger.info("Studio shot translated: %s → %s", user_description[:60], translated[:80])  # type: ignore[index]
         return translated if translated else user_description
@@ -1774,9 +1756,7 @@ Return a JSON object:
                 {"role": "user", "content": user_msg},
             ],
             response_format={"type": "json_object"},
-            max_completion_tokens=1200,
-            temperature=0.3,
-        )
+            max_completion_tokens=1200,        )
         raw = (resp.choices[0].message.content or "").strip()
         parsed = json.loads(raw)
         shots = parsed.get("shots") or parsed.get("Shots") or []
@@ -1847,9 +1827,7 @@ async def analyse_garment_slits(
             model="gpt-5.5",
             messages=[{"role": "user", "content": image_blocks}],
             response_format={"type": "json_object"},
-            max_completion_tokens=200,
-            temperature=0,
-        )
+            max_completion_tokens=200,        )
         data = json.loads(resp.choices[0].message.content or "{}")
         constraint = str(data.get("constraint", "")).strip()
         logger.info("Garment slit analysis: %s", constraint)
@@ -1896,9 +1874,7 @@ async def validate_element_alignment(image_urls: list[str]) -> dict:
             model="gpt-5.5",
             messages=[{"role": "user", "content": image_blocks}],
             response_format={"type": "json_object"},
-            max_completion_tokens=200,
-            temperature=0,
-        )
+            max_completion_tokens=200,        )
         data = json.loads(resp.choices[0].message.content or "{}")
         result = {
             "aligned": bool(data.get("aligned", True)),
@@ -1940,9 +1916,7 @@ async def describe_element_image(image_bytes: bytes, mime: str = "image/jpeg") -
                     {"type": "image_url", "image_url": {"url": data_uri, "detail": "high"}},
                 ]},
             ],
-            max_completion_tokens=200,
-            temperature=0.3,
-        )
+            max_completion_tokens=200,        )
         text = (resp.choices[0].message.content or "").strip().strip('"').strip("'")
         return text[:240]
     except Exception as e:
