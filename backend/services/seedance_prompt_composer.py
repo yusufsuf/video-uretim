@@ -32,6 +32,8 @@ from config import settings
 from services.kling_techniques import get_technique
 from services.kling_prompt_composer import (
     _ARC_TONE_GUIDANCE,
+    _FLOOR_LENGTH_OVERRIDE,
+    _STRUCTURED_GARMENT_OVERRIDE,
     _camera_lens_mm,
     _extract_json_object,
     _fetch_image_as_data_uri,
@@ -261,6 +263,16 @@ CRITICAL RULES
 17. LANGUAGE
     English only. Do NOT write Turkish anywhere in the output. No commentary,
     no markdown, no headings — only the JSON object defined below.
+
+18. FACE + IDENTITY REALISM (ALWAYS)
+    Describe faces only by what is VISIBLE in the start frame or carried via
+    the @character references. DO NOT invent cosmetic changes, age shifts,
+    makeup swaps, or facial restructuring across shots/beats. Across every
+    shot: eye shape, nose line, jaw structure, hairline, and body proportions
+    remain IDENTICAL. Skin is natural, not polished. Avoid "glowing",
+    "flawless", "airbrushed" — write "natural skin with fine pores and subtle
+    sheen, eye catchlight, tiny asymmetries preserved" when skin needs
+    description at all.
 """
 
 
@@ -304,6 +316,43 @@ RENDER MODE: timed_segments
 Single continuous take broken into timed beats. Write one "shot" entry per time
 window, but each prompt line starts with "{start}-{end}s: " (e.g., "0-3s: ...",
 "3-6s: ..."). No shot numbers, no cuts — one continuous camera body.
+
+BEAT VARIATION DISCIPLINE (CRITICAL — apply ruthlessly)
+Each timed beat MUST introduce a meaningfully DIFFERENT camera position,
+angle, framing, AND a NEW visual focus from the previous beat. The camera is
+one continuous body but its travel between beats is dramatic, not subtle.
+DO NOT keep the same framing across consecutive beats. DO NOT just adjust
+focal length or push slightly while staying anchored. Each beat is a NEW
+vantage point even though there are no cuts.
+
+Concrete variation menu (pick a different one for each beat — never repeat):
+  - establishing wide / pull-back to reveal architecture
+  - low-angle hero shot (24mm from below, hero silhouette)
+  - high-angle / overhead vantage
+  - tight push-in toward face (eye-line catchlight beat)
+  - macro detail beat on fabric construction or hem-floor contact
+  - 90-180° orbit around subject revealing new side
+  - side-tracking profile, parallel dolly
+  - hem-to-head vertical tilt-up (or head-to-hem tilt-down)
+  - over-the-shoulder from behind into the scene
+  - descending follow / ascending crane reveal
+  - whip-pan reveal landing on subject in new composition
+  - locked static hold while subject shifts inside the frame
+
+EACH beat must reveal a DIFFERENT detail/element of the scene:
+  Beat A: full silhouette + environment context
+  Beat B: garment construction OR fabric texture (close)
+  Beat C: facial expression / eye-line micro-beat
+  Beat D: foot-floor contact, hem-floor contact, or paving texture
+  Beat E: hair micro-motion, secondary motion, environmental light shift
+NO two beats may share the same focal subject. NO beat repeats the prior
+beat's framing or angle.
+
+ANTI-LOCK CHECK before writing each beat:
+  - Is this beat's framing different from the previous one? (must be YES)
+  - Is the camera in a new position (not just lens change)? (must be YES)
+  - Is the visual focus a different element of the scene? (must be YES)
+If any answer is NO, REWRITE the beat with a different vantage point.
 
 The full assembled `combined_prompt`:
   [Asset manifest]
@@ -547,6 +596,8 @@ async def compose_seedance_prompts(
     director_note: Optional[str] = None,
     shot_techniques: Optional[List[Optional[str]]] = None,
     previous_prompt: Optional[str] = None,
+    structured_garment: bool = False,
+    floor_length: bool = False,
 ) -> dict:
     """Compose Seedance 2.0 prompts from three upload buckets.
 
@@ -640,6 +691,10 @@ async def compose_seedance_prompts(
         _SYSTEM_PROMPT_BASE + "\n"
         + (_MODE_RULES_NUMBERED if rm == "numbered_shots" else _MODE_RULES_TIMED)
     )
+    if structured_garment:
+        system_msg += "\n" + _STRUCTURED_GARMENT_OVERRIDE
+    if floor_length:
+        system_msg += "\n" + _FLOOR_LENGTH_OVERRIDE
 
     # ── Start frame vision ──
     try:
@@ -720,6 +775,8 @@ async def compose_seedance_prompts(
         "total_references": total_refs,
         "combined_length": len(combined),
         "shot_swaps": shot_swaps,
+        "structured_garment": bool(structured_garment),
+        "floor_length": bool(floor_length),
         "model": _GPT_MODEL,
     }
 

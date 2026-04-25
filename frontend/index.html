@@ -933,6 +933,16 @@
                 <textarea id="sd-director-note" class="form-input" rows="2" placeholder="ör: gün batımında denize yakın, sıcak ışık" style="margin-top:4px;resize:vertical"></textarea>
 
                 <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:#d1d5db;cursor:pointer">
+                    <input type="checkbox" id="sd-structured-garment" style="width:14px;height:14px;cursor:pointer">
+                    <span>🧵 Yapılandırılmış kumaş <span style="color:#6b7280;font-size:11px">— haute couture / sert / küt (hem flapping, fabric sway kapatılır)</span></span>
+                </label>
+
+                <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:#d1d5db;cursor:pointer">
+                    <input type="checkbox" id="sd-floor-length" style="width:14px;height:14px;cursor:pointer">
+                    <span>👠 Yere sıfır <span style="color:#6b7280;font-size:11px">— elbisenin etek ucu yere değer (ankle/midi/knee-length yasak)</span></span>
+                </label>
+
+                <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:#d1d5db;cursor:pointer">
                     <input type="checkbox" id="sd-silent" checked style="width:14px;height:14px;cursor:pointer">
                     <span>Sessiz video <span style="color:#6b7280;font-size:11px">(fashion standardı — "no music, no audio" eklenir)</span></span>
                 </label>
@@ -1063,7 +1073,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=38"></script>
+    <script src="app.js?v=39"></script>
     <script>
         (function () {
             const btn = document.getElementById('hamburger-btn');

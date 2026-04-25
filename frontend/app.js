@@ -2550,6 +2550,8 @@ function toggleStudioModelSelect() {
     const arcSel = document.getElementById("sd-arc-tone");
     const dirNoteInput = document.getElementById("sd-director-note");
     const silentChk = document.getElementById("sd-silent");
+    const sdStructuredChk = document.getElementById("sd-structured-garment");
+    const sdFloorLengthChk = document.getElementById("sd-floor-length");
     const contToggle = document.getElementById("sd-continuation-toggle");
     const contBox = document.getElementById("sd-continuation-box");
     const prevPromptInput = document.getElementById("sd-previous-prompt");
@@ -3028,6 +3030,8 @@ function toggleStudioModelSelect() {
             render_mode: currentRenderMode,
             film_look: filmLookSel.value,
             silent: !!silentChk.checked,
+            structured_garment: !!sdStructuredChk?.checked,
+            floor_length: !!sdFloorLengthChk?.checked,
             density: currentDensity,
             director_note: dirNoteInput.value.trim() || null,
         };
