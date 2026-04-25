@@ -663,8 +663,7 @@ async def compose_seedance_prompts(
                 ],
             },
         ],
-        max_completion_tokens=6000,
-        reasoning_effort="minimal",
+        max_completion_tokens=8000,
         response_format={"type": "json_object"},
     )
     raw = resp.choices[0].message.content or ""
