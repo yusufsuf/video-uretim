@@ -607,8 +607,9 @@ async def compose_seedance_prompts(
     durations = _distribute_durations(total, n, min_per_segment=min_per_segment)
     time_ranges = _build_time_ranges(durations)
 
+    shot_swaps: list = []
     if rm == "numbered_shots":
-        cameras = _resolve_shot_cameras(n, arc, shot_techniques)
+        cameras, shot_swaps = _resolve_shot_cameras(n, arc, shot_techniques)
     else:
         # timed_segments: one continuous take, a single camera "body" — no per-beat
         # technique assignment. GPT writes a unified camera evolution.
@@ -718,6 +719,7 @@ async def compose_seedance_prompts(
         "reference_numbering": numbering,
         "total_references": total_refs,
         "combined_length": len(combined),
+        "shot_swaps": shot_swaps,
         "model": _GPT_MODEL,
     }
 

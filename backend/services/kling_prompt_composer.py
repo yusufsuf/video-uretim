@@ -220,19 +220,31 @@ def _camera_lens_mm(camera_id: str) -> Optional[int]:
     return int(match.group(1)) if match else None
 
 
+CLOSER_IDS = {"final_back_walk", "ascending_pull_back", "dolly_out"}
+
+
 def _resolve_shot_cameras(
     n: int,
     arc_tone: str,
     shot_techniques: Optional[List[Optional[str]]],
-) -> List[str]:
+) -> tuple[List[str], list]:
     """Merge user-picked technique IDs with auto-assignment.
 
     For shots where the user picked a technique ID (from the kling_techniques
     library), use that ID directly. For None/missing slots, auto-pick from the
     remaining pool while avoiding duplicates against user picks.
+
+    Post-resolution sanity: if a known CLOSER technique (final_back_walk,
+    ascending_pull_back, dolly_out) ends up in a non-last slot, swap it with
+    whatever sits in the last slot — closing techniques narratively belong at
+    the end. Each swap is reported in the returned log so the frontend can
+    surface a notice to the user.
+
+    Returns (cameras_list, swap_log) where swap_log is a list of
+        {"technique": str, "from_slot": int, "to_slot": int, "swapped_with": str}.
     """
     if not shot_techniques:
-        return _assign_cameras(n, arc_tone)
+        return _assign_cameras(n, arc_tone), []
 
     # Normalize
     picks = list(shot_techniques) + [None] * max(0, n - len(shot_techniques))
@@ -259,7 +271,23 @@ def _resolve_shot_cameras(
         else:
             # Fallback — user over-specified duplicates, just pick anything
             out.append(random.choice(_CAMERA_POOL))
-    return out
+
+    # Post-fix: any CLOSER_IDS technique at non-last slot → swap to last.
+    swap_log: list = []
+    if n > 1:
+        for i in range(n - 1):  # iterate non-last slots
+            if out[i] in CLOSER_IDS:
+                last_idx = n - 1
+                swapped_with = out[last_idx]
+                out[i], out[last_idx] = out[last_idx], out[i]
+                swap_log.append({
+                    "technique": out[last_idx],  # the closer (now at the end)
+                    "from_slot": i + 1,
+                    "to_slot": last_idx + 1,
+                    "swapped_with": swapped_with,
+                })
+                # Continue to catch chained closers (rare but possible)
+    return out, swap_log
 
 
 def _build_time_ranges(durations: List[int]) -> List[str]:
@@ -648,10 +676,11 @@ async def compose_kling_prompts(
 
     n, total = _validate_and_clamp(n_shots, total_duration)
 
+    shot_swaps: list = []
     if m == "custom_multi_shot":
         durations = _distribute_durations(total, n)
         time_ranges = _build_time_ranges(durations)
-        cameras = _resolve_shot_cameras(n, arc, shot_techniques)
+        cameras, shot_swaps = _resolve_shot_cameras(n, arc, shot_techniques)
         user_msg = _build_user_message_custom(
             tags, durations, time_ranges, cameras, arc, director_note, previous_prompt,
         )
@@ -724,6 +753,7 @@ async def compose_kling_prompts(
         "start_frame_url": start_frame_url,
         "continuation": bool(previous_prompt and previous_prompt.strip()),
         "structured_garment": bool(structured_garment),
+        "shot_swaps": shot_swaps,
         "model": _GPT_MODEL,
     }
 

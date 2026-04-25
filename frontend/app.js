@@ -2080,12 +2080,17 @@ function toggleStudioModelSelect() {
         }
     }
 
+    const CLOSER_TECH_IDS = new Set(["final_back_walk", "ascending_pull_back", "dolly_out"]);
+
     function openTechniquePicker(shotIdx) {
         activePickerShot = shotIdx;
         techShotIdx.textContent = String(shotIdx + 1);
         techGrid.innerHTML = "";
         const current = shotTechniques[shotIdx];
+        const totalShots = parseInt(nShotsSel.value, 10) || 1;
+        const isLastSlot = shotIdx === totalShots - 1;
         techniques.forEach((t) => {
+            const isCloser = CLOSER_TECH_IDS.has(t.id);
             const card = document.createElement("button");
             card.type = "button";
             const active = t.id === current;
@@ -2093,8 +2098,16 @@ function toggleStudioModelSelect() {
                 (active ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.03)") +
                 ";border:1px solid " + (active ? "rgba(99,102,241,0.6)" : "rgba(255,255,255,0.08)") +
                 ";border-radius:8px;cursor:pointer;transition:all 0.15s;color:#e5e7eb";
-            card.innerHTML = `<div style="font-size:12.5px;font-weight:700;margin-bottom:3px;color:${active ? '#c7d2fe' : '#f3f4f6'}">${escapeHtml(t.tr_label)}</div>` +
-                `<div style="font-size:11px;color:#9aa0a6;line-height:1.45">${escapeHtml(t.tr_desc)}</div>`;
+            const closerBadge = isCloser
+                ? `<span style="display:inline-block;font-size:10px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.35);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle">🏁 Kapanış</span>`
+                : "";
+            const closerHint = (isCloser && !isLastSlot)
+                ? `<div style="font-size:10.5px;color:#fbbf24;margin-top:4px">⚠️ Bu kapanış tekniği — son shot'a otomatik alınır</div>`
+                : "";
+            card.innerHTML =
+                `<div style="font-size:12.5px;font-weight:700;margin-bottom:3px;color:${active ? '#c7d2fe' : '#f3f4f6'}">${escapeHtml(t.tr_label)}${closerBadge}</div>` +
+                `<div style="font-size:11px;color:#9aa0a6;line-height:1.45">${escapeHtml(t.tr_desc)}</div>` +
+                closerHint;
             card.addEventListener("mouseenter", () => {
                 if (!active) card.style.background = "rgba(99,102,241,0.08)";
             });
@@ -2147,6 +2160,18 @@ function toggleStudioModelSelect() {
     function renderCustom(data) {
         const includeNeg = !!includeNegChk?.checked;
         const parts = [];
+        // Auto-swap notice: closer techniques moved to last slot
+        const swaps = (data.meta && data.meta.shot_swaps) || [];
+        if (swaps.length > 0) {
+            const swapLines = swaps.map((sw) =>
+                `&nbsp;&nbsp;• <b>${escapeHtml(sw.technique)}</b> Shot ${sw.from_slot}'den Shot ${sw.to_slot}'e taşındı (yer değiştirdi: <b>${escapeHtml(sw.swapped_with)}</b>)`
+            ).join("<br>");
+            parts.push(`
+              <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#fbbf24;line-height:1.6">
+                ⚠️ <b>Sahne sırası düzeltildi:</b> kapanış tekniği başa düşmüştü, anlatı tutarlılığı için son shot'a alındı.<br>${swapLines}
+              </div>
+            `);
+        }
         data.shots.forEach((s) => {
             parts.push(`
               <div class="kp-shot-card" style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:10px;padding:12px;margin-bottom:10px">
@@ -2836,7 +2861,11 @@ function toggleStudioModelSelect() {
         techShotIdx.textContent = String(shotIdx + 1);
         techGrid.innerHTML = "";
         const current = shotTechniques[shotIdx];
+        const totalShots = parseInt(nShotsSel.value, 10) || 1;
+        const isLastSlot = shotIdx === totalShots - 1;
+        const SD_CLOSER_IDS = new Set(["final_back_walk", "ascending_pull_back", "dolly_out"]);
         techniques.forEach((t) => {
+            const isCloser = SD_CLOSER_IDS.has(t.id);
             const card = document.createElement("button");
             card.type = "button";
             const active = t.id === current;
@@ -2844,8 +2873,16 @@ function toggleStudioModelSelect() {
                 (active ? "rgba(249,115,22,0.18)" : "rgba(255,255,255,0.03)") +
                 ";border:1px solid " + (active ? "rgba(249,115,22,0.6)" : "rgba(255,255,255,0.08)") +
                 ";border-radius:8px;cursor:pointer;transition:all 0.15s;color:#e5e7eb";
-            card.innerHTML = `<div style="font-size:12.5px;font-weight:700;margin-bottom:3px;color:${active ? '#fed7aa' : '#f3f4f6'}">${escapeHtml(t.tr_label)}</div>` +
-                `<div style="font-size:11px;color:#9aa0a6;line-height:1.45">${escapeHtml(t.tr_desc)}</div>`;
+            const closerBadge = isCloser
+                ? `<span style="display:inline-block;font-size:10px;font-weight:700;color:#fbbf24;background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.35);border-radius:4px;padding:1px 6px;margin-left:6px;vertical-align:middle">🏁 Kapanış</span>`
+                : "";
+            const closerHint = (isCloser && !isLastSlot)
+                ? `<div style="font-size:10.5px;color:#fbbf24;margin-top:4px">⚠️ Bu kapanış tekniği — son shot'a otomatik alınır</div>`
+                : "";
+            card.innerHTML =
+                `<div style="font-size:12.5px;font-weight:700;margin-bottom:3px;color:${active ? '#fed7aa' : '#f3f4f6'}">${escapeHtml(t.tr_label)}${closerBadge}</div>` +
+                `<div style="font-size:11px;color:#9aa0a6;line-height:1.45">${escapeHtml(t.tr_desc)}</div>` +
+                closerHint;
             card.addEventListener("click", () => {
                 shotTechniques[shotIdx] = t.id;
                 rebuildShotChips();
