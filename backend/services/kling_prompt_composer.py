@@ -33,7 +33,7 @@ import json
 import logging
 import random
 import re
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import httpx
 from openai import AsyncOpenAI
@@ -480,6 +480,93 @@ is at floor level AND it is sculpted/rigid (no fan, no swirl, no dramatic
 sweep — the hem rests architecturally against the ground).
 """
 
+_FLOOR_LENGTH_OVERRIDE_WITH_SHOES = """\
+FLOOR-LENGTH GOWN MODE — SHOE-VISIBLE VARIANT (override garment length)
+The subject's gown is FLOOR-LENGTH — the hemline rests at the ground at REST,
+NEVER ankle-length / midi / knee-length. BUT the @shoes element is part of
+this look and MUST be glimpsed naturally during motion.
+
+MANDATORY phrasing:
+  - At rest / static shots: "the gown extends fully to the floor, hemline
+    pooling softly against the ground" — feet/shoes covered.
+  - Walking shots: the hem LIFTS A FEW CENTIMETERS off the floor with each
+    stride and the @shoes element is briefly REVEALED at the front of the
+    foot — describe the toe-cap or heel of the @shoes flashing into view as
+    weight transfers, then the hem settling back down.
+  - Back-slit / side-slit reveals: when the camera catches a slit, write the
+    @shoes element clearly visible through the slit — heel and ankle exposed
+    along the slit line.
+  - Wide / full-body shots without motion: hem covers the @shoes (resting at
+    floor level).
+  - Close-up shots on the foot/hem area: describe the precise interaction
+    between the hem and the @shoes — fabric grazing the heel, brushing the
+    counter, partial reveal of the toe.
+  - The shoe is a styling reveal, not a constant exposure: it appears in
+    motion / slit-reveal beats only, then disappears under the hem at rest.
+
+BANNED LENGTH DESCRIPTORS (still apply): ankle-length, midi, mid-calf,
+calf-length, tea-length, knee-length, above-the-knee, short skirt, short
+dress, hem above ankle, trimmed hem, cropped hem, mini.
+
+NOT BANNED in this variant: visible heel during stride, exposed toe through
+hem lift, shoe glimpsed through back slit. These ARE the styling beats.
+
+If this mode is ON together with STRUCTURED GARMENT MODE, both apply: the
+hem is sculpted/rigid AND lifts only minimally (just enough to flash the
+@shoes), then resets to floor contact.
+"""
+
+# Fixed accessory slots — the frontend exposes these as dedicated boxes.
+# Each slot has a Turkish label (for guidance text) and an English noun
+# (used in the system-prompt block to clarify what the @tag refers to).
+_ACCESSORY_SLOTS: Dict[str, Dict[str, str]] = {
+    "shoes":       {"tr": "Ayakkabı",  "en": "footwear"},
+    "jewelry":     {"tr": "Takı",       "en": "jewelry piece"},
+    "bag":         {"tr": "Çanta",      "en": "handbag / clutch"},
+    "accessories": {"tr": "Aksesuar",   "en": "styling accessory"},
+}
+
+
+def _build_accessories_block(accessories: Optional[Dict[str, str]]) -> str:
+    """Render an ACCESSORIES block for the user message.
+
+    Each present key is described as `@<tag> = <kind> (description)`. The
+    description is whatever the user typed in the slot; an empty string means
+    binding-only and the kind alone is shown.
+    """
+    if not accessories:
+        return ""
+    lines = []
+    for key, desc in accessories.items():
+        slot = _ACCESSORY_SLOTS.get(key)
+        if not slot:
+            continue
+        kind = slot["en"]
+        clean_desc = (desc or "").strip()
+        if clean_desc:
+            lines.append(f"  - @{key} → {kind}: {clean_desc}")
+        else:
+            lines.append(f"  - @{key} → {kind} (no extra description; identity comes from the bound element image)")
+    if not lines:
+        return ""
+    return (
+        "ACCESSORIES (named element tags — refer to each by @<tag>; do NOT "
+        "re-describe its color/shape, identity comes from the bound reference):\n"
+        + "\n".join(lines)
+        + "\n\nIntegration rules:\n"
+        "  - Weave the @accessory tags into existing motion/lighting beats — "
+        "do NOT dedicate a beat solely to the accessory unless the shot framing "
+        "naturally lands on it.\n"
+        "  - For @shoes: tie to gait beats (heel-first landing, weight transfer) "
+        "and to any hem-lift / slit-reveal moments.\n"
+        "  - For @bag: tie to hand contact, swing dynamics during walking, or "
+        "rest position when static.\n"
+        "  - For @jewelry: tie to micro-motion of head/neck/wrists and to "
+        "specular catchlight beats (especially close-ups).\n"
+        "  - For @accessories: blend into the closest matching action beat — "
+        "treat it as styling, not narrative focus."
+    )
+
 _MODE_RULES_CUSTOM = """\
 MODE: CUSTOM MULTI-SHOT
 You will receive a list of shot contracts — one per shot — with shot_no,
@@ -537,6 +624,7 @@ def _build_user_message_custom(
     arc_tone: str,
     director_note: Optional[str],
     previous_prompt: Optional[str] = None,
+    accessories: Optional[Dict[str, str]] = None,
 ) -> str:
     tag_line = ", ".join(f"@{t}" for t in element_tags) if element_tags else "(no elements — write generic fashion scene)"
     arc_guidance = _ARC_TONE_GUIDANCE.get(arc_tone, _ARC_TONE_GUIDANCE["runway"])
@@ -594,6 +682,9 @@ def _build_user_message_custom(
         "SHOT CONTRACTS (write one prompt per shot, honor camera_type / camera_instruction exactly):",
         shot_block,
     ])
+    accessory_block = _build_accessories_block(accessories)
+    if accessory_block:
+        parts.append(accessory_block)
     if director_note and director_note.strip():
         parts.append(f"DIRECTOR NOTE (shape the overall narrative around this): {director_note.strip()}")
 
@@ -608,6 +699,7 @@ def _build_user_message_multi(
     arc_tone: str,
     director_note: Optional[str],
     previous_prompt: Optional[str] = None,
+    accessories: Optional[Dict[str, str]] = None,
 ) -> str:
     tag_line = ", ".join(f"@{t}" for t in element_tags) if element_tags else "(no elements — write generic fashion scene)"
     arc_guidance = _ARC_TONE_GUIDANCE.get(arc_tone, _ARC_TONE_GUIDANCE["runway"])
@@ -632,6 +724,9 @@ def _build_user_message_multi(
         f"TOTAL DURATION: {total_duration}s",
         "Pace the beats so they fit the total duration naturally. Do NOT output time stamps or shot numbers.",
     ])
+    accessory_block = _build_accessories_block(accessories)
+    if accessory_block:
+        parts.append(accessory_block)
     if director_note and director_note.strip():
         parts.append(f"DIRECTOR NOTE (shape the overall narrative around this): {director_note.strip()}")
 
@@ -677,6 +772,7 @@ async def compose_kling_prompts(
     previous_prompt: Optional[str] = None,
     structured_garment: bool = False,
     floor_length: bool = False,
+    accessories: Optional[Dict[str, str]] = None,
 ) -> dict:
     """Compose Kling 3.0 Omni prompts from a start frame image.
 
@@ -703,6 +799,17 @@ async def compose_kling_prompts(
     tags = ["".join(ch for ch in t if ch.isalnum() or ch in "-_") for t in tags]
     tags = [t for t in tags if t]
 
+    # Sanitize accessories: drop unknown keys, trim values.
+    clean_accessories: Optional[Dict[str, str]] = None
+    if accessories:
+        clean_accessories = {
+            k: (v or "").strip()
+            for k, v in accessories.items()
+            if k in _ACCESSORY_SLOTS
+        }
+        if not clean_accessories:
+            clean_accessories = None
+
     n, total = _validate_and_clamp(n_shots, total_duration)
 
     shot_swaps: list = []
@@ -712,19 +819,26 @@ async def compose_kling_prompts(
         cameras, shot_swaps = _resolve_shot_cameras(n, arc, shot_techniques)
         user_msg = _build_user_message_custom(
             tags, durations, time_ranges, cameras, arc, director_note, previous_prompt,
+            accessories=clean_accessories,
         )
         system_msg = _SYSTEM_PROMPT_BASE + "\n" + _MODE_RULES_CUSTOM
     else:
         durations, time_ranges, cameras = [], [], []
         user_msg = _build_user_message_multi(
             tags, n, total, arc, director_note, previous_prompt,
+            accessories=clean_accessories,
         )
         system_msg = _SYSTEM_PROMPT_BASE + "\n" + _MODE_RULES_MULTI
 
     if structured_garment:
         system_msg += "\n" + _STRUCTURED_GARMENT_OVERRIDE
     if floor_length:
-        system_msg += "\n" + _FLOOR_LENGTH_OVERRIDE
+        # If user has wired up a @shoes accessory, use the variant that permits
+        # shoe reveals during gait + slit beats; otherwise strict no-shoe rule.
+        if clean_accessories and "shoes" in clean_accessories:
+            system_msg += "\n" + _FLOOR_LENGTH_OVERRIDE_WITH_SHOES
+        else:
+            system_msg += "\n" + _FLOOR_LENGTH_OVERRIDE
 
     try:
         image_data_uri = await _fetch_image_as_data_uri(start_frame_url)
@@ -794,6 +908,7 @@ async def compose_kling_prompts(
         "continuation": bool(previous_prompt and previous_prompt.strip()),
         "structured_garment": bool(structured_garment),
         "floor_length": bool(floor_length),
+        "accessories": clean_accessories or {},
         "shot_swaps": shot_swaps,
         "model": _GPT_MODEL,
     }

@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 class ComposeRequest(BaseModel):
     start_frame_url: str = Field(min_length=5)
-    element_tags: List[str] = Field(default_factory=list, max_length=6)
+    element_tags: List[str] = Field(default_factory=list, max_length=10)
     n_shots: int = Field(ge=MIN_SHOTS, le=MAX_SHOTS)
     total_duration: int = Field(ge=MIN_TOTAL_DURATION, le=MAX_TOTAL_DURATION)
     arc_tone: str = Field(default="runway")
@@ -50,6 +50,11 @@ class ComposeRequest(BaseModel):
     previous_prompt: Optional[str] = Field(default=None, max_length=8000)
     structured_garment: bool = Field(default=False)
     floor_length: bool = Field(default=False)
+    # Fixed-slot accessories: keys ∈ {shoes, jewelry, bag, accessories}.
+    # Presence of a key marks the slot as active (the tag is auto-added to
+    # element_tags client-side). Value is the freetext description shown to GPT
+    # ("" = no description, binding only).
+    accessories: Optional[Dict[str, str]] = Field(default=None)
 
 
 @router.get("/techniques")
@@ -80,6 +85,7 @@ async def compose(
             previous_prompt=body.previous_prompt,
             structured_garment=body.structured_garment,
             floor_length=body.floor_length,
+            accessories=body.accessories,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e

@@ -1950,6 +1950,11 @@ function toggleStudioModelSelect() {
     let techniques = [];  // loaded once from backend
     let shotTechniques = [];  // aligned to n_shots; null = AI picks
     let activePickerShot = -1;
+    let bindableItems = [];  // library items with cached kling_element_id
+    let lastAccessoryBindings = {};  // {shoes: element_id, ...} from latest compose
+
+    const accessorySlotsWrap = document.getElementById("kp-accessory-slots");
+    const accessoryStatusEl = document.getElementById("kp-accessory-bindable-status");
 
     function open() {
         modal.style.display = "flex";
@@ -1957,10 +1962,73 @@ function toggleStudioModelSelect() {
         output.style.display = "none";
         copyAllBtn.style.display = "none";
         loadTechniques();
+        loadBindableItemsForAccessories();
         rebuildShotChips();
         updateTechniqueVisibility();
     }
     function close() { modal.style.display = "none"; }
+
+    async function loadBindableItemsForAccessories() {
+        if (!accessorySlotsWrap) return;
+        try {
+            const resp = await fetch("/api/kling-prompt/bindable-items", { headers: getAuthHeaders() });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            bindableItems = data.items || [];
+        } catch (e) {
+            bindableItems = [];
+            if (accessoryStatusEl) {
+                accessoryStatusEl.textContent = "⚠️ Library yüklenemedi — açıklama yazabilirsiniz ama element bağlama devre dışı.";
+                accessoryStatusEl.style.color = "#fca5a5";
+            }
+            return;
+        }
+        if (accessoryStatusEl) {
+            if (bindableItems.length === 0) {
+                accessoryStatusEl.innerHTML = "ℹ️ Library'nizde bağlanabilir element yok — önce <a href=\"library.html\" target=\"_blank\" style=\"color:#a5b4fc\">Library</a>'e bir aksesuar ekleyin.";
+                accessoryStatusEl.style.color = "#9aa0a6";
+            } else {
+                accessoryStatusEl.textContent = `✓ ${bindableItems.length} bağlanabilir element library'de.`;
+                accessoryStatusEl.style.color = "#86efac";
+            }
+        }
+        // Repopulate every slot's <select> with the latest library items.
+        accessorySlotsWrap.querySelectorAll(".kp-acc-bind").forEach((sel) => {
+            const prev = sel.value;
+            sel.innerHTML = "";
+            const empty = document.createElement("option");
+            empty.value = "";
+            empty.textContent = "— bağlama yok —";
+            sel.appendChild(empty);
+            bindableItems.forEach((it) => {
+                const opt = document.createElement("option");
+                opt.value = String(it.kling_element_id);
+                opt.textContent = `${it.name}${it.category ? " · " + it.category : ""}`;
+                sel.appendChild(opt);
+            });
+            if (prev) sel.value = prev;  // preserve picks across re-loads
+        });
+    }
+
+    function collectAccessories() {
+        // Returns { accessories: {slot: desc}, accessoryTags: [slot...], accessoryBindings: {slot: element_id} }
+        const accessories = {};
+        const accessoryTags = [];
+        const accessoryBindings = {};
+        if (!accessorySlotsWrap) return { accessories, accessoryTags, accessoryBindings };
+        accessorySlotsWrap.querySelectorAll(".kp-acc-row").forEach((row) => {
+            const slot = row.dataset.slot;
+            if (!slot) return;
+            const desc = (row.querySelector(".kp-acc-desc")?.value || "").trim();
+            const bindRaw = row.querySelector(".kp-acc-bind")?.value || "";
+            const bindId = bindRaw ? parseInt(bindRaw, 10) : null;
+            if (!desc && !bindId) return;  // slot is empty → skip
+            accessories[slot] = desc;       // "" allowed (binding-only)
+            accessoryTags.push(slot);
+            if (bindId) accessoryBindings[slot] = bindId;
+        });
+        return { accessories, accessoryTags, accessoryBindings };
+    }
 
     sfZone?.addEventListener("click", (e) => {
         if (e.target === sfInput) return;
@@ -2264,13 +2332,19 @@ function toggleStudioModelSelect() {
                 showError("Başlangıç karesi yüklü olmalı — önce prompt üretin.");
                 return;
             }
-            const tags = tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean);
+            const userTags = tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean);
+            const accessoryTagsNow = Object.keys(lastAccessoryBindings || {});
+            // Merge so generate modal asks for bindings on every active tag.
+            const tagSet = new Set(userTags);
+            accessoryTagsNow.forEach((t) => tagSet.add(t));
+            const tags = Array.from(tagSet);
             const payload = payloadProvider();
             window.__klingGenerateOpen?.({
                 start_frame_url: startFrameUrl,
                 shots: payload.shots,
                 negative_prompt: payload.negative_prompt,
                 tags,
+                pre_bindings: { ...(lastAccessoryBindings || {}) },
             });
         });
     }
@@ -2299,7 +2373,16 @@ function toggleStudioModelSelect() {
             return;
         }
 
-        const tags = tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean);
+        const userTags = tagsInput.value.split(",").map((s) => s.trim()).filter(Boolean);
+        const { accessories, accessoryTags, accessoryBindings } = collectAccessories();
+        // Accessories' fixed slot keys go into element_tags so GPT writes @shoes etc.
+        // De-duplicate against any user-typed tags (e.g. they typed "shoes" themselves).
+        const tagSet = new Set(userTags);
+        accessoryTags.forEach((t) => tagSet.add(t));
+        const tags = Array.from(tagSet);
+        // Stash bindings on the modal scope so the generate handoff can pre-fill them.
+        lastAccessoryBindings = accessoryBindings;
+
         const nShots = parseInt(nShotsSel.value, 10);
         const body = {
             start_frame_url: startFrameUrl,
@@ -2312,6 +2395,9 @@ function toggleStudioModelSelect() {
             structured_garment: !!structuredGarmentChk?.checked,
             floor_length: !!floorLengthChk?.checked,
         };
+        if (Object.keys(accessories).length > 0) {
+            body.accessories = accessories;
+        }
 
         if (currentMode === "custom_multi_shot") {
             const picks = shotTechniques.slice(0, nShots);
@@ -3118,6 +3204,7 @@ function toggleStudioModelSelect() {
     function renderBindings() {
         bindingsEl.innerHTML = "";
         const tags = currentContext.tags || [];
+        const preBindings = currentContext.pre_bindings || {};
         if (tags.length === 0) {
             bindingsEl.innerHTML = `<div style="font-size:12px;color:#9aa0a6;padding:10px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.2);border-radius:8px">Prompt'ta element tag'i yok — video element binding olmadan üretilecek.</div>`;
             return;
@@ -3146,6 +3233,11 @@ function toggleStudioModelSelect() {
                 opt.textContent = `${it.name} (${it.category})`;
                 select.appendChild(opt);
             });
+            // Pre-fill from accessory slot picks if matching element_id exists in library.
+            const preId = preBindings[tag];
+            if (preId && bindableItems.some((it) => it.kling_element_id === preId)) {
+                select.value = String(preId);
+            }
             row.appendChild(select);
             bindingsEl.appendChild(row);
         });

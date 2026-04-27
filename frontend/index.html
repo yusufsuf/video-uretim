@@ -687,7 +687,39 @@
 
                 <label style="font-size:11px;color:#9aa0a6;text-transform:uppercase;letter-spacing:0.5px">Element tag'leri (virgülle ayırın)</label>
                 <input type="text" id="kp-element-tags" class="form-input" placeholder="ör: dress, jacket" style="margin-top:4px">
-                <div style="font-size:11px;color:#6b7280;margin-top:4px">Boş bırakırsanız element-bağsız prompt üretilir.</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:4px">Ana giysi için yazın (örn. <code style="background:rgba(99,102,241,0.15);padding:1px 5px;border-radius:4px">dress</code>). Aksesuarlar aşağıdaki kutulardan eklenir.</div>
+
+                <!-- ACCESSORY SLOTS — fixed @tags: shoes / jewelry / bag / accessories -->
+                <div style="margin-top:14px;padding:12px;border:1px solid rgba(139,92,246,0.25);border-radius:8px;background:rgba(139,92,246,0.04)">
+                    <div style="font-size:11px;color:#c4b5fd;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;margin-bottom:4px">Aksesuar element'leri</div>
+                    <div style="font-size:11px;color:#9aa0a6;margin-bottom:10px;line-height:1.5">
+                        Her kutu otomatik olarak <code style="background:rgba(139,92,246,0.18);padding:1px 5px;border-radius:4px">@shoes / @jewelry / @bag / @accessories</code> tag'i ile prompt'a girer. Açıklama opsiyonel — library'den element seçerseniz video tutarlılığı için Kling Bind Subject'e otomatik bağlanır.
+                    </div>
+                    <div id="kp-accessory-slots" style="display:flex;flex-direction:column;gap:8px">
+                        <!-- Filled by app.js: data-slot ∈ {shoes, jewelry, bag, accessories} -->
+                        <div class="kp-acc-row" data-slot="shoes" style="display:grid;grid-template-columns:110px 1fr 180px;gap:8px;align-items:center">
+                            <div style="font-size:12px;font-weight:600;color:#e5e7eb">👠 Ayakkabı</div>
+                            <input type="text" class="form-input kp-acc-desc" placeholder="ör: kırmızı taban stiletto" style="font-size:12px;padding:7px 9px">
+                            <select class="form-input kp-acc-bind" style="font-size:12px;padding:7px 9px"><option value="">— bağlama yok —</option></select>
+                        </div>
+                        <div class="kp-acc-row" data-slot="jewelry" style="display:grid;grid-template-columns:110px 1fr 180px;gap:8px;align-items:center">
+                            <div style="font-size:12px;font-weight:600;color:#e5e7eb">💎 Takı</div>
+                            <input type="text" class="form-input kp-acc-desc" placeholder="ör: zincir kolye + drop küpe" style="font-size:12px;padding:7px 9px">
+                            <select class="form-input kp-acc-bind" style="font-size:12px;padding:7px 9px"><option value="">— bağlama yok —</option></select>
+                        </div>
+                        <div class="kp-acc-row" data-slot="bag" style="display:grid;grid-template-columns:110px 1fr 180px;gap:8px;align-items:center">
+                            <div style="font-size:12px;font-weight:600;color:#e5e7eb">👜 Çanta</div>
+                            <input type="text" class="form-input kp-acc-desc" placeholder="ör: küçük zincirli klatch" style="font-size:12px;padding:7px 9px">
+                            <select class="form-input kp-acc-bind" style="font-size:12px;padding:7px 9px"><option value="">— bağlama yok —</option></select>
+                        </div>
+                        <div class="kp-acc-row" data-slot="accessories" style="display:grid;grid-template-columns:110px 1fr 180px;gap:8px;align-items:center">
+                            <div style="font-size:12px;font-weight:600;color:#e5e7eb">✨ Aksesuar</div>
+                            <input type="text" class="form-input kp-acc-desc" placeholder="ör: ipek eşarp, geniş kemer" style="font-size:12px;padding:7px 9px">
+                            <select class="form-input kp-acc-bind" style="font-size:12px;padding:7px 9px"><option value="">— bağlama yok —</option></select>
+                        </div>
+                    </div>
+                    <div id="kp-accessory-bindable-status" style="font-size:11px;color:#6b7280;margin-top:8px"></div>
+                </div>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px">
                     <div>
