@@ -1036,11 +1036,24 @@
                     </div>
                 </div>
 
+                <!-- Garment analiz sonucu (Kling element açıklaması) -->
+                <div id="pm-analysis-wrap" style="display:none;margin-top:12px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                        <div style="font-size:11px;color:#a5b4fc;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">🔍 Elbise Analizi (İngilizce — Kling element açıklaması)</div>
+                        <button id="pm-copy-analysis-btn" class="wizard-btn-ghost" style="font-size:11px;padding:4px 10px">📋 Kopyala</button>
+                    </div>
+                    <div style="background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.25);border-radius:10px;padding:12px">
+                        <div id="pm-analysis-text" style="font-size:12.5px;line-height:1.6;color:#e5e7eb;white-space:pre-wrap;font-family:ui-monospace,Menlo,Consolas,monospace"></div>
+                        <div id="pm-analysis-meta" style="font-size:11px;color:#6b7280;margin-top:8px"></div>
+                    </div>
+                </div>
+
                 <div id="pm-error" style="margin-top:14px;display:none;padding:10px 12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:#fca5a5;font-size:12px"></div>
             </div>
-            <div class="studio-create-footer" style="display:flex;gap:10px;align-items:center">
+            <div class="studio-create-footer" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                 <button id="pm-clear-btn" class="wizard-btn-ghost" style="display:none">Temizle</button>
                 <button id="pm-combine-btn" class="wizard-btn-primary" style="flex:1" disabled>Birleştir</button>
+                <button id="pm-analyze-btn" class="wizard-btn-primary" style="display:none;background:linear-gradient(135deg,#6366f1,#8b5cf6)">🔍 Analiz Et</button>
                 <a id="pm-download-btn" class="wizard-btn-ghost" style="display:none;text-decoration:none" download>⬇️ İndir</a>
             </div>
         </div>

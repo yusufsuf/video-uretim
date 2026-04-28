@@ -2455,9 +2455,16 @@ function toggleStudioModelSelect() {
     const resultWrap = document.getElementById("pm-result-wrap");
     const resultImg = document.getElementById("pm-result-img");
     const resultMeta = document.getElementById("pm-result-meta");
+    const analyzeBtn = document.getElementById("pm-analyze-btn");
+    const analysisWrap = document.getElementById("pm-analysis-wrap");
+    const analysisText = document.getElementById("pm-analysis-text");
+    const analysisMeta = document.getElementById("pm-analysis-meta");
+    const copyAnalysisBtn = document.getElementById("pm-copy-analysis-btn");
 
     const MAX = 4;
     let files = [];  // File[] — upload order
+    let lastMontageUrl = null;  // most recent combined image url
+    let lastMontageCount = 0;
 
     function open() {
         modal.style.display = "flex";
@@ -2548,6 +2555,10 @@ function toggleStudioModelSelect() {
         files = [];
         resultWrap.style.display = "none";
         downloadBtn.style.display = "none";
+        if (analyzeBtn) analyzeBtn.style.display = "none";
+        if (analysisWrap) analysisWrap.style.display = "none";
+        lastMontageUrl = null;
+        lastMontageCount = 0;
         clearError();
         renderPreviews();
     });
@@ -2557,6 +2568,10 @@ function toggleStudioModelSelect() {
         clearError();
         resultWrap.style.display = "none";
         downloadBtn.style.display = "none";
+        if (analyzeBtn) analyzeBtn.style.display = "none";
+        if (analysisWrap) analysisWrap.style.display = "none";
+        lastMontageUrl = null;
+        lastMontageCount = 0;
 
         const fd = new FormData();
         files.forEach((f) => fd.append("files", f));
@@ -2580,11 +2595,59 @@ function toggleStudioModelSelect() {
             resultWrap.style.display = "block";
             downloadBtn.href = data.url;
             downloadBtn.style.display = "inline-flex";
+            lastMontageUrl = data.url;
+            lastMontageCount = data.count || files.length;
+            if (analyzeBtn) analyzeBtn.style.display = "inline-flex";
         } catch (e) {
             showError(e.message || "Birleştirme başarısız.");
         } finally {
             combineBtn.disabled = false;
             combineBtn.textContent = origText;
+        }
+    });
+
+    analyzeBtn?.addEventListener("click", async () => {
+        if (!lastMontageUrl) {
+            showError("Önce fotoğrafları birleştirin.");
+            return;
+        }
+        clearError();
+        if (analysisWrap) analysisWrap.style.display = "none";
+        const orig = analyzeBtn.textContent;
+        analyzeBtn.disabled = true;
+        analyzeBtn.textContent = "Analiz ediliyor…";
+        try {
+            const resp = await fetch("/api/photo-montage/analyze-garment", {
+                method: "POST",
+                headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+                body: JSON.stringify({ image_url: lastMontageUrl, n_views: lastMontageCount }),
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || `HTTP ${resp.status}`);
+            }
+            const data = await resp.json();
+            analysisText.textContent = data.description || "";
+            analysisMeta.textContent = `${data.char_count || (data.description || "").length} karakter · model: ${data.model || "?"}`;
+            analysisWrap.style.display = "block";
+        } catch (e) {
+            showError("Analiz başarısız: " + (e.message || e));
+        } finally {
+            analyzeBtn.disabled = false;
+            analyzeBtn.textContent = orig;
+        }
+    });
+
+    copyAnalysisBtn?.addEventListener("click", async () => {
+        const txt = analysisText?.textContent || "";
+        if (!txt) return;
+        try {
+            await navigator.clipboard.writeText(txt);
+            const orig = copyAnalysisBtn.textContent;
+            copyAnalysisBtn.textContent = "✓ Kopyalandı";
+            setTimeout(() => { copyAnalysisBtn.textContent = orig; }, 1400);
+        } catch {
+            showError("Panoya kopyalanamadı.");
         }
     });
 })();
